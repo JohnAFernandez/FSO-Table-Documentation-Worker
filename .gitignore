@@ -12,3 +12,6 @@ Cargo.lock
 
 # MSVC Windows builds of rustc generate these, which store debugging information
 *.pdb
+
+# This is a node.js/rust/wasm framework that works in conjunction with cloudflare
+node_modules/

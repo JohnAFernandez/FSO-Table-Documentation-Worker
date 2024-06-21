@@ -1,0 +1,6 @@
+name = "fso-tables-worker"
+main = "build/worker/shim.mjs"
+compatibility_date = "2024-06-21"
+
+[build]
+command = "cargo install -q worker-build && worker-build --release"
