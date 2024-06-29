@@ -1,8 +1,11 @@
 use axum::
     {
+        http,
         http::StatusCode,
         routing::{get, post, patch, delete},
         Router,
+        response::IntoResponse,
+        response::Response,
     };
 use tower_service::Service;
 use worker::*;
@@ -12,7 +15,7 @@ const USER_LEVEL_OWNER: u8 = 0;
 const USER_LEVEL_ADMIN: u8 = 1; // Able to upgrade other users to a maintainer
 const USER_LEVEL_MAINTAINER: u8 = 2; // Able to make changes to table docs
 const USER_LEVEL_VIEWER: u8 = 3; 
-const DB_NAME: str = "fso-modoption-d1-db";
+const DB_NAME: &str = "fso-modoption-d1-db";
 
 /*#[derive(Serialize, Deserialize)]
 struct PasswordResetRequest {
@@ -24,21 +27,25 @@ struct PasswordResetRequest {
 //  POST, GET, PATCH, and DELETE -- PUTS AND PATCHES are going to be the same.
 
 fn router() -> Router {
-    let db = ctx.env.d1(DB_NAME)?;
-
     Router::new()
     .route("/", get(root))
     .route("/users", get(user_stats_get))       // No Post, put, patch, or delete for overarching category
-    .route("/users/:username", 
+/*    .route("/users/:username", 
         post(user_register_new).get(user_get_details).put(api_insufficent_permissions).patch(api_insufficent_permissions).delete(deactivate_user))
     .route("/users/:username/passwordchange", put(user_change_password).patch(user_change_password).delete(api_insufficent_permissions))    // No post, get or delete for password
     .route("/users/:username/upgrade", put(upgrade_user_permissions).patch(upgrade_user_permissions))
     .route("/users/:username/downgrade", put(downgrade_user_permissions).patch(downgrade_user_permissions))
     .route("/users/:username/email", post(add_email).put(add_email).patch(add_email).delete(api_insufficent_permissions))
-    .route("/users/:username/activateemail/:code", post(confirm_email_address))
+    .route("/users/:username/activateemail/:code", post(confirm_email_address)) */
     .fallback(api_fallback)
 }
 
+#[event(fetch, respond_with_errors)]
+pub async fn main(request: HttpRequest, env: Env, _ctx: Context) -> Result<http::Response<axum::body::Body>> {
+    let db = env.d1(DB_NAME);
+
+    Ok(router().call(request).await?)
+}
 /* 
 user_register_new
 user_get_details
@@ -64,22 +71,26 @@ confirm_email_address
 
  //:id for the taco rocket of doom
 
-#[event(fetch)]
-async fn fetch(
-    req: HttpRequest,
-    _env: Env,
-    _ctx: Context,
-) -> Result<axum::http::Response<axum::body::Body>> {
-    console_error_panic_hook::set_once();
-    Ok(router().call(req).await?)
-}
 
 pub async fn root() -> &'static str {
     "You have accessed the Freespace Open Table Option Databse API.\n\nRoutes are users, tables, items, deprecations, and behaviors."
 }
 
-pub async fn user_stats_get() -> (StatusCode, &'static str) {
-    (StatusCode::NOT_IMPLEMENTED, "API has not been set up to retrieve overall user details")
+pub async fn user_stats_get(env: Env) -> Response {
+    let db = env.d1(DB_NAME).unwrap();
+
+    let query = db.prepare("SELECT COUNT(*) FROM users WHERE active = 1");;
+    let result = query.run().await.unwrap().results::<i32>();
+      
+
+    match &result{
+        Ok(number) => return Response::builder()
+        .status(StatusCode::OK)
+        .body(axum::body::Body::from(number[0].to_string()))
+        .unwrap(),
+	    Err(E) => (StatusCode::OK, E.to_string()).into_response(),
+	}
+
 }
 
 pub async fn deactivate_user() -> (StatusCode, &'static str) {
