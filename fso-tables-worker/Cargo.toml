@@ -3,6 +3,9 @@ name = "fso-tables-worker"
 version = "0.1.0"
 edition = "2021"
 authors = [ "JohnAFernandez <jafernandez.tampabay@gmail.com>" ]
+description = "A cloudflare worker designed to allow the FSO tables to be worked on by any authorized party."
+license = "Unlicense"
+repository = "https://github.com/JohnAFernandez/FSO-Table-Documentation-Worker"
 
 [package.metadata.release]
 release = false
@@ -21,3 +24,5 @@ axum  = { version = "0.7", default-features = false }
 tower-service = "0.3.2"
 console_error_panic_hook = { version = "0.1.1" }
 serde = "1.0.203"
+axum-macros = "0.4.1"
+argon2 = "0.5.3"

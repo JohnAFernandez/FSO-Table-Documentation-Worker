@@ -1,50 +1,35 @@
-use axum::
-    {
-        http,
-        http::StatusCode,
-        routing::{get, post, patch, delete},
-        Router,
-        response::IntoResponse,
-        response::Response,
-    };
-use tower_service::Service;
-use worker::*;
 use serde::{Deserialize, Serialize};
+use worker::*;
 
+/*
 const USER_LEVEL_OWNER: u8 = 0;
 const USER_LEVEL_ADMIN: u8 = 1; // Able to upgrade other users to a maintainer
 const USER_LEVEL_MAINTAINER: u8 = 2; // Able to make changes to table docs
-const USER_LEVEL_VIEWER: u8 = 3; 
-const DB_NAME: &str = "fso-modoption-d1-db";
+const USER_LEVEL_VIEWER: u8 = 3;  */
+const DB_NAME: &str = "fso_table_database";
 
-/*#[derive(Serialize, Deserialize)]
-struct PasswordResetRequest {
-	thing_id: String,
-	desc: String,
-	num: u32,
-}*/
-
-//  POST, GET, PATCH, and DELETE -- PUTS AND PATCHES are going to be the same.
-
-fn router() -> Router {
-    Router::new()
-    .route("/", get(root))
-    .route("/users", get(user_stats_get))       // No Post, put, patch, or delete for overarching category
-/*    .route("/users/:username", 
-        post(user_register_new).get(user_get_details).put(api_insufficent_permissions).patch(api_insufficent_permissions).delete(deactivate_user))
-    .route("/users/:username/passwordchange", put(user_change_password).patch(user_change_password).delete(api_insufficent_permissions))    // No post, get or delete for password
-    .route("/users/:username/upgrade", put(upgrade_user_permissions).patch(upgrade_user_permissions))
-    .route("/users/:username/downgrade", put(downgrade_user_permissions).patch(downgrade_user_permissions))
-    .route("/users/:username/email", post(add_email).put(add_email).patch(add_email).delete(api_insufficent_permissions))
-    .route("/users/:username/activateemail/:code", post(confirm_email_address)) */
-    .fallback(api_fallback)
+#[derive(Debug, Deserialize, Serialize)]
+struct GenericResponse {
+    status: u16,
+    message: String,
 }
 
-#[event(fetch, respond_with_errors)]
-pub async fn main(request: HttpRequest, env: Env, _ctx: Context) -> Result<http::Response<axum::body::Body>> {
-    let db = env.d1(DB_NAME);
 
-    Ok(router().call(request).await?)
+//  POST, GET, PATCH, and DELETE -- PUTS AND PATCHES are going to be the same.
+#[event(fetch)]
+async fn fetch(req: Request, env: Env, _ctx: Context,) -> Result<Response> {
+    Router::new()
+        .get_async("/", root_get)
+        .get_async("/users", user_stats_get)       // No Post, put, patch, or delete for overarching category
+    /*    .route("/users/:username", 
+            post(user_register_new).get(user_get_details).put(api_insufficent_permissions).patch(api_insufficent_permissions).delete(deactivate_user))
+        .route("/users/:username/passwordchange", put(user_change_password).patch(user_change_password).delete(api_insufficent_permissions))    // No post, get or delete for password
+        .route("/users/:username/upgrade", put(upgrade_user_permissions).patch(upgrade_user_permissions))
+        .route("/users/:username/downgrade", put(downgrade_user_permissions).patch(downgrade_user_permissions))
+        .route("/users/:username/email", post(add_email).put(add_email).patch(add_email).delete(api_insufficent_permissions))
+        .route("/users/:username/activateemail/:code", post(confirm_email_address)) */
+        .run(req, env)
+        .await
 }
 /* 
 user_register_new
@@ -72,47 +57,59 @@ confirm_email_address
  //:id for the taco rocket of doom
 
 
-pub async fn root() -> &'static str {
-    "You have accessed the Freespace Open Table Option Databse API.\n\nRoutes are users, tables, items, deprecations, and behaviors."
+pub async fn root_get(_: Request, _ctx: RouteContext<()>) -> worker::Result<Response> {   
+    Response::from_json(&GenericResponse {
+    status: 200,
+    message: "You have accessed the Freespace Open Table Option Databse API.\n\nRoutes are users, tables, items, deprecations, and behaviors.\n\nThis API is currently under construction!".to_string(),
+    })
 }
 
-pub async fn user_stats_get(env: Env) -> Response {
-    let db = env.d1(DB_NAME).unwrap();
+pub async fn user_stats_get(_: Request, _ctx: RouteContext<()>) -> worker::Result<Response> {   
+    let db = _ctx.env.d1(DB_NAME);
+    let query_result: std::result::Result<_, _>;
 
-    let query = db.prepare("SELECT COUNT(*) FROM users WHERE active = 1");;
-    let result = query.run().await.unwrap().results::<i32>();
-      
+    match &db{
+        Ok(connection) => {
+                let query = connection.prepare("SELECT COUNT(*) FROM users WHERE active = 1");
+                query_result = query.run().await.unwrap().results::<i32>();
+            },
+        Err(e) => return Response::from_json(&GenericResponse {
+            status: 500,
+            message: e.to_string(),
+            }),
+    }
 
-    match &result{
-        Ok(number) => return Response::builder()
-        .status(StatusCode::OK)
-        .body(axum::body::Body::from(number[0].to_string()))
-        .unwrap(),
-	    Err(E) => (StatusCode::OK, E.to_string()).into_response(),
+    match &query_result{
+        Ok(number) => Response::from_json(&GenericResponse {
+            status: 200,
+            message: number[0].to_string(),
+            }),
+	    Err(e) => Response::from_json(&GenericResponse {
+            status: 500,
+            message: e.to_string(),
+            }),
 	}
 
-}
 
-pub async fn deactivate_user() -> (StatusCode, &'static str) {
-    (StatusCode::NOT_IMPLEMENTED, "API has not been set up to deactivate users")
 }
-
-pub async fn table_stats_get() -> (StatusCode, &'static str) {
-    (StatusCode::NOT_IMPLEMENTED, "API has not been set up to retrieve overall table details")
-}
-
 
 //pub async fn table_get_details(params(":tid")) -> &'static str {
 //    "FINISH ME! = Table get details"
 //}
 
 // Failures
-pub async fn api_insufficent_permissions() -> (StatusCode, &'static str) {
-    (StatusCode::FORBIDDEN, "This operation is not authorizable via our API")
+pub async fn err_insufficent_permissions() -> worker::Result<Response> {
+    Response::from_json(&GenericResponse {
+        status: 403,
+        message: "This operation is not authorizable via our API at your access level.".to_string(),
+    })
 }
 
-pub async fn api_fallback() -> (StatusCode, &'static str) {
-    (StatusCode::NOT_FOUND, "API Route Not Found")
+pub async fn err_api_fallback() -> worker::Result<Response> {
+    Response::from_json(&GenericResponse {
+        status: 404,
+        message: "A method for this API route does not exist.".to_string(),
+    })
 }
 /*
 use worker::*;
