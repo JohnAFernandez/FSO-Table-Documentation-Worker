@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use worker::*;
+use email_address::*;
 
 /*
 const USER_LEVEL_OWNER: u8 = 0;
@@ -27,20 +28,86 @@ async fn fetch(req: Request, env: Env, _ctx: Context,) -> Result<Response> {
         .route("/users/:username/upgrade", put(upgrade_user_permissions).patch(upgrade_user_permissions))
         .route("/users/:username/downgrade", put(downgrade_user_permissions).patch(downgrade_user_permissions))
         .route("/users/:username/email", post(add_email).put(add_email).patch(add_email).delete(api_insufficent_permissions))
-        .route("/users/:username/activateemail/:code", post(confirm_email_address)) */
+        .route("/users/activate/:code", post(confirm_email_address)) */
         .run(req, env)
         .await
 }
-/* 
-user_register_new
-user_get_details
-deactivate_user
-user_change_password
-upgrade_user_permissions
-downgrade_user_permissions
-add_email
-confirm_email_address
-*/
+
+
+pub async fn root_get(_: Request, _ctx: RouteContext<()>) -> worker::Result<Response> {   
+    Response::from_json(&GenericResponse {
+    status: 200,
+    message: "You have accessed the Freespace Open Table Option Databse API.\n\nRoutes are users, tables, items, deprecations, and behaviors.\n\nThis API is currently under construction!".to_string(),
+    })
+}
+
+pub async fn user_stats_get(_: Request, _ctx: RouteContext<()>) -> worker::Result<Response> {   
+    let db = _ctx.env.d1(DB_NAME);
+    let query_result: std::result::Result<_, _>;
+    let query_result2: std::result::Result<_, _>;
+
+    match &db{
+        Ok(connection) => {
+                let query = connection.prepare("SELECT COUNT(*) FROM users WHERE active = 1");
+                query_result = query.run().await;
+
+                match query_result {
+                    Ok(r) => query_result2 = r.results::<i32>(),
+                    Err(e) => Response::from_json(&GenericResponse {
+                        status: 500,
+                        message: e.to_string(),
+                        }),                            
+                }
+            },
+        Err(e) => return Response::from_json(&GenericResponse {
+            status: 500,
+            message: e.to_string(),
+            }),
+    }
+
+    match &query_result2{
+        Ok(number) => Response::from_json(&GenericResponse {
+            status: 200,
+            message: number[0].to_string(),
+            }),
+	    Err(e) => Response::from_json(&GenericResponse {
+            status: 500,
+            message: e.to_string(),
+            }),
+	}
+}
+
+pub async fn user_register_new(_: Request, _ctx: RouteContext<()>) -> worker::Result<Response> {  
+    err_api_under_construction()
+}
+
+pub async fn user_get_details(_: Request, _ctx: RouteContext<()>) -> worker::Result<Response> {  
+    // FINISH ME!
+}
+
+pub async fn deactivate_user(_: Request, _ctx: RouteContext<()>) -> worker::Result<Response> {  
+    // FINISH ME!
+}
+
+pub async fn user_change_password(_: Request, _ctx: RouteContext<()>) -> worker::Result<Response> {  
+    // FINISH ME!
+}
+
+pub async fn user_upgrade_user_permissions(_: Request, _ctx: RouteContext<()>) -> worker::Result<Response> {  
+    // FINISH ME!
+}
+
+pub async fn user_downgrade_user_permissions(_: Request, _ctx: RouteContext<()>) -> worker::Result<Response> {  
+    // FINISH ME!
+}
+
+pub async fn user_add_email(_: Request, _ctx: RouteContext<()>) -> worker::Result<Response> {  
+    // FINISH ME!
+}
+
+pub async fn user_confirm_email_address(_: Request, _ctx: RouteContext<()>) -> worker::Result<Response> {  
+    // FINISH ME!
+}
 
 /*
     .route("/tables", get(table_stats_get).post(table_post).delete(api_insufficent_permissions))
@@ -57,45 +124,11 @@ confirm_email_address
  //:id for the taco rocket of doom
 
 
-pub async fn root_get(_: Request, _ctx: RouteContext<()>) -> worker::Result<Response> {   
-    Response::from_json(&GenericResponse {
-    status: 200,
-    message: "You have accessed the Freespace Open Table Option Databse API.\n\nRoutes are users, tables, items, deprecations, and behaviors.\n\nThis API is currently under construction!".to_string(),
-    })
-}
-
-pub async fn user_stats_get(_: Request, _ctx: RouteContext<()>) -> worker::Result<Response> {   
-    let db = _ctx.env.d1(DB_NAME);
-    let query_result: std::result::Result<_, _>;
-
-    match &db{
-        Ok(connection) => {
-                let query = connection.prepare("SELECT COUNT(*) FROM users WHERE active = 1");
-                query_result = query.run().await.unwrap().results::<i32>();
-            },
-        Err(e) => return Response::from_json(&GenericResponse {
-            status: 500,
-            message: e.to_string(),
-            }),
-    }
-
-    match &query_result{
-        Ok(number) => Response::from_json(&GenericResponse {
-            status: 200,
-            message: number[0].to_string(),
-            }),
-	    Err(e) => Response::from_json(&GenericResponse {
-            status: 500,
-            message: e.to_string(),
-            }),
-	}
-
-
-}
-
 //pub async fn table_get_details(params(":tid")) -> &'static str {
 //    "FINISH ME! = Table get details"
 //}
+
+pub async
 
 // Failures
 pub async fn err_insufficent_permissions() -> worker::Result<Response> {
@@ -111,6 +144,14 @@ pub async fn err_api_fallback() -> worker::Result<Response> {
         message: "A method for this API route does not exist.".to_string(),
     })
 }
+
+pub async fn err_api_under_construction() -> worker::Result<Response> {
+    Response::from_json(&GenericResponse {
+        status: 403,
+        message: "Methods for this API are under construction.".to_string(),
+    })
+}
+
 /*
 use worker::*;
 
