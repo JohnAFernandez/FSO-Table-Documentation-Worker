@@ -15,6 +15,12 @@ struct GenericResponse {
     message: String,
 }
 
+#[derive(Deserialize, Serialize)]
+struct BasicCount {
+    count: i32,
+}
+
+
 
 //  POST, GET, PATCH, and DELETE -- PUTS AND PATCHES are going to be the same.
 #[event(fetch)]
@@ -23,7 +29,7 @@ async fn fetch(req: Request, env: Env, _ctx: Context,) -> Result<Response> {
         .get_async("/", root_get)
         .get_async("/users", user_stats_get)       // No Post, put, patch, or delete for overarching category
         .post_async("/users/register", user_register_new)
-        .get_async("/users/:username", user_get_details)\
+        .get_async("/users/:username", user_get_details)/*
         .put_async(api_insufficent_permissions).patch(api_insufficent_permissions).delete(deactivate_user))
         .route("/users/:username/passwordchange", put(user_change_password).patch(user_change_password).delete(api_insufficent_permissions))    // No post, get or delete for password
         .route("/users/:username/upgrade", put(upgrade_user_permissions).patch(upgrade_user_permissions))
@@ -44,16 +50,16 @@ pub async fn root_get(_: Request, _ctx: RouteContext<()>) -> worker::Result<Resp
 
 pub async fn user_stats_get(_: Request, _ctx: RouteContext<()>) -> worker::Result<Response> {   
     let db = _ctx.env.d1(DB_NAME);
-    let query_result: std::result::Result<_, _>;
-    let query_result2: std::result::Result<_, _>;
+//    let query_result: std::result::Result<_, _>;
+    let query_result: Option<BasicCount>;
 
     match &db{
         Ok(connection) => {
                 let query = connection.prepare("SELECT COUNT(*) FROM users WHERE active = 1");
-                query_result = query.run().await;
+                query_result = query.first(None).await;
 
                 match query_result {
-                    Ok(r) => query_result2 = r.results::<i32>(),
+                    Some(r) => Response::from_json(&BasicCount) ,
                     Err(e) => Response::from_json(&GenericResponse {
                         status: 500,
                         message: e.to_string(),
@@ -65,7 +71,19 @@ pub async fn user_stats_get(_: Request, _ctx: RouteContext<()>) -> worker::Resul
             message: e.to_string(),
             }),
     }
-
+    /*
+    let statement = d1.prepare("SELECT * FROM things WHERE thing_id = ? LIMIT 1");
+			let query = statement.bind(&[id.into()])?;
+			let result: Option<Thing> = query.first(None).await?;
+			match result {
+				Some(thing) => Response::from_json(&thing),
+				None => Response::error("Not found", 404),
+			}
+		})
+		.run(request, env)
+		.await
+    */
+/*
     match &query_result2{
         Ok(number) => Response::from_json(&GenericResponse {
             status: 200,
@@ -76,10 +94,12 @@ pub async fn user_stats_get(_: Request, _ctx: RouteContext<()>) -> worker::Resul
             message: e.to_string(),
             }),
 	}
+*/            
 }
 
-pub async fn user_register_new(_: Request, _ctx: RouteContext<()>) -> worker::Result<Response> {  
+pub async fn user_register_new(_: Request, ctx: RouteContext<()>) -> worker::Result<Response> {  
     // FINISH ME!
+    ctx.
 
     err_api_under_construction()
 }
