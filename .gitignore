@@ -15,3 +15,5 @@ Cargo.lock
 
 # This is a node.js/rust/wasm framework that works in conjunction with cloudflare
 node_modules/
+fso-tables-worker/package-lock.json
+fso-tables-worker/package.json

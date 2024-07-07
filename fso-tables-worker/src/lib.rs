@@ -17,7 +17,7 @@ struct GenericResponse {
 
 #[derive(Deserialize, Serialize)]
 struct BasicCount {
-    count: i32,
+    the_count: i32,
 }
 
 
@@ -50,93 +50,64 @@ pub async fn root_get(_: Request, _ctx: RouteContext<()>) -> worker::Result<Resp
 
 pub async fn user_stats_get(_: Request, _ctx: RouteContext<()>) -> worker::Result<Response> {   
     let db = _ctx.env.d1(DB_NAME);
-//    let query_result: std::result::Result<_, _>;
-    let query_result: Option<BasicCount>;
 
     match &db{
         Ok(connection) => {
-                let query = connection.prepare("SELECT COUNT(*) FROM users WHERE active = 1");
-                query_result = query.first(None).await;
-
-                match query_result {
-                    Some(r) => Response::from_json(&BasicCount) ,
-                    Err(e) => Response::from_json(&GenericResponse {
-                        status: 500,
-                        message: e.to_string(),
-                        }),                            
-                }
-            },
-        Err(e) => return Response::from_json(&GenericResponse {
-            status: 500,
-            message: e.to_string(),
-            }),
-    }
-    /*
-    let statement = d1.prepare("SELECT * FROM things WHERE thing_id = ? LIMIT 1");
-			let query = statement.bind(&[id.into()])?;
-			let result: Option<Thing> = query.first(None).await?;
-			match result {
-				Some(thing) => Response::from_json(&thing),
-				None => Response::error("Not found", 404),
-			}
-		})
-		.run(request, env)
-		.await
-    */
-/*
-    match &query_result2{
-        Ok(number) => Response::from_json(&GenericResponse {
-            status: 200,
-            message: number[0].to_string(),
-            }),
-	    Err(e) => Response::from_json(&GenericResponse {
-            status: 500,
-            message: e.to_string(),
-            }),
-	}
-*/            
+            let query = connection.prepare("SELECT COUNT(*) as the_count FROM users WHERE active = 1");
+            match query.first::<BasicCount>(None).await {
+                Ok(r) => {
+                    match r {
+                        Some(r2) => Response::from_json(&r2) ,
+                        None => return err_specific_error("Internal server erorr, query returned no count".to_string()).await,
+                    }
+                },
+                Err(e) => return err_specific_error(e.to_string()).await,
+            }
+        }
+        Err(e) => return err_specific_error(e.to_string()).await,
+    }            
 }
 
 pub async fn user_register_new(_: Request, ctx: RouteContext<()>) -> worker::Result<Response> {  
     // FINISH ME!
-    ctx.
+//    ctx.
 
-    err_api_under_construction()
+    err_api_under_construction().await
 }
 
 pub async fn user_get_details(_: Request, _ctx: RouteContext<()>) -> worker::Result<Response> {  
     // FINISH ME!
-    err_api_under_construction()
+    err_api_under_construction().await
 }
 
 pub async fn deactivate_user(_: Request, _ctx: RouteContext<()>) -> worker::Result<Response> {  
     // FINISH ME!
-    err_api_under_construction()
+    err_api_under_construction().await
 }
 
 pub async fn user_change_password(_: Request, _ctx: RouteContext<()>) -> worker::Result<Response> {  
     // FINISH ME!
-    err_api_under_construction()
+    err_api_under_construction().await
 }
 
 pub async fn user_upgrade_user_permissions(_: Request, _ctx: RouteContext<()>) -> worker::Result<Response> {  
     // FINISH ME!
-    err_api_under_construction()
+    err_api_under_construction().await
 }
 
 pub async fn user_downgrade_user_permissions(_: Request, _ctx: RouteContext<()>) -> worker::Result<Response> {  
     // FINISH ME!
-    err_api_under_construction()
+    err_api_under_construction().await
 }
 
 pub async fn user_add_email(_: Request, _ctx: RouteContext<()>) -> worker::Result<Response> {  
     // FINISH ME!
-    err_api_under_construction()
+    err_api_under_construction().await
 }
 
 pub async fn user_confirm_email_address(_: Request, _ctx: RouteContext<()>) -> worker::Result<Response> {  
     // FINISH ME!
-    err_api_under_construction()
+    err_api_under_construction().await
 }
 
 /*
@@ -180,6 +151,13 @@ pub async fn err_api_under_construction() -> worker::Result<Response> {
     })
 }
 
+pub async fn err_specific_error(e: String) -> worker::Result<Response> {
+    Response::from_json(&GenericResponse {
+        status: 500,
+        message: e
+    })
+}
+
 /*
 use worker::*;
 
@@ -188,4 +166,4 @@ struct Registration {
 	email: String,
 	password: String,
 }
-
+*/
