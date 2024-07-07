@@ -231,38 +231,23 @@ pub async fn db_does_user_exists(email: &String, db: &D1Database) -> bool {
 
 // SECTION!! Body/Server Failure Responses
 pub async fn err_insufficent_permissions() -> worker::Result<Response> {
-    Response::from_json(&GenericResponse {
-        status: 403,
-        message: "This operation is not authorizable via our API at your access level.".to_string(),
-    })
+    Response::error("This operation is not authorizable via our API at your access level.", 403)    
 }
 
 pub async fn err_api_fallback() -> worker::Result<Response> {
-    Response::from_json(&GenericResponse {
-        status: 404,
-        message: "A method for this API route does not exist.".to_string(),
-    })
+    Response::error("A method for this API route does not exist.", 404)    
 }
 
 pub async fn err_api_under_construction() -> worker::Result<Response> {
-    Response::from_json(&GenericResponse {
-        status: 403,
-        message: "Methods for this API are under construction.".to_string(),
-    })
+    Response::error("Methods for this API are under construction.", 403)    
 }
 
 pub async fn err_bad_request() -> worker::Result<Response> {
-    Response::from_json(&GenericResponse {
-        status: 400,
-        message: "Bad request, check your json input".to_string(),
-    })
+    Response::error("Bad request, check your json input.", 400)    
 }
 
 pub async fn err_specific(e: String) -> worker::Result<Response> {
-    Response::from_json(&GenericResponse {
-        status: 500,
-        message: e
-    })
+    Response::error(&e, 500)    
 }
 
 /*
