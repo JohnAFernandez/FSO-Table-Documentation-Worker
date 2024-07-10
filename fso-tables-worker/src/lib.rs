@@ -29,7 +29,7 @@ async fn fetch(req: Request, env: Env, _ctx: Context,) -> Result<Response> {
         .get_async("/", root_get)
         .get_async("/users", user_stats_get)       // No Post, put, patch, or delete for overarching category
         .post_async("/users/register", user_register_new)
-        .get_async("/users/:username", user_get_details)/* 
+        .get_async("/users/myaccount", user_get_details)/* 
         .put_async(api_insufficent_permissions).patch(api_insufficent_permissions).delete(deactivate_user))
         .route("/users/:username/passwordchange", put(user_change_password).patch(user_change_password).delete(api_insufficent_permissions))    // No post, get or delete for password
         .route("/users/:username/upgrade", put(upgrade_user_permissions).patch(upgrade_user_permissions))
@@ -92,11 +92,9 @@ pub async fn user_register_new(mut req: Request, ctx: RouteContext<()>) -> worke
     let db = ctx.env.d1(DB_NAME);
     match &db{
         Ok(db1) => {
-            if db_does_user_exists(&email.email, &db1).await {
-                return Response::from_json(&GenericResponse {
-                    status: 200,
-                    message: "Email address is already taken.".to_string(),
-                })
+            match db_does_user_exists(&email.email, &db1).await {
+                Ok(_) => {},
+                Err(e) => return err_specific(e.to_string()).await,
             };
             
             let statement = db1.prepare("INSERT INTO users (username, role, active) VALUES (?, 3, 0)").bind(&[email.email.into()]);
@@ -121,12 +119,39 @@ pub async fn user_register_new(mut req: Request, ctx: RouteContext<()>) -> worke
 
 }
 
-pub async fn user_get_details(_: Request, ctx: RouteContext<()>) -> worker::Result<Response> {  
-    let db = ctx.env.d1(DB_NAME);
-    match &db{
-        Ok(_) => {
-            
-            return err_api_under_construction().await            
+#[derive(Serialize, Deserialize)]
+pub struct UserDetails{
+    username: String,
+    role: i32,
+    contribution_count: i32,
+    active: i32,
+}
+
+
+pub async fn user_get_details(req: Request, ctx: RouteContext<()>) -> worker::Result<Response> {  
+    if let Some(resp) = header_has_token(&req).await{
+        return resp;
+    }
+
+    if let Some(resp) = header_has_username(&req).await {
+        return resp;
+    }
+  
+    match ctx.env.d1(DB_NAME) {
+        Ok(db) => {
+            if !header_token_is_valid(&req, &db).await {
+                return err_not_logged_in().await
+            } else {
+                if let Some(username) = req.headers().get("username").unwrap(){
+                    match db_get_user_details(&username, &db).await {
+                        Ok(res) => return Response::from_json(&res),
+                        Err(e) => return err_specific(e.to_string()).await,
+                    }    
+                } else {
+                    return err_specific("Header didn't have username the second time?".to_string()).await
+                }
+
+            }            
         },
         Err(e) => return err_specific(e.to_string()).await,
     }
@@ -223,18 +248,66 @@ struct Enabled{
 }
 
 // SECTION!! generic database tasks 
-pub async fn db_does_user_exists(email: &String, db: &D1Database) -> bool {
+pub async fn db_does_user_exists(email: &String, db: &D1Database) -> Result<bool> {
     let query = db.prepare("SELECT active FROM users WHERE username = ?").bind(&[email.into()]).unwrap();
 
     match query.first::<Enabled>(None).await {
         Ok(r) => {
             match r {
-                Some(_) => return true,
-                None => return false,
+                Some(_) => return Ok(true),
+                None => return Ok(false),
             }
         },
-        Err(e) => panic!("{}", e.to_string()),
+        Err(e) => return Err(e),
     }
+}
+
+pub async fn db_get_user_details(email: &String, db: &D1Database) -> Result<UserDetails> {
+    let query = db.prepare("SELECT username, role, contribution_count, active FROM users WHERE username = ?").bind(&[email.into()]).unwrap();
+
+    match query.first::<UserDetails>(None).await {
+        Ok(r) => {
+            match r {
+                Some(ud) => return Ok(ud),
+                None => Err("Database error! Could not find user despite already being verified!".into()),
+            }
+        },
+        Err(e) => return Err(e),
+    }
+}
+
+// SECTION!! generic server tasks
+pub async fn  header_has_token(req: &Request) -> Option<Result<Response>> {
+    match req.headers().has("ganymede_token"){
+        Ok(res) => {
+            if res { 
+                return None 
+            } else {
+                return Some(err_not_logged_in().await)
+            }        
+        },
+        Err(e) => return Some(err_specific(e.to_string()).await),
+    }
+}
+
+pub async fn header_has_username(req: &Request) -> Option<Result<Response>>{
+    match req.headers().has("username"){
+        Ok(res) => {
+            if res { 
+                return None 
+            } else {
+                return Some(err_bad_request().await)
+            }        
+        },
+        Err(e) => return Some(err_specific(e.to_string()).await),
+    }
+}
+
+// this is going to be a big one.  We'll need to 1. Lookup an entry on username/tokens
+// 2. Compare the token they gave us and see if it matches the username. 
+// 3. See if the token is still valid.
+pub async fn header_token_is_valid(_req: &Request, _db: &D1Database) -> bool {
+    true
 }
 
 // SECTION!! Body/Server Failure Responses
@@ -242,12 +315,16 @@ pub async fn err_insufficent_permissions() -> worker::Result<Response> {
     Response::error("This operation is not authorizable via our API at your access level.", 403)    
 }
 
+pub async fn err_not_logged_in() -> worker::Result<Response> {
+    Response::error("You must be logged in to access this ednpoint.", 403)
+}
+
 pub async fn err_api_fallback(_: Request, _: RouteContext<()>) -> worker::Result<Response> {
     Response::error("A method for this API route does not exist.", 404)    
 }
 
 pub async fn err_api_under_construction() -> worker::Result<Response> {
-    Response::error("Methods for this API are under construction.", 403)    
+    Response::error("This endpoint is under construction.", 403)    
 }
 
 pub async fn err_bad_request() -> worker::Result<Response> {
