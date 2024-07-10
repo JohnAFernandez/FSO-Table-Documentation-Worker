@@ -2,13 +2,16 @@ use serde::{Deserialize, Serialize};
 use worker::*;
 use email_address::*;
 
-/*
-const USER_LEVEL_OWNER: u8 = 0;
-const USER_LEVEL_ADMIN: u8 = 1; // Able to upgrade other users to a maintainer
-const USER_LEVEL_MAINTAINER: u8 = 2; // Able to make changes to table docs
-const USER_LEVEL_VIEWER: u8 = 3; // Just here until someone upgrades to a maintainer level  */
-const DB_NAME: &str = "fso_table_database";
+const DB_NAME: &str = "fso_table_database";    
 
+enum USER_ROLE {
+    OWNER = 0,
+    ADMIN = 1, // Able to upgrade other users to a maintainer or downgrade maintainers to viewers
+    MAINTAINER = 2; // Able to make changes to table docs
+    VIEWER = 3; // Waiting for someone to approve an upgrade to a maintainer level
+}
+
+// TODO! Replace me with proper calls.
 #[derive(Deserialize, Serialize)]
 struct GenericResponse {
     status: u16,
@@ -19,8 +22,6 @@ struct GenericResponse {
 struct BasicCount {
     the_count: i32,
 }
-
-
 
 //  POST, GET, PATCH, and DELETE -- PUTS AND PATCHES are going to be the same.
 #[event(fetch)]
@@ -97,7 +98,7 @@ pub async fn user_register_new(mut req: Request, ctx: RouteContext<()>) -> worke
                 Err(e) => return err_specific(e.to_string()).await,
             };
             
-            let statement = db1.prepare("INSERT INTO users (username, role, active) VALUES (?, 3, 0)").bind(&[email.email.into()]);
+            let statement = db1.prepare("INSERT INTO users (username, role, active, contribution_count) VALUES (?, 3, 0, 0)").bind(&[email.email.into()]);
             match &statement {
                 Ok(q) => {
                     if let Err(e) = q.run().await {
@@ -157,11 +158,31 @@ pub async fn user_get_details(req: Request, ctx: RouteContext<()>) -> worker::Re
     }
 }
 
+
 pub async fn deactivate_user(_: Request, ctx: RouteContext<()>) -> worker::Result<Response> {  
-    let db = ctx.env.d1(DB_NAME);
-    match &db{
-        Ok(_) => {
-            // AUTHENTICATE USER HERE
+    if let Some(resp) = header_has_token(&req).await{
+        return resp;
+    }
+
+    if let Some(resp) = header_has_username(&req).await {
+        return resp;
+    }
+  
+    match ctx.env.d1(DB_NAME) {
+        Ok(db) => {
+            if !header_token_is_valid(&req, &db).await {
+                return err_not_logged_in().await
+            }
+
+            if let Ok(username) = header_get_username(&req).await{
+                match db_get_user_role(&username).await {
+                    Ok(role) => {},
+                    Err(e) => err_specific(e.to_string()).await, 
+                }
+            } else {
+                return err_specific("Header didn't have username the second time?".to_string()).await
+            }
+
             return err_api_under_construction().await            
         },
         Err(e) => return err_specific(e.to_string()).await,
@@ -262,6 +283,20 @@ pub async fn db_does_user_exists(email: &String, db: &D1Database) -> Result<bool
     }
 }
 
+pub async fn db_get_user_role(email: &String, db: &D1Database) -> Result<USER_ROLE> {
+    let query = db.prepare("SELECT role FROM users WHERE username = ?").bind(&[email.into()]).unwrap();
+
+    match query.first::<Enabled>(None).await {
+        Ok(r) => {
+            match r {
+                Some(role) => return Ok(USER_ROLE(role.into())),
+                None => Err("Database error! Could not find user despite already being verified!".into()),
+            }
+        },
+        Err(e) => return Err(e),
+    }
+}
+
 pub async fn db_get_user_details(email: &String, db: &D1Database) -> Result<UserDetails> {
     let query = db.prepare("SELECT username, role, contribution_count, active FROM users WHERE username = ?").bind(&[email.into()]).unwrap();
 
@@ -290,7 +325,7 @@ pub async fn  header_has_token(req: &Request) -> Option<Result<Response>> {
     }
 }
 
-pub async fn header_has_username(req: &Request) -> Option<Result<Response>>{
+pub async fn header_has_username(req: &Request) -> Option<Result<Response>> {
     match req.headers().has("username"){
         Ok(res) => {
             if res { 
@@ -300,6 +335,13 @@ pub async fn header_has_username(req: &Request) -> Option<Result<Response>>{
             }        
         },
         Err(e) => return Some(err_specific(e.to_string()).await),
+    }
+}
+
+pub async fn header_get_username(req: &Request) -> Result<String> {
+    match req.headers().get("username"){
+        Ok(username) => return Ok(username),
+        Err(e) => return Err(e.to_string().await),
     }
 }
 
