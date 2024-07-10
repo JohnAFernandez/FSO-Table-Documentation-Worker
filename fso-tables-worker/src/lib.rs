@@ -36,6 +36,7 @@ async fn fetch(req: Request, env: Env, _ctx: Context,) -> Result<Response> {
         .route("/users/:username/downgrade", put(downgrade_user_permissions).patch(downgrade_user_permissions))
         .route("/users/:username/email", post(add_email).put(add_email).patch(add_email).delete(api_insufficent_permissions))
         .route("/users/activate/:code", post(confirm_email_address)) */
+        .or_else_any_method_async("/", err_api_fallback)
         .run(req, env)
         .await
 }
@@ -124,7 +125,7 @@ pub async fn user_get_details(_: Request, ctx: RouteContext<()>) -> worker::Resu
     let db = ctx.env.d1(DB_NAME);
     match &db{
         Ok(_) => {
-            // AUTHENTICATE USER HERE
+            
             return err_api_under_construction().await            
         },
         Err(e) => return err_specific(e.to_string()).await,
@@ -241,7 +242,7 @@ pub async fn err_insufficent_permissions() -> worker::Result<Response> {
     Response::error("This operation is not authorizable via our API at your access level.", 403)    
 }
 
-pub async fn err_api_fallback() -> worker::Result<Response> {
+pub async fn err_api_fallback(_: Request, _: RouteContext<()>) -> worker::Result<Response> {
     Response::error("A method for this API route does not exist.", 404)    
 }
 
