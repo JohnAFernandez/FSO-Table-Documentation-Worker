@@ -124,6 +124,7 @@ pub async fn user_get_details(_: Request, ctx: RouteContext<()>) -> worker::Resu
     let db = ctx.env.d1(DB_NAME);
     match &db{
         Ok(_) => {
+            // AUTHENTICATE USER HERE
             return err_api_under_construction().await            
         },
         Err(e) => return err_specific(e.to_string()).await,
@@ -134,6 +135,7 @@ pub async fn deactivate_user(_: Request, ctx: RouteContext<()>) -> worker::Resul
     let db = ctx.env.d1(DB_NAME);
     match &db{
         Ok(_) => {
+            // AUTHENTICATE USER HERE
             return err_api_under_construction().await            
         },
         Err(e) => return err_specific(e.to_string()).await,
@@ -144,6 +146,7 @@ pub async fn user_change_password(_: Request, ctx: RouteContext<()>) -> worker::
     let db = ctx.env.d1(DB_NAME);
     match &db{
         Ok(_) => {
+            // AUTHENTICATE USER HERE
             return err_api_under_construction().await            
         },
         Err(e) => return err_specific(e.to_string()).await,
@@ -154,6 +157,7 @@ pub async fn user_upgrade_user_permissions(_: Request, ctx: RouteContext<()>) ->
     let db = ctx.env.d1(DB_NAME);
     match &db{
         Ok(_) => {
+            // AUTHENTICATE USER HERE
             return err_api_under_construction().await            
         },
         Err(e) => return err_specific(e.to_string()).await,
@@ -164,6 +168,7 @@ pub async fn user_downgrade_user_permissions(_: Request, ctx: RouteContext<()>) 
     let db = ctx.env.d1(DB_NAME);
     match &db{
         Ok(_) => {
+            // AUTHENTICATE USER HERE
             return err_api_under_construction().await            
         },
         Err(e) => return err_specific(e.to_string()).await,
@@ -174,6 +179,7 @@ pub async fn user_add_email(_: Request, ctx: RouteContext<()>) -> worker::Result
     let db = ctx.env.d1(DB_NAME);
     match &db{
         Ok(_) => {
+            // AUTHENTICATE USER HERE
             return err_api_under_construction().await            
         },
         Err(e) => return err_specific(e.to_string()).await,
@@ -184,6 +190,7 @@ pub async fn user_confirm_email_address(_: Request, ctx: RouteContext<()>) -> wo
     let db = ctx.env.d1(DB_NAME);
     match &db{
         Ok(_) => {
+            
             return err_api_under_construction().await            
         },
         Err(e) => return err_specific(e.to_string()).await,
