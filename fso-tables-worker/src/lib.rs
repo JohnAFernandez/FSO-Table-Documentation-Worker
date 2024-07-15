@@ -12,13 +12,6 @@ pub enum UserRole {
     VIEWER = 3, // Waiting for someone to approve an upgrade to a maintainer level
 }
 
-// TODO! Replace me with proper calls.
-#[derive(Deserialize, Serialize)]
-struct GenericResponse {
-    status: u16,
-    message: String,
-}
-
 #[derive(Deserialize, Serialize)]
 struct BasicCount {
     the_count: i32,
@@ -32,7 +25,9 @@ async fn fetch(req: Request, env: Env, _ctx: Context,) -> Result<Response> {
         .get_async("/users", user_stats_get)       // No Post, put, patch, or delete for overarching category
         .post_async("/users/register", user_register_new)
         .get_async("/users/myaccount", user_get_details)
-        .delete_async("/users", deactivate_user)/* 
+        .delete_async("/users", deactivate_user)
+        .post_async("/users/reactivate", activate_user)
+        /* 
         .put_async(api_insufficent_permissions).patch(api_insufficent_permissions).delete(deactivate_user))
         .route("/users/:username/passwordchange", put(user_change_password).patch(user_change_password).delete(api_insufficent_permissions))    // No post, get or delete for password
         .route("/users/:username/upgrade", put(upgrade_user_permissions).patch(upgrade_user_permissions))
@@ -46,10 +41,7 @@ async fn fetch(req: Request, env: Env, _ctx: Context,) -> Result<Response> {
 
 
 pub async fn root_get(_: Request, _ctx: RouteContext<()>) -> worker::Result<Response> {   
-    Response::from_json(&GenericResponse {
-    status: 200,
-    message: "You have accessed the Freespace Open Table Option Databse API.\n\nRoutes are users, tables, items, deprecations, and behaviors.\n\nThis API is currently under construction!".to_string(),
-    })
+    Response::ok("You have accessed the Freespace Open Table Option Databse API.\n\nRoutes are users, tables, items, deprecations, and behaviors.\n\nThis API is currently under construction!".to_string())
 }
 
 pub async fn user_stats_get(_: Request, _ctx: RouteContext<()>) -> worker::Result<Response> {   
@@ -86,17 +78,13 @@ pub async fn user_register_new(mut req: Request, ctx: RouteContext<()>) -> worke
     let email = submission.unwrap();
 
     if !EmailAddress::is_valid(&email.email){
-        return Response::from_json(&GenericResponse {
-            status: 200,
-            message: "Email address is not in the right format".to_string(),
-        })
+        return Response::ok("Email address is not in the right format".to_string());
     }
 
     let db = ctx.env.d1(DB_NAME);
     match &db{
         Ok(db1) => {
-            // TODO! Need to distinguish between active and exists *and* active
-            match db_does_user_exists(&email.email, &db1).await {
+            match db_email_taken(&email.email, &db1).await {
                 Ok(exists) => if exists {
                     return err_specific("User already exists".to_string()).await;
                 },
@@ -112,10 +100,7 @@ pub async fn user_register_new(mut req: Request, ctx: RouteContext<()>) -> worke
 
                     // TODO! need to send a confirmation email here
 
-                    return Response::from_json(&GenericResponse {
-                        status: 200,
-                        message: "User created!".to_string(),
-                    })    
+                    return Response::ok("User created!".to_string());     
                 },
                 Err(e) => return err_specific(e.to_string()).await,
             }
@@ -185,7 +170,74 @@ pub async fn deactivate_user(mut req: Request, ctx: RouteContext<()>) -> worker:
 
                         match req.json::<EmailSubmission>().await {                                                        
                             Ok(target_user) =>{
-                                match db_does_user_exists(&target_user.email, &db).await {
+                                match db_has_active_user(&target_user.email, &db).await {
+                                    Ok(exists) => if !exists {
+                                        return err_specific("User does not exist or may already be deactivated.".to_string()).await;
+                                    },
+                                    Err(e) => return err_specific(e.to_string()).await,
+                                };
+                    
+                                // Owners can only be deactivated by someone working directly with the database.
+                                // But otherwise, you *can* deactivate yourself.
+                                if target_user.email == username && authorizer_role != UserRole::OWNER {
+                                    db_deactivate_user(&username, &db).await;
+                                    return worker::Response::ok("User Deactivated")
+                                }
+
+                                // these two types are not allowed to deactivate other users
+                                match authorizer_role {
+                                    UserRole::MAINTAINER => return err_insufficent_permissions().await,
+                                    UserRole::VIEWER => return err_insufficent_permissions().await,
+                                    _=> (),
+                                }         
+                                                                                        
+                                match db_get_user_role(&target_user.email, &db).await { 
+                                    Ok(target_user_role) => {
+                                        if authorizer_role < target_user_role{
+                                            db_deactivate_user(&target_user.email, &db).await;
+                                            return worker::Response::ok("User Deactivated");
+                                        } else {
+                                            return err_insufficent_permissions().await;
+                                        }
+                                    },
+                                    Err(e) => return err_specific(e.to_string()).await,                                
+                                }               
+                            },
+                            Err(_) => return err_bad_request().await,
+                        }
+                    },
+                    Err(e) => return err_specific(e.to_string()).await, 
+                }
+            } else {
+                return err_specific("Header didn't have username the second time?".to_string()).await
+            }
+        },
+        Err(e) => return err_specific(e.to_string()).await,
+    }
+}
+
+pub async fn activate_user(mut req: Request, ctx: RouteContext<()>) -> worker::Result<Response> {  
+    if let Some(resp) = header_has_token(&req).await{
+        return resp;
+    }
+
+    if let Some(resp) = header_has_username(&req).await {
+        return resp;
+    }
+  
+    match ctx.env.d1(DB_NAME) {
+        Ok(db) => {
+            if !header_token_is_valid(&req, &db).await {
+                return err_not_logged_in().await
+            }
+
+            if let Ok(username) = header_get_username(&req).await{
+                match db_get_user_role(&username, &db).await {                 
+                    Ok(authorizer_role) => {
+
+                        match req.json::<EmailSubmission>().await {                                                        
+                            Ok(target_user) =>{
+                                match db_has_active_user(&target_user.email, &db).await {
                                     Ok(exists) => if !exists {
                                         return err_specific("User does not exist or may already be deactivated.".to_string()).await;
                                     },
@@ -311,7 +363,7 @@ struct Enabled{
 }
 
 // SECTION!! generic database tasks 
-pub async fn db_does_user_exists(email: &String, db: &D1Database) -> Result<bool> {
+pub async fn db_has_active_user(email: &String, db: &D1Database) -> Result<bool> {
     let query = db.prepare("SELECT active FROM users WHERE username = ?").bind(&[email.into()]).unwrap();
 
     match query.first::<Enabled>(None).await {
@@ -325,6 +377,19 @@ pub async fn db_does_user_exists(email: &String, db: &D1Database) -> Result<bool
     }
 }
 
+pub async fn db_email_taken(email: &String, db: &D1Database) -> Result<bool> {
+    let query = db.prepare("SELECT count(*) AS the_count FROM users WHERE username = ?").bind(&[email.into()]).unwrap();
+
+    match query.first::<BasicCount>(None).await {
+        Ok(r) => {
+            match r {
+                Some(thing) => return Ok(thing.the_count > 0),
+                None => return Ok(false),
+            }
+        },
+        Err(e) => return Err(e),
+    }    
+}
 
 #[derive(Serialize, Deserialize)]
 struct Role{
@@ -426,7 +491,7 @@ pub async fn number_to_role(n: i32) -> Result<UserRole> {
         1 => Ok(UserRole::ADMIN),
         2 => Ok(UserRole::MAINTAINER),
         3 => Ok(UserRole::VIEWER),
-        _ => panic!("Tried to convert a number into a UserRole, but that user role does not exist.")
+        _ => panic!("Tried to convert a number into a UserRole, but the number is out of range: {}.", n)
     }
 }
 
