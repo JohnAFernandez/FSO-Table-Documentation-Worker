@@ -12,7 +12,7 @@ use rand::*;
 use rand_chacha::*;
 
 const DB_NAME: &str = "fso_table_database";    
-const DB_ALLOWED_PASSWORD_CHARACTERS: &str = "[^0-9A-Za-z~! @#$%^&*()_\\-+={[}\\]|\\:;<,>.?/]";
+const DB_ALLOWED_PASSWORD_CHARACTERS: &str = "[^0-9A-Za-z~! @#$%^&*()_\\-+={[}\\]|\\\\:;<,>.?/]";
 const DB_MINIMUM_PASSWORD_LENGTH: usize = 8;
 
 #[derive(PartialEq, PartialOrd)]
@@ -109,7 +109,7 @@ pub async fn user_register_new(mut req: Request, ctx: RouteContext<()>) -> worke
                         return err_specific(e.to_string()).await;
                     }
 
-                    // TODO! need to send a confirmation email here
+                    // TODO! need to send a confirmation email here. No login without it!
 
                     return Response::ok("User created!".to_string());     
                 },
