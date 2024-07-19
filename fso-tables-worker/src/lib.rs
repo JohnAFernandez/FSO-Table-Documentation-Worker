@@ -284,11 +284,26 @@ pub async fn activate_user(mut req: Request, ctx: RouteContext<()>) -> worker::R
 }
 
 pub async fn user_change_password(_: Request, ctx: RouteContext<()>) -> worker::Result<Response> {  
-    let db = ctx.env.d1(DB_NAME);
-    match &db{
-        Ok(_) => {
-            // AUTHENTICATE USER HERE
-            return err_api_under_construction().await            
+    if let Some(resp) = header_has_token(&req).await{
+        return resp;
+    }
+
+    if let Some(resp) = header_has_username(&req).await {
+        return resp;
+    }
+
+    match ctx.env.d1(DB_NAME){
+        Ok(db) => {
+            if !header_token_is_valid(&req, &db).await {
+                return err_not_logged_in().await
+            }
+
+            // Check password for bad characters
+            // set up salting
+            // salt and place in te database
+
+
+            return err_api_under_construction().await
         },
         Err(e) => return err_specific(e.to_string()).await,
     }
@@ -501,7 +516,7 @@ pub async fn err_insufficent_permissions() -> worker::Result<Response> {
 }
 
 pub async fn err_not_logged_in() -> worker::Result<Response> {
-    Response::error("You must be logged in to access this ednpoint.", 403)
+    Response::error("You must be logged in to access this endpoint.", 403)
 }
 
 pub async fn err_api_fallback(_: Request, _: RouteContext<()>) -> worker::Result<Response> {
