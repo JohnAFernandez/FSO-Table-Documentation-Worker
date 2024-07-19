@@ -257,9 +257,14 @@ pub async fn activate_user(mut req: Request, ctx: RouteContext<()>) -> worker::R
                     
                                 // Owners can only be deactivated by someone working directly with the database.
                                 // But otherwise, you *can* deactivate yourself.
-                                if target_user.email == username && authorizer_role != UserRole::OWNER {
-                                    db_deactivate_user(&username, &db).await;
-                                    return worker::Response::ok("User Deactivated")
+                                if target_user.email == username{
+                                    if authorizer_role == UserRole::OWNER {
+                                        return err_insufficent_permissions()
+                                    } else {    
+                                        db_deactivate_user(&username, &db).await;
+                                        return worker::Response::ok("User Deactivated")
+                                    }
+
                                 }
 
                                 // these two types are not allowed to deactivate other users
