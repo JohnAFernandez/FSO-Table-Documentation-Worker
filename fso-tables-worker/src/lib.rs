@@ -36,11 +36,10 @@ async fn fetch(req: Request, env: Env, _ctx: Context,) -> Result<Response> {
         .get_async("/users", user_stats_get)       // No Post, put, patch, or delete for overarching category
         .post_async("/users/register", user_register_new)
         .get_async("/users/myaccount", user_get_details)
+        .post_async("/users/myaccount/password", user_change_password)
         .delete_async("/users", deactivate_user)
-        .post_async("/users/reactivate", activate_user)
+        .post_async("/users/reactivate", activate_user).put_async("/users/reactivate", activate_user).patch_async("/users/reactivate", activate_user)
         /* 
-        .put_async(api_insufficent_permissions).patch(api_insufficent_permissions).delete(deactivate_user))
-        .route("/users/:username/passwordchange", put(user_change_password).patch(user_change_password).delete(api_insufficent_permissions))    // No post, get or delete for password
         .route("/users/:username/upgrade", put(upgrade_user_permissions).patch(upgrade_user_permissions))
         .route("/users/:username/downgrade", put(downgrade_user_permissions).patch(downgrade_user_permissions))
         .route("/users/:username/email", post(add_email).put(add_email).patch(add_email).delete(api_insufficent_permissions))
@@ -349,33 +348,168 @@ pub async fn user_change_password(mut req: Request, ctx: RouteContext<()>) -> wo
 }
 
 pub async fn user_upgrade_user_permissions(_: Request, ctx: RouteContext<()>) -> worker::Result<Response> {  
-    let db = ctx.env.d1(DB_NAME);
-    match &db{
-        Ok(_) => {
-            // AUTHENTICATE USER HERE
-            return err_api_under_construction().await            
+    if let Some(resp) = header_has_token(&req).await{
+        return resp;
+    }
+
+    if let Some(resp) = header_has_username(&req).await {
+        return resp;
+    }
+  
+    match ctx.env.d1(DB_NAME) {
+        Ok(db) => {
+            if !header_token_is_valid(&req, &db).await {
+                return err_not_logged_in().await
+            }
+
+            if let Ok(username) = header_get_username(&req).await{
+                match db_get_user_role(&username, &db).await {                 
+                    Ok(authorizer_role) => {
+
+                        match req.json::<EmailSubmission>().await {                                                        
+                            Ok(target_user) =>{
+                                match db_has_active_user(&target_user.email, &db).await {
+                                    Ok(exists) => if !exists {
+                                        return err_specific("User does not exist or may be deactivated.".to_string()).await;
+                                    },
+                                    Err(e) => return err_specific(e.to_string()).await,
+                                };
+                    
+                                // You *cannot* upgrade yourself.
+                                if target_user.email == username {
+                                    return err_specific("You cannot upgrade your own account.".to_string())
+                                }
+
+                                // these two types are not allowed to deactivate other users
+                                match authorizer_role {
+                                    UserRole::MAINTAINER => return err_insufficent_permissions().await,
+                                    UserRole::VIEWER => return err_insufficent_permissions().await,
+                                    _=> (),
+                                }         
+                                                                                        
+                                match db_get_user_role(&target_user.email, &db).await { 
+                                    Ok(target_user_role) => {
+                                        // We cannot upgrade Admins here.  Only when directly accessing the database.
+                                        if authorizer_role < target_user_role && target_user_role > UserRole::ADMIN {
+                                            //db_upgrade_user(&target_user.email, &db).await;
+                                            return worker::Response::ok("User Upgraded");
+                                        } else {
+                                            return err_insufficent_permissions().await;
+                                        }
+                                    },
+                                    Err(e) => return err_specific(e.to_string()).await,                                
+                                }               
+                            },
+                            Err(_) => return err_bad_request().await,
+                        }
+                    },
+                    Err(e) => return err_specific(e.to_string()).await, 
+                }
+            } else {
+                return err_specific("Header didn't have username the second time?".to_string()).await
+            }
         },
         Err(e) => return err_specific(e.to_string()).await,
     }
 }
 
 pub async fn user_downgrade_user_permissions(_: Request, ctx: RouteContext<()>) -> worker::Result<Response> {  
-    let db = ctx.env.d1(DB_NAME);
-    match &db{
-        Ok(_) => {
-            // AUTHENTICATE USER HERE
-            return err_api_under_construction().await            
+    if let Some(resp) = header_has_token(&req).await{
+        return resp;
+    }
+
+    if let Some(resp) = header_has_username(&req).await {
+        return resp;
+    }
+  
+    match ctx.env.d1(DB_NAME) {
+        Ok(db) => {
+            if !header_token_is_valid(&req, &db).await {
+                return err_not_logged_in().await
+            }
+
+            if let Ok(username) = header_get_username(&req).await{
+                match db_get_user_role(&username, &db).await {                 
+                    Ok(authorizer_role) => {
+
+                        match req.json::<EmailSubmission>().await {                                                        
+                            Ok(target_user) =>{
+                                match db_has_active_user(&target_user.email, &db).await {
+                                    Ok(exists) => if !exists {
+                                        return err_specific("User does not exist or may be deactivated.".to_string()).await;
+                                    },
+                                    Err(e) => return err_specific(e.to_string()).await,
+                                };
+                    
+                                // You *cannot* upgrade yourself.
+                                if target_user.email == username {
+                                    return err_specific("You cannot downgrade your own account.".to_string())
+                                }
+
+                                // these two types are not allowed to deactivate other users
+                                match authorizer_role {
+                                    UserRole::MAINTAINER => return err_insufficent_permissions().await,
+                                    UserRole::VIEWER => return err_insufficent_permissions().await,
+                                    _=> (),
+                                }         
+                                                                                        
+                                match db_get_user_role(&target_user.email, &db).await { 
+                                    Ok(target_user_role) => {
+                                        // We cannot downgrade viewers.  Deactivating them is a different code path
+                                        if authorizer_role < target_user_role && target_user_role < UserRole::VIEWER {
+                                            //db_downgrade_user(&target_user.email, &db).await;
+                                            return worker::Response::ok("User Upgraded");
+                                        } else {
+                                            return err_insufficent_permissions().await;
+                                        }
+                                    },
+                                    Err(e) => return err_specific(e.to_string()).await,                                
+                                }               
+                            },
+                            Err(_) => return err_bad_request().await,
+                        }
+                    },
+                    Err(e) => return err_specific(e.to_string()).await, 
+                }
+            } else {
+                return err_specific("Header didn't have username the second time?".to_string()).await
+            }
         },
         Err(e) => return err_specific(e.to_string()).await,
     }
 }
 
 pub async fn user_add_email(_: Request, ctx: RouteContext<()>) -> worker::Result<Response> {  
-    let db = ctx.env.d1(DB_NAME);
-    match &db{
-        Ok(_) => {
-            // AUTHENTICATE USER HERE
-            return err_api_under_construction().await            
+    if let Some(resp) = header_has_token(&req).await{
+        return resp;
+    }
+
+    if let Some(resp) = header_has_username(&req).await {
+        return resp;
+    }
+
+    match ctx.env.d1(DB_NAME){
+        Ok(db) => {
+            if !header_token_is_valid(&req, &db).await {
+                return err_not_logged_in().await
+            }
+
+            match header_get_username(&req).await {
+                Ok(username) => {
+                    match req.json::<EmailSubmission>().await {                                                        
+                        Ok (email) => {
+                            // db_replace_email
+                            // send_email for confirmation
+                        },
+                        Err(_) => return err_bad_request().await;
+                        }
+
+                    
+                },
+                Err(_) => return err_specific("Header didn't have username the second time?".to_string()).await
+            }
+
+            return err_api_under_construction().await
         },
         Err(e) => return err_specific(e.to_string()).await,
     }
