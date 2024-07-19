@@ -26,3 +26,7 @@ console_error_panic_hook = { version = "0.1.1" }
 serde = "1.0.203"
 argon2 = "0.5.3"
 email_address = "0.2.5"
+regex = "1.10.5"
+rand = "0.8.5"
+rand_chacha = "0.3.1"
+

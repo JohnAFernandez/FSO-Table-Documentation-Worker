@@ -1,8 +1,19 @@
 use serde::{Deserialize, Serialize};
 use worker::*;
 use email_address::*;
+use regex::Regex;
+use argon2::{
+    password_hash::{
+        PasswordHasher, SaltString
+    },
+    Argon2
+};
+use rand::*;
+use rand_chacha::*;
 
 const DB_NAME: &str = "fso_table_database";    
+const DB_ALLOWED_PASSWORD_CHARACTERS: &str = "[^0-9A-Za-z~! @#$%^&*()_\\-+={[}\\]|\\:;<,>.?/]";
+const DB_MINIMUM_PASSWORD_LENGTH: usize = 8;
 
 #[derive(PartialEq, PartialOrd)]
 pub enum UserRole {
@@ -283,7 +294,12 @@ pub async fn activate_user(mut req: Request, ctx: RouteContext<()>) -> worker::R
     }
 }
 
-pub async fn user_change_password(_: Request, ctx: RouteContext<()>) -> worker::Result<Response> {  
+#[derive(Serialize, Deserialize)]
+pub struct Password{
+    password: String,
+}
+
+pub async fn user_change_password(mut req: Request, ctx: RouteContext<()>) -> worker::Result<Response> {  
     if let Some(resp) = header_has_token(&req).await{
         return resp;
     }
@@ -298,10 +314,28 @@ pub async fn user_change_password(_: Request, ctx: RouteContext<()>) -> worker::
                 return err_not_logged_in().await
             }
 
-            // Check password for bad characters
-            // set up salting
-            // salt and place in te database
+            match req.json::<Password>().await{
+                Ok(password) => {
+                    if password.password.len() < DB_MINIMUM_PASSWORD_LENGTH {
+                        return err_specific("Password is too short".to_string()).await
+                    }
+                    let search_set = Regex::new(DB_ALLOWED_PASSWORD_CHARACTERS).unwrap();
+                    match search_set.find(&password.password) {
+                        Some(_) => return err_specific("Disallowed password characters".to_string()).await,
+                        None => (),
+                    }
 
+                    match header_get_username(&req).await {
+                        Ok(username) =>
+                            match hash_password(&username, &password.password).await {
+                                Ok(hash) => (),//db_set_new_pass,
+                                Err(_) => return err_specific("Hashing function failed.".to_string()).await,                            
+                            },
+                        Err(_) => return err_specific("Header didn't have username the second time?".to_string()).await
+                    }
+                },
+                Err(_) => return err_bad_request().await,
+            }
 
             return err_api_under_construction().await
         },
@@ -490,6 +524,28 @@ pub async fn header_get_username(req: &Request) -> Result<String> {
             }
         },
         Err(e) => return Err(e),
+    }
+}
+
+pub async fn hash_password(username: &String, password: &String) -> worker::Result<String> {
+    // Right here we need to do a little bit of server-only stuff!! For safety.  Only on production!
+    
+    // So this needs some documentation.
+    // Basically, we need to conver the string into its u8 array and then into it's u64 array, because that is what randChaCha accepts
+    let username_seed: u64;
+    unsafe {
+        username_seed = username.as_bytes().align_to::<u64>().1[0]; 
+    }
+
+    // RandChaCha will provide a repeatable result from the username so that even if the way that cloudflare structures its servers
+    // We do not need to worry about the seeds changing.
+    // So we generate the salt string using the seeded rng 
+    let rng = rand_chacha::ChaCha12Rng::seed_from_u64(username_seed);
+    let salt = SaltString::generate(rng);
+    
+    match Argon2::default().hash_password(password.as_bytes(), &salt) {
+        Ok(s) => return Ok(s.to_string()),
+        Err(e) => return Err(e.to_string().into()),
     }
 }
 
