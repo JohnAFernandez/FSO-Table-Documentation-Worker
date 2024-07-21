@@ -9,7 +9,9 @@ use argon2::{
     Argon2
 };
 use rand::*;
-use rand_chacha::*;
+use mail_send::*;
+
+mod secrets;
 
 const DB_NAME: &str = "fso_table_database";    
 const DB_ALLOWED_PASSWORD_CHARACTERS: &str = "[^0-9A-Za-z~! @#$%^&*()_\\-+={[}\\]|\\\\:;<,>.?/]";
@@ -30,7 +32,7 @@ struct BasicCount {
 
 //  POST, GET, PATCH, and DELETE -- PUTS AND PATCHES are going to be the same.
 #[event(fetch)]
-async fn fetch(req: Request, env: Env, _ctx: Context,) -> Result<Response> {
+async fn fetch(req: Request, env: Env, _ctx: Context,) -> worker::Result<Response> {
     Router::new()
         .get_async("/", root_get)
         .get_async("/users", user_stats_get)       // No Post, put, patch, or delete for overarching category
@@ -258,7 +260,7 @@ pub async fn activate_user(mut req: Request, ctx: RouteContext<()>) -> worker::R
                                 // But otherwise, you *can* deactivate yourself.
                                 if target_user.email == username{
                                     if authorizer_role == UserRole::OWNER {
-                                        return err_insufficent_permissions()
+                                        return err_insufficent_permissions().await
                                     } else {    
                                         db_deactivate_user(&username, &db).await;
                                         return worker::Response::ok("User Deactivated")
@@ -347,7 +349,7 @@ pub async fn user_change_password(mut req: Request, ctx: RouteContext<()>) -> wo
     }
 }
 
-pub async fn user_upgrade_user_permissions(_: Request, ctx: RouteContext<()>) -> worker::Result<Response> {  
+pub async fn user_upgrade_user_permissions(mut req: Request, ctx: RouteContext<()>) -> worker::Result<Response> {  
     if let Some(resp) = header_has_token(&req).await{
         return resp;
     }
@@ -377,7 +379,7 @@ pub async fn user_upgrade_user_permissions(_: Request, ctx: RouteContext<()>) ->
                     
                                 // You *cannot* upgrade yourself.
                                 if target_user.email == username {
-                                    return err_specific("You cannot upgrade your own account.".to_string())
+                                    return err_specific("You cannot upgrade your own account.".to_string()).await
                                 }
 
                                 // these two types are not allowed to deactivate other users
@@ -413,7 +415,7 @@ pub async fn user_upgrade_user_permissions(_: Request, ctx: RouteContext<()>) ->
     }
 }
 
-pub async fn user_downgrade_user_permissions(_: Request, ctx: RouteContext<()>) -> worker::Result<Response> {  
+pub async fn user_downgrade_user_permissions(mut req: Request, ctx: RouteContext<()>) -> worker::Result<Response> {  
     if let Some(resp) = header_has_token(&req).await{
         return resp;
     }
@@ -443,7 +445,7 @@ pub async fn user_downgrade_user_permissions(_: Request, ctx: RouteContext<()>) 
                     
                                 // You *cannot* upgrade yourself.
                                 if target_user.email == username {
-                                    return err_specific("You cannot downgrade your own account.".to_string())
+                                    return err_specific("You cannot downgrade your own account.".to_string()).await
                                 }
 
                                 // these two types are not allowed to deactivate other users
@@ -479,7 +481,7 @@ pub async fn user_downgrade_user_permissions(_: Request, ctx: RouteContext<()>) 
     }
 }
 
-pub async fn user_add_email(_: Request, ctx: RouteContext<()>) -> worker::Result<Response> {  
+pub async fn user_add_email(mut req: Request, ctx: RouteContext<()>) -> worker::Result<Response> {  
     if let Some(resp) = header_has_token(&req).await{
         return resp;
     }
@@ -501,7 +503,7 @@ pub async fn user_add_email(_: Request, ctx: RouteContext<()>) -> worker::Result
                             // db_replace_email
                             // send_email for confirmation
                         },
-                        Err(_) => return err_bad_request().await;
+                        Err(_) => return err_bad_request().await,
                         }
 
                     
@@ -551,7 +553,7 @@ struct Enabled{
 }
 
 // SECTION!! generic database tasks 
-pub async fn db_has_active_user(email: &String, db: &D1Database) -> Result<bool> {
+pub async fn db_has_active_user(email: &String, db: &D1Database) -> worker::Result<bool> {
     let query = db.prepare("SELECT active FROM users WHERE username = ?").bind(&[email.into()]).unwrap();
 
     match query.first::<Enabled>(None).await {
@@ -565,7 +567,7 @@ pub async fn db_has_active_user(email: &String, db: &D1Database) -> Result<bool>
     }
 }
 
-pub async fn db_email_taken(email: &String, db: &D1Database) -> Result<bool> {
+pub async fn db_email_taken(email: &String, db: &D1Database) -> worker::Result<bool> {
     let query = db.prepare("SELECT count(*) AS the_count FROM users WHERE username = ?").bind(&[email.into()]).unwrap();
 
     match query.first::<BasicCount>(None).await {
@@ -584,7 +586,7 @@ struct Role{
     role: i32,
 }
 
-pub async fn db_get_user_role(email: &String, db: &D1Database) -> Result<UserRole> {
+pub async fn db_get_user_role(email: &String, db: &D1Database) -> worker::Result<UserRole> {
     // roles are only meaningful if the user is active.
     let query = db.prepare("SELECT role FROM users WHERE active = 1 AND username = ?").bind(&[email.into()]).unwrap();
 
@@ -604,7 +606,7 @@ pub async fn db_get_user_role(email: &String, db: &D1Database) -> Result<UserRol
     }
 }
 
-pub async fn db_get_user_details(email: &String, db: &D1Database) -> Result<UserDetails> {
+pub async fn db_get_user_details(email: &String, db: &D1Database) -> worker::Result<UserDetails> {
     let query = db.prepare("SELECT username, role, contribution_count, active FROM users WHERE username = ?").bind(&[email.into()]).unwrap();
 
     match query.first::<UserDetails>(None).await {
@@ -628,7 +630,7 @@ pub async fn db_deactivate_user(email: &String, db: &D1Database) {
 }
 
 // SECTION!! generic server tasks
-pub async fn  header_has_token(req: &Request) -> Option<Result<Response>> {
+pub async fn  header_has_token(req: &Request) -> Option<worker::Result<Response>> {
     match req.headers().has("ganymede_token"){
         Ok(res) => {
             if res { 
@@ -641,7 +643,7 @@ pub async fn  header_has_token(req: &Request) -> Option<Result<Response>> {
     }
 }
 
-pub async fn header_has_username(req: &Request) -> Option<Result<Response>> {
+pub async fn header_has_username(req: &Request) -> Option<worker::Result<Response>> {
     match req.headers().has("username"){
         Ok(res) => {
             if res { 
@@ -654,7 +656,7 @@ pub async fn header_has_username(req: &Request) -> Option<Result<Response>> {
     }
 }
 
-pub async fn header_get_username(req: &Request) -> Result<String> {
+pub async fn header_get_username(req: &Request) -> worker::Result<String> {
     match req.headers().get("username"){
         Ok(user) => {
             match user {
@@ -695,7 +697,7 @@ pub async fn header_token_is_valid(_req: &Request, _db: &D1Database) -> bool {
     true
 }
 
-pub async fn number_to_role(n: i32) -> Result<UserRole> {
+pub async fn number_to_role(n: i32) -> worker::Result<UserRole> {
     match n {
         0 => Ok(UserRole::OWNER),
         1 => Ok(UserRole::ADMIN),
@@ -704,6 +706,32 @@ pub async fn number_to_role(n: i32) -> Result<UserRole> {
         _ => panic!("Tried to convert a number into a UserRole, but the number is out of range: {}.", n)
     }
 }
+
+pub async fn send_confirmation_link(email : String) -> worker::Result<worker::Response> {
+ // Build a simple multipart message
+ let message = mail_builder::MessageBuilder::new()
+ .from(("FSO Tables Server", "registration@fsotables.com"))
+ .to(vec!("New User", &email),)
+ .subject("Account Confirmation Link")
+ .html_body("TODO");
+
+// Connect to the SMTP submissions port, upgrade to TLS and
+// authenticate using the provided credentials.
+match SmtpClientBuilder::new(secrets::SMTP_SERVER, secrets::SMTP_PORT)
+    .implicit_tls(false)
+    .credentials((secrets::SMTP_LOGIN, secrets::SMTP_PASSWORD))
+    .connect()
+    .await {
+        Ok(mut connection) => {if let Err(err) = connection.send(message).await {
+            return err_specific(err.to_string()).await
+        } else {
+            return worker::Response::ok("Authentication Email Sent!");
+        }
+    },
+        Err(e) =>  err_specific(e.to_string()).await,
+    } 
+}
+
 
 // SECTION!! Body/Server Failure Responses
 pub async fn err_insufficent_permissions() -> worker::Result<Response> {
