@@ -9,7 +9,8 @@ use argon2::{
     Argon2
 };
 use rand::*;
-use mail_send::*;
+use lettre::{transport, Message, SmtpTransport, Transport,};
+use lettre_email::{EmailBuilder, Mailbox};
 
 mod secrets;
 
@@ -33,6 +34,7 @@ struct BasicCount {
 //  POST, GET, PATCH, and DELETE -- PUTS AND PATCHES are going to be the same.
 #[event(fetch)]
 async fn fetch(req: Request, env: Env, _ctx: Context,) -> worker::Result<Response> {
+
     Router::new()
         .get_async("/", root_get)
         .get_async("/users", user_stats_get)       // No Post, put, patch, or delete for overarching category
@@ -49,6 +51,7 @@ async fn fetch(req: Request, env: Env, _ctx: Context,) -> worker::Result<Respons
         .or_else_any_method_async("/", err_api_fallback)
         .run(req, env)
         .await
+
 }
 
 
@@ -707,29 +710,35 @@ pub async fn number_to_role(n: i32) -> worker::Result<UserRole> {
     }
 }
 
-pub async fn send_confirmation_link(email : String) -> worker::Result<worker::Response> {
- // Build a simple multipart message
- let message = mail_builder::MessageBuilder::new()
- .from(("FSO Tables Server", "registration@fsotables.com"))
- .to(vec!("New User", &email),)
- .subject("Account Confirmation Link")
- .html_body("TODO");
+pub async fn send_confirmation_link(address : String) -> worker::Result<worker::Response> {
+    if !(EmailAddress::is_valid(&address)){
+        return err_specific(format!("Tried to send automated email to invalid email address {}", address)).await
+    }
 
-// Connect to the SMTP submissions port, upgrade to TLS and
-// authenticate using the provided credentials.
-match SmtpClientBuilder::new(secrets::SMTP_SERVER, secrets::SMTP_PORT)
-    .implicit_tls(false)
-    .credentials((secrets::SMTP_LOGIN, secrets::SMTP_PASSWORD))
-    .connect()
-    .await {
-        Ok(mut connection) => {if let Err(err) = connection.send(message).await {
-            return err_specific(err.to_string()).await
-        } else {
-            return worker::Response::ok("Authentication Email Sent!");
-        }
-    },
-        Err(e) =>  err_specific(e.to_string()).await,
-    } 
+    let to_address: lettre::message::Mailbox = address.parse().unwrap();
+    let from_address: lettre::message::Mailbox = "FSO Tables Registration <registration@fsotables.com>".parse().unwrap();
+
+    match Message::builder()
+        .to(to_address)
+        .from(from_address)
+        .subject("Confirm Your FSO Tables Account")
+        .body("<h1>TODO!</h1>".to_string())
+        {
+            Ok(email) => {
+                match transport::smtp::SmtpTransport::relay(secrets::SMTP_SERVER) {
+                    Ok(relay_bulder) => 
+                    {
+                        let relay = relay_bulder.credentials(transport::smtp::authentication::Credentials::new(secrets::SMTP_LOGIN.to_string(), secrets::SMTP_PASSWORD.to_string())).build();        
+                        match relay.send(&email) {
+                            Ok(_) => return Response::ok("Registration Successful!  Please confirm your account!"),
+                            Err(e) => return err_specific(e.to_string()).await,
+                        }
+                    },
+                    Err(e) => return err_specific(e.to_string()).await,
+                }
+            },            
+            Err(e) => return err_specific(e.to_string()).await,
+        }    
 }
 
 
