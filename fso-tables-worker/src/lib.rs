@@ -1,3 +1,5 @@
+use std::borrow::BorrowMut;
+
 use serde::{Deserialize, Serialize};
 use worker::*;
 use email_address::*;
@@ -9,9 +11,8 @@ use argon2::{
     Argon2
 };
 use rand::*;
-use lettre::{transport, Message, SmtpTransport, Transport,};
-use lettre_email::{EmailBuilder, Mailbox};
-
+use serde_json::*;
+use wasm_bindgen::JsValue;
 mod secrets;
 
 const DB_NAME: &str = "fso_table_database";    
@@ -31,10 +32,55 @@ struct BasicCount {
     the_count: i32,
 }
 
+#[derive(Serialize)]
+struct FullEmailAddress {
+    name: String,
+    email: String,
+}
+
+impl FullEmailAddress {
+    fn create_full_email(name: String, email:String) -> FullEmailAddress {
+        FullEmailAddress{ name, email}
+    }
+}
+
+#[derive(Serialize)]
+struct EmailMessage {
+    sender: FullEmailAddress, 
+    to: Vec<FullEmailAddress>,
+    subject: String,
+    htmlContent: String, // do not change, as this needs to have this case to be properly processed by Bevo
+    /*     "sender":{  
+           "name":"Sender Alex",
+           "email":"senderalex@example.com"
+        },
+        "to":[  
+           {  
+              "email":"testmail@example.com",
+              "name":"John Doe"
+           }
+        ],
+        "subject":"Hello world",
+        "htmlContent":"<html><head></head><body><p>Hello,</p>This is my first transactional email sent from Brevo.</p></body></html>"
+     }'*/
+}
+
+impl EmailMessage {
+    fn create_activation_email() -> EmailMessage{
+        EmailMessage{
+            sender : FullEmailAddress::create_full_email("FSO Tables Database Activations".to_string(), "table@fsotables.com".to_string()),
+            to : vec![], 
+            subject : "Account Confirmation Link".to_string(),
+            htmlContent : "<h1>testing</h1>".to_string(),
+        }
+    }
+}
+
+
 //  POST, GET, PATCH, and DELETE -- PUTS AND PATCHES are going to be the same.
 #[event(fetch)]
 async fn fetch(req: Request, env: Env, _ctx: Context,) -> worker::Result<Response> {
-
+    
     Router::new()
         .get_async("/", root_get)
         .get_async("/users", user_stats_get)       // No Post, put, patch, or delete for overarching category
@@ -112,7 +158,7 @@ pub async fn user_register_new(mut req: Request, ctx: RouteContext<()>) -> worke
                     if let Err(e) = q.run().await {
                         return err_specific(e.to_string()).await;
                     }
-
+                    send_confirmation_link("jafernandez.tampabay@gmail.com".to_string()).await;
                     // TODO! need to send a confirmation email here. No login without it!
 
                     return Response::ok("User created!".to_string());     
@@ -715,30 +761,48 @@ pub async fn send_confirmation_link(address : String) -> worker::Result<worker::
         return err_specific(format!("Tried to send automated email to invalid email address {}", address)).await
     }
 
-    let to_address: lettre::message::Mailbox = address.parse().unwrap();
-    let from_address: lettre::message::Mailbox = "FSO Tables Registration <registration@fsotables.com>".parse().unwrap();
+    let mut headers : Headers = Headers::new();
+    match headers.append("content-type", "application/json"){
+        Ok(_) => (),
+        Err(e) => return err_specific(e.to_string()).await,
+    }
 
-    match Message::builder()
-        .to(to_address)
-        .from(from_address)
-        .subject("Confirm Your FSO Tables Account")
-        .body("<h1>TODO!</h1>".to_string())
-        {
-            Ok(email) => {
-                match transport::smtp::SmtpTransport::relay(secrets::SMTP_SERVER) {
-                    Ok(relay_bulder) => 
-                    {
-                        let relay = relay_bulder.credentials(transport::smtp::authentication::Credentials::new(secrets::SMTP_LOGIN.to_string(), secrets::SMTP_PASSWORD.to_string())).build();        
-                        match relay.send(&email) {
-                            Ok(_) => return Response::ok("Registration Successful!  Please confirm your account!"),
-                            Err(e) => return err_specific(e.to_string()).await,
-                        }
-                    },
-                    Err(e) => return err_specific(e.to_string()).await,
-                }
-            },            
-            Err(e) => return err_specific(e.to_string()).await,
-        }    
+    match headers.append("accept", "application/json") {
+        Ok(_) => (),
+        Err(e) => return err_specific(e.to_string()).await,
+    }
+
+    match headers.append("api-key", secrets::SMTP_API_KEY) {
+        Ok(_) => (),
+        Err(e) => return err_specific(e.to_string()).await,
+    }
+
+    let mut message: EmailMessage = EmailMessage::create_activation_email();
+    message.to.push(FullEmailAddress::create_full_email("".to_string(), address));
+
+    let jvalue_out : JsValue;
+
+    match json!(message).as_str() {
+        Some(json_message) => jvalue_out = JsValue::from_str(json_message),
+        None => return err_specific("Got an json empty string from email builder serializer. Please investigate!".to_string()).await,
+    }
+
+    let mut outbound_request = RequestInit::new();
+    outbound_request.with_method(Method::Post).with_headers(headers).with_body(Some(jvalue_out));
+    
+    let imminent_request = worker::Request::new_with_init("https://api.brevo.com/v3/smtp/email", &outbound_request).unwrap();
+    
+    match worker::Fetch::Request(imminent_request).send().await {
+        Ok(mut res) => { 
+            match res.text().await {
+                Ok(text) => return Response::ok(text + "Email sent!"),
+                Err(e) => return err_specific(e.to_string()).await,
+            }
+        },
+
+        Err(e) => return err_specific(e.to_string()).await,
+    }
+
 }
 
 
