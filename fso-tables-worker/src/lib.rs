@@ -1,5 +1,3 @@
-use std::borrow::BorrowMut;
-
 use serde::{Deserialize, Serialize};
 use worker::*;
 use email_address::*;
@@ -11,7 +9,6 @@ use argon2::{
     Argon2
 };
 use rand::*;
-use serde_json::*;
 use wasm_bindgen::JsValue;
 mod secrets;
 
@@ -152,16 +149,14 @@ pub async fn user_register_new(mut req: Request, ctx: RouteContext<()>) -> worke
                 Err(e) => return err_specific(e.to_string()).await,
             };
             
-            let statement = db1.prepare("INSERT INTO users (username, role, active, contribution_count) VALUES (?, 3, 0, 0)").bind(&[email.email.into()]);
+            let statement = db1.prepare("INSERT INTO users (username, role, active, contribution_count) VALUES (?, 3, 0, 0)").bind(&[email.email.clone().into()]);
             match &statement {
                 Ok(q) => {
                     if let Err(e) = q.run().await {
                         return err_specific(e.to_string()).await;
                     }
-                    send_confirmation_link("jafernandez.tampabay@gmail.com".to_string()).await;
-                    // TODO! need to send a confirmation email here. No login without it!
 
-                    return Response::ok("User created!".to_string());     
+                    return send_confirmation_link(&email.email).await
                 },
                 Err(e) => return err_specific(e.to_string()).await,
             }
@@ -226,6 +221,10 @@ pub async fn deactivate_user(mut req: Request, ctx: RouteContext<()>) -> worker:
             }
 
             if let Ok(username) = header_get_username(&req).await{
+                if !db_user_is_active(&username, &db).await {
+                    return err_user_not_active().await
+                }
+
                 match db_get_user_role(&username, &db).await {                 
                     Ok(authorizer_role) => {
 
@@ -293,14 +292,18 @@ pub async fn activate_user(mut req: Request, ctx: RouteContext<()>) -> worker::R
             }
 
             if let Ok(username) = header_get_username(&req).await{
+                if !db_user_is_active(&username, &db).await {
+                    return err_user_not_active().await
+                }
+
                 match db_get_user_role(&username, &db).await {                 
                     Ok(authorizer_role) => {
 
                         match req.json::<EmailSubmission>().await {                                                        
                             Ok(target_user) =>{
-                                match db_has_active_user(&target_user.email, &db).await {
+                                match db_email_taken(&target_user.email, &db).await {
                                     Ok(exists) => if !exists {
-                                        return err_specific("User does not exist or may already be deactivated.".to_string()).await;
+                                        return err_specific("User does not exist.".to_string()).await;
                                     },
                                     Err(e) => return err_specific(e.to_string()).await,
                                 };
@@ -311,10 +314,9 @@ pub async fn activate_user(mut req: Request, ctx: RouteContext<()>) -> worker::R
                                     if authorizer_role == UserRole::OWNER {
                                         return err_insufficent_permissions().await
                                     } else {    
-                                        db_deactivate_user(&username, &db).await;
-                                        return worker::Response::ok("User Deactivated")
+                                        db_activate_user(&username, &db).await;
+                                        return worker::Response::ok("User Activated")
                                     }
-
                                 }
 
                                 // these two types are not allowed to deactivate other users
@@ -323,18 +325,32 @@ pub async fn activate_user(mut req: Request, ctx: RouteContext<()>) -> worker::R
                                     UserRole::VIEWER => return err_insufficent_permissions().await,
                                     _=> (),
                                 }         
-                                                                                        
-                                match db_get_user_role(&target_user.email, &db).await { 
-                                    Ok(target_user_role) => {
-                                        if authorizer_role < target_user_role{
-                                            db_deactivate_user(&target_user.email, &db).await;
-                                            return worker::Response::ok("User Deactivated");
+                                
+                                // activate the user
+                                db_activate_user(&target_user.email, &db).await;
+                                match db_get_user_role(&target_user.email, &db).await {
+                                    Ok(role) => {
+                                        // only allow returning accounts to be maintainers in case a bad actor decides to 
+                                        // try to act via a deactivated Admin
+                                        if role < UserRole::MAINTAINER{
+                                            match db_force_role(&target_user.email, &db, UserRole::MAINTAINER).await {
+                                                Ok(_) => return worker::Response::ok("User Activated"),
+                                                Err(e) => return err_specific(e.to_string()).await,
+                                            }
                                         } else {
-                                            return err_insufficent_permissions().await;
+                                            match db_force_role(&target_user.email, &db, UserRole::MAINTAINER).await {
+                                                Ok(_) => return worker::Response::ok("User Activated"),
+                                                Err(e) => return err_specific(e.to_string()).await,
+                                            }
                                         }
                                     },
-                                    Err(e) => return err_specific(e.to_string()).await,                                
-                                }               
+                                    Err(e) => {
+                                        db_deactivate_user(&target_user.email, &db).await;
+                                        return err_specific(e.to_string()).await
+                                    }
+
+                                }
+                                
                             },
                             Err(_) => return err_bad_request().await,
                         }
@@ -383,7 +399,7 @@ pub async fn user_change_password(mut req: Request, ctx: RouteContext<()>) -> wo
                     match header_get_username(&req).await {
                         Ok(username) =>
                             match hash_password(&username, &password.password).await {
-                                Ok(hash) => (),//db_set_new_pass,
+                                Ok(hash) => db_set_new_pass(&username, &hash, &db).await,//db_set_new_pass,
                                 Err(_) => return err_specific("Hashing function failed.".to_string()).await,                            
                             },
                         Err(_) => return err_specific("Header didn't have username the second time?".to_string()).await
@@ -414,6 +430,10 @@ pub async fn user_upgrade_user_permissions(mut req: Request, ctx: RouteContext<(
             }
 
             if let Ok(username) = header_get_username(&req).await{
+                if !db_user_is_active(&username, &db).await {
+                    return err_user_not_active().await
+                }
+
                 match db_get_user_role(&username, &db).await {                 
                     Ok(authorizer_role) => {
 
@@ -437,7 +457,8 @@ pub async fn user_upgrade_user_permissions(mut req: Request, ctx: RouteContext<(
                                     UserRole::VIEWER => return err_insufficent_permissions().await,
                                     _=> (),
                                 }         
-                                                                                        
+
+                                // TODO! Extra check needed?                                                                                        
                                 match db_get_user_role(&target_user.email, &db).await { 
                                     Ok(target_user_role) => {
                                         // We cannot upgrade Admins here.  Only when directly accessing the database.
@@ -480,6 +501,10 @@ pub async fn user_downgrade_user_permissions(mut req: Request, ctx: RouteContext
             }
 
             if let Ok(username) = header_get_username(&req).await{
+                if !db_user_is_active(&username, &db).await {
+                    return err_user_not_active().await
+                }
+
                 match db_get_user_role(&username, &db).await {                 
                     Ok(authorizer_role) => {
 
@@ -503,7 +528,8 @@ pub async fn user_downgrade_user_permissions(mut req: Request, ctx: RouteContext
                                     UserRole::VIEWER => return err_insufficent_permissions().await,
                                     _=> (),
                                 }         
-                                                                                        
+
+                                // TODO! Do we need extra checks here?                                                                                        
                                 match db_get_user_role(&target_user.email, &db).await { 
                                     Ok(target_user_role) => {
                                         // We cannot downgrade viewers.  Deactivating them is a different code path
@@ -530,6 +556,7 @@ pub async fn user_downgrade_user_permissions(mut req: Request, ctx: RouteContext
     }
 }
 
+/*  I don't think I actualyl need this ...
 pub async fn user_add_email(mut req: Request, ctx: RouteContext<()>) -> worker::Result<Response> {  
     if let Some(resp) = header_has_token(&req).await{
         return resp;
@@ -565,6 +592,7 @@ pub async fn user_add_email(mut req: Request, ctx: RouteContext<()>) -> worker::
         Err(e) => return err_specific(e.to_string()).await,
     }
 }
+ */
 
 pub async fn user_confirm_email_address(_: Request, ctx: RouteContext<()>) -> worker::Result<Response> {  
     let db = ctx.env.d1(DB_NAME);
@@ -655,6 +683,24 @@ pub async fn db_get_user_role(email: &String, db: &D1Database) -> worker::Result
     }
 }
 
+pub async fn db_force_role(email: &String, db : &D1Database, role: UserRole) -> worker::Result<()> {
+    let role_num : i32;
+    
+    match role {
+        UserRole::ADMIN => role_num = 1,
+        UserRole::MAINTAINER => role_num = 2,
+        UserRole::VIEWER => role_num = 3,
+        UserRole::OWNER => return Err("Nice try bro.  No owners unless I add them directly.".into()),
+    }
+
+    let query = db.prepare("UPDATE users SET role = ? WHERE username = ?").bind(&[role_num.into()]).unwrap().bind(&[email.into()]).unwrap();
+
+    match query.first::<UserDetails>(None).await {
+        Ok(_) => Ok(()),
+        Err(e) => return Err(e),
+    }
+}
+
 pub async fn db_get_user_details(email: &String, db: &D1Database) -> worker::Result<UserDetails> {
     let query = db.prepare("SELECT username, role, contribution_count, active FROM users WHERE username = ?").bind(&[email.into()]).unwrap();
 
@@ -671,6 +717,44 @@ pub async fn db_get_user_details(email: &String, db: &D1Database) -> worker::Res
 
 pub async fn db_deactivate_user(email: &String, db: &D1Database) {
     let query = db.prepare("UPDATE users SET active = 0 WHERE username = ?").bind(&[email.into()]).unwrap();
+    
+    match query.first::<UserDetails>(None).await {
+        Ok(_) => (),
+        Err(e) => panic!("{}", e.to_string()),
+    }
+}
+
+pub async fn db_activate_user(email: &String, db: &D1Database) {
+    let query = db.prepare("UPDATE users SET active = 1 WHERE username = ?").bind(&[email.into()]).unwrap();
+    
+    match query.first::<UserDetails>(None).await {
+        Ok(_) => (),
+        Err(e) => panic!("{}", e.to_string()),
+    }
+}
+
+pub async fn db_user_is_active(email: &String, db: &D1Database) -> bool {
+    let query = db.prepare("SELECT active WHERE username = ?").bind(&[email.into()]).unwrap();
+
+    match query.first::<BasicCount>(None).await {
+        Ok(status) => {
+            match status {
+                Some(active) => {
+                    if active.the_count == 1{
+                        return true
+                    } else {
+                        return false
+                    }
+                },
+                None => return false,
+            }
+        },
+        Err(_) => return false,
+    }
+}
+
+pub async fn db_set_new_pass(email: &String, password: &String, db: &D1Database) {
+    let query = db.prepare("UPDATE users SET password = ? WHERE username = ?").bind(&[password.into()]).unwrap().bind(&[email.into()]).unwrap();
     
     match query.first::<UserDetails>(None).await {
         Ok(_) => (),
@@ -756,7 +840,7 @@ pub async fn number_to_role(n: i32) -> worker::Result<UserRole> {
     }
 }
 
-pub async fn send_confirmation_link(address : String) -> worker::Result<worker::Response> {
+pub async fn send_confirmation_link(address : &String) -> worker::Result<worker::Response> {
     if !(EmailAddress::is_valid(&address)){
         return err_specific(format!("Tried to send automated email to invalid email address {}", address)).await
     }
@@ -778,13 +862,13 @@ pub async fn send_confirmation_link(address : String) -> worker::Result<worker::
     }
 
     let mut message: EmailMessage = EmailMessage::create_activation_email();
-    message.to.push(FullEmailAddress::create_full_email("".to_string(), address));
+    message.to.push(FullEmailAddress::create_full_email("Lob".to_string(), address.to_string()));
 
     let jvalue_out : JsValue;
 
-    match json!(message).as_str() {
-        Some(json_message) => jvalue_out = JsValue::from_str(json_message),
-        None => return err_specific("Got an json empty string from email builder serializer. Please investigate!".to_string()).await,
+    match serde_json::to_string(&message) {
+        Ok(json_message) => jvalue_out = JsValue::from_str(&json_message),
+        Err(e) => return err_specific(e.to_string()).await,
     }
 
     let mut outbound_request = RequestInit::new();
@@ -813,6 +897,10 @@ pub async fn err_insufficent_permissions() -> worker::Result<Response> {
 
 pub async fn err_not_logged_in() -> worker::Result<Response> {
     Response::error("You must be logged in to access this endpoint.", 403)
+}
+
+pub async fn err_user_not_active() -> worker::Result<Response> {
+    Response::error("The user must be active before it can authorize this type of action", 403)
 }
 
 pub async fn err_api_fallback(_: Request, _: RouteContext<()>) -> worker::Result<Response> {
