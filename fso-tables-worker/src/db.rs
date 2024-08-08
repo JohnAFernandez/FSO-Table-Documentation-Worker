@@ -67,6 +67,11 @@ struct BasicCount {
     the_count: i32,
 }
 
+#[derive(Deserialize,Serialize)]
+struct Active {
+    active: i32,
+}
+
 
 pub async fn db_get_user_role(email: &String, db: &D1Database) -> worker::Result<UserRole> {
     // roles are only meaningful if the user is active.
@@ -141,13 +146,13 @@ pub async fn db_activate_user(email: &String, db: &D1Database) {
 }
 
 pub async fn db_user_is_active(email: &String, db: &D1Database) -> bool {
-    let query = db.prepare("SELECT active WHERE username = ?").bind(&[email.into()]).unwrap();
+    let query = db.prepare("SELECT active FROM users WHERE username = ? LIMIT 1").bind(&[email.into()]).unwrap();
 
-    match query.first::<BasicCount>(None).await {
+    match query.first::<Active>(None).await {
         Ok(status) => {
             match status {
                 Some(active) => {
-                    if active.the_count == 1{
+                    if active.active == 1{
                         return true
                     } else {
                         return false
