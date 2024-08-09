@@ -166,7 +166,8 @@ pub async fn db_user_is_active(email: &String, db: &D1Database) -> bool {
 }
 
 pub async fn db_check_password(email: &String, password: &String, db: &D1Database) -> bool {
-    let query = db.prepare("SELECT Count(*) FROM users WHERE username = ? and password = ? LIMIT 1").bind(&[email.into()]).unwrap().bind(&[password.into()]).unwrap();
+    let query_string = format!("SELECT count(*) AS the_count FROM users WHERE username = ? and password = \"{}\"", password);
+    let query = db.prepare(&query_string).bind(&[email.into()]).unwrap();
 
     match query.first::<BasicCount>(None).await {
         Ok(count) => {
@@ -214,4 +215,12 @@ pub async fn db_user_stats_get(_: Request, _ctx: RouteContext<()>) -> worker::Re
         }
         Err(e) => return err_specific(e.to_string()).await,
     }            
+}
+
+pub async fn db_session_add(email: &String, token: &String, time: &String, db : &D1Database){
+
+    
+
+    let statement = db1.prepare("INSERT INTO sessions (key, user, expiration, contribution_count) VALUES (?, 3, 0, 0)").bind(&[email.email.clone().into()]);
+
 }

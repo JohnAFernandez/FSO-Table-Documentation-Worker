@@ -38,19 +38,6 @@ struct EmailMessage {
     to: Vec<FullEmailAddress>,
     subject: String,
     htmlContent: String, // do not change, as this needs to have this case to be properly processed by Bevo
-    /*     "sender":{  
-           "name":"Sender Alex",
-           "email":"senderalex@example.com"
-        },
-        "to":[  
-           {  
-              "email":"testmail@example.com",
-              "name":"John Doe"
-           }
-        ],
-        "subject":"Hello world",
-        "htmlContent":"<html><head></head><body><p>Hello,</p>This is my first transactional email sent from Brevo.</p></body></html>"
-     }'*/
 }
 
 impl EmailMessage {
@@ -363,20 +350,20 @@ pub async fn user_login(mut req: Request, ctx: RouteContext<()>) -> worker::Resu
         Ok(db) => {
             match req.json::<LoginRequest>().await{
                 Ok(login) => {
-                    if let Err(_e) = db_fso::db_email_taken(&login.email, &db).await {
-                        return err_specific("User does not exist.".to_string()).await;
+                    match db_fso::db_email_taken(&login.email, &db).await {
+                        Ok(b) => if !b { return err_specific("User does not exist.".to_string()).await },
+                        Err(e) => return err_specific(e.to_string()).await,
                     }
                     match hash_password(&login.email, &login.password).await {
                         Ok(hash) => {
                             if db_fso::db_check_password(&login.email, &hash, &db).await {
-                                return worker::Response::ok("Password Check Successful!");
+                                return worker::Response::ok("Login Successful!");
                             } else {
-                                return worker::Response::ok("Password check performed but unsuccessful");
+                                return worker::Response::error("Login unsuccessful!", 403);
                             }
                         },
                         Err(_) => return err_specific("Hashing function failed.".to_string()).await,
-                    }
-                    
+                    }                    
                 },
                 Err(e) => return err_specific(e.to_string()).await,
             }
@@ -436,8 +423,6 @@ pub async fn user_change_password(mut req: Request, ctx: RouteContext<()>) -> wo
                 },
                 Err(_) => return err_bad_request().await,
             }
-
-            return err_api_under_construction().await
         },
         Err(e) => return err_specific(e.to_string()).await,
     }
