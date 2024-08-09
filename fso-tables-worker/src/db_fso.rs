@@ -165,12 +165,34 @@ pub async fn db_user_is_active(email: &String, db: &D1Database) -> bool {
     }
 }
 
-pub async fn db_set_new_pass(email: &String, password: &String, db: &D1Database) {
-    let query = db.prepare("UPDATE users SET password = ? WHERE username = ?").bind(&[password.into()]).unwrap().bind(&[email.into()]).unwrap();
+pub async fn db_check_password(email: &String, password: &String, db: &D1Database) -> bool {
+    let query = db.prepare("SELECT Count(*) FROM users WHERE username = ? and password = ? LIMIT 1").bind(&[email.into()]).unwrap().bind(&[password.into()]).unwrap();
+
+    match query.first::<BasicCount>(None).await {
+        Ok(count) => {
+            match count {
+                Some(count) => {
+                    if count.the_count > 0 {
+                        return true
+                    } else {
+                        return false
+                    }
+                },
+                None => return false,
+            }
+        },
+        Err(_) => return false,
+    }    
+}
+
+pub async fn db_set_new_pass(email: &String, password: &String, db: &D1Database) -> String {
+    let query_string = format!("UPDATE users SET password = \"{}\" WHERE username = ?", password);
+
+    let query = db.prepare(&query_string).bind(&[email.into()]).unwrap();
     
     match query.first::<UserDetails>(None).await {
-        Ok(_) => (),
-        Err(e) => panic!("{}", e.to_string()),
+        Ok(_) => return "Success!".to_string(),
+        Err(e) => return e.to_string(),
     }
 }
 
