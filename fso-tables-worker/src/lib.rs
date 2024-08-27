@@ -65,6 +65,7 @@ async fn fetch(req: Request, env: Env, _ctx: Context,) -> worker::Result<Respons
         .delete_async("/users", deactivate_user)
         .post_async("/users/activate", activate_user).put_async("/users/activate", activate_user).patch_async("/users/activate", activate_user)
         .get_async("/users/login", user_login)
+        .get_async("/tables/parse-types", get_parse_types)
         /* 
         .route("/users/:username/upgrade", put(upgrade_user_permissions).patch(upgrade_user_permissions))
         .route("/users/:username/downgrade", put(downgrade_user_permissions).patch(downgrade_user_permissions))
@@ -570,6 +571,16 @@ pub async fn user_downgrade_user_permissions(mut req: Request, ctx: RouteContext
     }
 }
 
+
+pub async fn get_parse_types(_: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
+    match ctx.env.d1(DB_NAME) {
+        Ok(db) => {
+            return db_fso::db_get_parse_behavior_types(&db).await;
+        },
+        Err(e) => return err_specific(e.to_string()).await,
+    }
+
+}
 /*  I don't think I actualyl need this ...
 pub async fn user_add_email(mut req: Request, ctx: RouteContext<()>) -> worker::Result<Response> {  
     if let Some(resp) = header_has_token(&req).await{

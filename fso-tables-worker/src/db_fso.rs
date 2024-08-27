@@ -217,6 +217,27 @@ pub async fn db_user_stats_get(_: Request, _ctx: RouteContext<()>) -> worker::Re
     }            
 }
 
+#[derive(Deserialize, Serialize)]
+struct ParseBehavior{
+    behavior_id	: i32,
+    behavior : String,
+    description : String,
+}
+
+pub async fn db_get_parse_behavior_types(db : &D1Database) -> worker::Result<Response>{
+    let query = db.prepare("SELECT * FROM parse_behaviors;");
+
+    match query.all().await {
+        Ok(results) => {
+            match results.results::<ParseBehavior>() {
+                Ok(result) => return Response::from_json(&result),
+                Err(e) => return err_specific(e.to_string()).await,
+            }
+        },
+        Err(e) => return err_specific(e.to_string()).await,
+    }    
+}
+
 pub async fn db_session_add(email: &String, token: &String, time: &String, db : &D1Database){
 
     
