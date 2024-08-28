@@ -12,8 +12,10 @@ use argon2::{
 };
 use rand::*;
 use wasm_bindgen::JsValue;
+use random_string;
 mod secrets;
 mod db_fso;
+
 
 const DB_NAME: &str = "fso_table_database";    
 const DB_ALLOWED_PASSWORD_CHARACTERS: &str = "[^0-9A-Za-z~!@#$%^&*()_\\-+={\\[}\\]|\\\\:;<,>.?\\/]";// 
@@ -345,6 +347,7 @@ pub struct LoginRequest{
     password: String,
 }
 
+
 pub async fn user_login(mut req: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
 
     match ctx.env.d1(DB_NAME) {
@@ -355,10 +358,21 @@ pub async fn user_login(mut req: Request, ctx: RouteContext<()>) -> worker::Resu
                         Ok(b) => if !b { return err_specific("User does not exist.".to_string()).await },
                         Err(e) => return err_specific(e.to_string()).await,
                     }
-                    match hash_password(&login.email, &login.password).await {
+                    match hash_string(&login.email, &login.password).await {
                         Ok(hash) => {
                             if db_fso::db_check_password(&login.email, &hash, &db).await {
-                                return worker::Response::ok("Login Successful!");
+                                let login_token = create_random_string().await;
+                                let hashed_string: String;                                
+
+                                match hash_string(&login.email, &login_token).await {
+                                    Ok(hashed) => hashed_string = hashed,
+                                    Err(e) => return err_specific(e.to_string()).await,
+                                }
+
+                                match db_fso::db_session_add(&hashed_string, &login.email, &"time".to_string(), &db).await {
+                                    Ok(_) => return worker::Response::ok(format!("{{\"token\":\"{}\"}}", login_token)),
+                                    Err(e) => return err_specific(e.to_string()).await,
+                                }
                             } else {
                                 return worker::Response::error("Login unsuccessful!", 403);
                             }
@@ -411,7 +425,7 @@ pub async fn user_change_password(mut req: Request, ctx: RouteContext<()>) -> wo
                                      
                     match header_get_username(&req).await {
                         Ok(username) => {
-                            match hash_password(&username, &password.password).await {                             
+                            match hash_string(&username, &password.password).await {                             
                                 Ok(hash) => { 
                                     db_fso::db_set_new_pass(&username, &hash, &db).await;
                                     return worker::Response::ok("Password Changed!");
@@ -689,7 +703,7 @@ pub async fn header_get_username(req: &Request) -> worker::Result<String> {
     }
 }
 
-pub async fn hash_password(username: &String, password: &String) -> worker::Result<String> {
+pub async fn hash_string(username: &String, string: &String) -> worker::Result<String> {
     // Right here we need to do a little bit of server-only stuff!! For safety.  Only on production!
 
     // So this needs some documentation.
@@ -721,13 +735,17 @@ pub async fn hash_password(username: &String, password: &String) -> worker::Resu
     let rng = rand_chacha::ChaCha12Rng::seed_from_u64(username_seed);
     let salt = SaltString::generate(rng);
     
-    match Argon2::default().hash_password(password.as_bytes(), &salt) {
+    match Argon2::default().hash_password(string.as_bytes(), &salt) {
         Ok(s) => match s.hash {
             Some(hash) => return Ok(hash.to_string()),
             None => return Err("Hashing function gave an empty output!!".to_string().into()),
         },
         Err(e) => return Err(e.to_string().into()),
     }
+}
+
+pub async fn create_random_string() -> String {
+    return random_string::generate(64, "1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ+-!@#$%^&*()_<>,.:;|+={}")
 }
 
 // this is going to be a big one.  We'll need to 1. Lookup an entry on username/tokens

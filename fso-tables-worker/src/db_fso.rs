@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use crate::UserDetails;
 use crate::DB_NAME;
 use crate::err_specific;
+use wasm_bindgen::JsValue;
 
 #[derive(PartialEq, PartialOrd)]
 pub enum UserRole {
@@ -70,6 +71,11 @@ struct BasicCount {
 #[derive(Deserialize,Serialize)]
 struct Active {
     active: i32,
+}
+
+#[derive(Deserialize, Serialize)]
+struct GeneralResults{
+    rows : Vec<Vec<String>>,
 }
 
 
@@ -238,10 +244,27 @@ pub async fn db_get_parse_behavior_types(db : &D1Database) -> worker::Result<Res
     }    
 }
 
-pub async fn db_session_add(email: &String, token: &String, time: &String, db : &D1Database){
 
-    
+pub async fn db_session_add(token: &String, email: &String, time: &String, db : &D1Database) -> worker::Result<()> {
 
-    let statement = db1.prepare("INSERT INTO sessions (key, user, expiration, contribution_count) VALUES (?, 3, 0, 0)").bind(&[email.email.clone().into()]);
+    // I know this is silly, but JsValue constructors can't accept vectors of Strings
+    // Only vectors of numeric types (although I haven't tried it myself)
+    // Anyway ... this logic is only temporary.  I should be able to create a function that does this
+    // for any input.
+    let js_value = JsValue::from(token);
+    let js_value2 = JsValue::from(email);
+    let js_value3 = JsValue::from(time);
 
+    let input_vec = vec!{js_value, js_value2, js_value3};
+    let js_value2 = JsValue::from(input_vec);
+
+    match db.prepare("INSERT INTO sessions (key, user, expiration) VALUES (?, ?, ?, 0)").bind(&[js_value2]) {
+        Ok(statement) => {
+            match statement.run().await {
+                Ok(_) => return Ok(()),
+                Err(e) => return Err(e),
+            }
+        },
+        Err(e)=> return Err(e),
+    }
 }
