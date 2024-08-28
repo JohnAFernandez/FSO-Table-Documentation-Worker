@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use crate::UserDetails;
 use crate::DB_NAME;
 use crate::err_specific;
-use wasm_bindgen::JsValue;
+//use wasm_bindgen::JsValue;
 
 #[derive(PartialEq, PartialOrd)]
 pub enum UserRole {
@@ -247,18 +247,28 @@ pub async fn db_get_parse_behavior_types(db : &D1Database) -> worker::Result<Res
 
 pub async fn db_session_add(token: &String, email: &String, time: &String, db : &D1Database) -> worker::Result<()> {
 
+    // METACOMMENT! The below didn't end up working.  I did trick the JsValue constructor to use the 
+    // vector, but the database code said, "MUAAAAAH I CAN'T USE AN OBJECT!!!!"
+    // It may not be possible, but I think I have to trick it to create an array object.
+    // I'm just not sure how.
+    
     // I know this is silly, but JsValue constructors can't accept vectors of Strings
     // Only vectors of numeric types (although I haven't tried it myself)
     // Anyway ... this logic is only temporary.  I should be able to create a function that does this
     // for any input.
-    let js_value = JsValue::from(token);
+    /*let js_value = JsValue::from(token);
     let js_value2 = JsValue::from(email);
     let js_value3 = JsValue::from(time);
 
     let input_vec = vec!{js_value, js_value2, js_value3};
     let js_value2 = JsValue::from(input_vec);
+    */
 
-    match db.prepare("INSERT INTO sessions (key, user, expiration) VALUES (?, ?, ?, 0)").bind(&[js_value2]) {
+    // So we'll just use the work around .... again... until I can find a way to bind more than one item.
+    let final_token = &token.replace("\"", "");
+    let query = format!("INSERT INTO sessions (key, user, expiration) VALUES (\"{}\", ?, \"{}\")", final_token, time);
+
+    match db.prepare(query).bind(&[email.into()]) {
         Ok(statement) => {
             match statement.run().await {
                 Ok(_) => return Ok(()),

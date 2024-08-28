@@ -11,7 +11,9 @@ use argon2::{
     Argon2
 };
 use rand::*;
+use rand::distributions::Alphanumeric;
 use wasm_bindgen::JsValue;
+use chrono::Utc;
 //use random_string;
 mod secrets;
 mod db_fso;
@@ -356,7 +358,7 @@ pub async fn user_login(mut req: Request, ctx: RouteContext<()>) -> worker::Resu
                 Ok(login) => {
                     match db_fso::db_email_taken(&login.email, &db).await {
                         Ok(b) => if !b { return err_specific("User does not exist.".to_string()).await },
-                        Err(e) => return err_specific(e.to_string()).await,
+                        Err(e) => return err_specific(e.to_string()  + "Part 3").await,
                     }
                     match hash_string(&login.email, &login.password).await {
                         Ok(hash) => {
@@ -366,24 +368,24 @@ pub async fn user_login(mut req: Request, ctx: RouteContext<()>) -> worker::Resu
 
                                 match hash_string(&login.email, &login_token).await {
                                     Ok(hashed) => hashed_string = hashed,
-                                    Err(e) => return err_specific(e.to_string()).await,
+                                    Err(e) => return err_specific(e.to_string() + "Part 1").await,
                                 }
 
-                                match db_fso::db_session_add(&hashed_string, &login.email, &"time".to_string(), &db).await {
+                                match db_fso::db_session_add(&hashed_string, &login.email, &Utc::now().to_string(), &db).await {
                                     Ok(_) => return worker::Response::ok(format!("{{\"token\":\"{}\"}}", login_token)),
-                                    Err(e) => return err_specific(e.to_string()).await,
+                                    Err(e) => return err_specific(e.to_string() + "Part 2").await,
                                 }
                             } else {
-                                return worker::Response::error("Login unsuccessful!", 403);
+                                return worker::Response::error("Login unsuccessful! Part 4", 403);
                             }
                         },
-                        Err(_) => return err_specific("Hashing function failed.".to_string()).await,
+                        Err(_) => return err_specific("Hashing function failed.".to_string()  + "Part 5").await,
                     }                    
                 },
-                Err(e) => return err_specific(e.to_string()).await,
+                Err(e) => return err_specific(e.to_string()  + "Part 6").await,
             }
         },
-    Err(e) => err_specific(e.to_string()).await,
+    Err(e) => err_specific(e.to_string()  + "Part 7").await,
     }
 
 }
@@ -744,8 +746,12 @@ pub async fn hash_string(username: &String, string: &String) -> worker::Result<S
     }
 }
 
-pub async fn create_random_string() -> String {
-    return /*random_string::generate(64, */"1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ+-!@#$%^&*()_<>,.:;|+={}".to_string();
+pub async fn create_random_string() -> String {    
+    return rand::thread_rng()
+    .sample_iter(&Alphanumeric)
+    .take(64)
+    .map(char::from)
+    .collect();
 }
 
 // this is going to be a big one.  We'll need to 1. Lookup an entry on username/tokens
