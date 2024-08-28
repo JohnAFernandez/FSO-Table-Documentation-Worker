@@ -13,7 +13,7 @@ use argon2::{
 use rand::*;
 use rand::distributions::Alphanumeric;
 use wasm_bindgen::JsValue;
-use chrono::Utc;
+use chrono::{Utc, TimeDelta};
 //use random_string;
 mod secrets;
 mod db_fso;
@@ -371,7 +371,8 @@ pub async fn user_login(mut req: Request, ctx: RouteContext<()>) -> worker::Resu
                                     Err(e) => return err_specific(e.to_string() + "Part 1").await,
                                 }
 
-                                match db_fso::db_session_add(&hashed_string, &login.email, &Utc::now().to_string(), &db).await {
+                                // We give the user two hours to do what they need to do.
+                                match db_fso::db_session_add(&hashed_string, &login.email, &(Utc::now() + TimeDelta::hours(2)).to_string(), &db).await {
                                     Ok(_) => return worker::Response::ok(format!("{{\"token\":\"{}\"}}", login_token)),
                                     Err(e) => return err_specific(e.to_string() + "Part 2").await,
                                 }
