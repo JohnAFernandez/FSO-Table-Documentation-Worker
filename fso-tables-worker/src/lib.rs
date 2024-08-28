@@ -12,7 +12,7 @@ use argon2::{
 };
 use rand::*;
 use wasm_bindgen::JsValue;
-use random_string;
+//use random_string;
 mod secrets;
 mod db_fso;
 
@@ -745,7 +745,7 @@ pub async fn hash_string(username: &String, string: &String) -> worker::Result<S
 }
 
 pub async fn create_random_string() -> String {
-    return random_string::generate(64, "1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ+-!@#$%^&*()_<>,.:;|+={}")
+    return /*random_string::generate(64, */"1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ+-!@#$%^&*()_<>,.:;|+={}".to_string();
 }
 
 // this is going to be a big one.  We'll need to 1. Lookup an entry on username/tokens
