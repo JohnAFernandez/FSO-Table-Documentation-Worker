@@ -699,7 +699,19 @@ pub async fn header_get_username(req: &Request) -> worker::Result<String> {
         Ok(user) => {
             match user {
                 Some(username) => return Ok(username),
-                None => panic!("No username found under username in header."),
+                None => return Err("No username found under username in header.".to_string().into()),
+            }
+        },
+        Err(e) => return Err(e),
+    }
+}
+
+pub async fn header_get_username(req: &Request) -> worker::Result<String> {
+    match req.headers().get("username"){
+        Ok(user) => {
+            match user {
+                Some(username) => return Ok(username),
+                None => return Err("No username found under username in header.".to_string().into()),
             }
         },
         Err(e) => return Err(e),
@@ -758,8 +770,23 @@ pub async fn create_random_string() -> String {
 // this is going to be a big one.  We'll need to 1. Lookup an entry on username/tokens
 // 2. Compare the token they gave us and see if it matches the username. 
 // 3. See if the token is still valid.
-pub async fn header_token_is_valid(_req: &Request, _db: &D1Database) -> bool {
-    true
+pub async fn header_token_is_valid(req: &Request, db: &D1Database) -> (bool, String)  {
+    let return_tuple = (false, "".to_string())
+    
+    if let Some(resp) = header_has_token(&req).await{
+        return return_tuple;
+    }
+
+    if let Some(resp) = header_has_username(&req).await {
+        return return_tuple;
+    }
+
+    if let Ok(username) = header_get_username(&req).await{
+        return_tuple[1] = username;
+    }
+
+
+    
 }
 
 pub async fn send_confirmation_link(address : &String) -> worker::Result<worker::Response> {
@@ -818,7 +845,7 @@ pub async fn err_insufficent_permissions() -> worker::Result<Response> {
 }
 
 pub async fn err_not_logged_in() -> worker::Result<Response> {
-    Response::error("You must be logged in to access this endpoint.", 403)
+    Response::error("You must be logged and provide an access token to access this endpoint.", 403)
 }
 
 pub async fn err_user_not_active() -> worker::Result<Response> {
