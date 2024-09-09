@@ -23,6 +23,103 @@ pub async fn number_to_role(n: i32) -> worker::Result<UserRole> {
     }
 }
 
+pub enum Table {
+    ACTIONS,
+    DEPRECATIONS,
+    EMAIL_VALIDATIONS, 
+    FSO_ITEMS,
+    FSO_TABLES,
+    PARSE_BEHAVIORS,
+    RESTRICTIONS,
+    SESSIONS,
+    TABLE_ALIASES,
+    USERS,
+}
+
+const ActionsQuery: &str = "SELECT * FROM actions";    
+const DeprecationsQuery: &str = "SELECT * FROM deprecations"; 
+const EmailValidationsQuery: &str = "SELECT validation_id, user_id FROM email_validations";
+const FsoItemsQuery: &str = "SELECT * FROM fso_items";
+const FsoTablesQuery: &str = "SELECT * FROM fso_tables";    
+const ParseBehaviorsQuery: &str = "SELECT * FROM parse_behaviors";    
+const RestrictionsQuery: &str = "SELECT * FROM restrictions";    
+const SessionsQuery: &str = "SELECT * FROM sessions";    
+const TableAliasesQuery: &str = "SELECT * FROM table_aliases";    
+const UsersQuery: &str = "SELECT id, username, role, active, email_confirmed, contribution_count FROM users";
+
+
+#[derive(Serialize, Deserialize)]
+struct Actions {
+    action_id: i32,
+    user_id: i32,
+    action: String,
+    approved_by_user: i32,
+    timestamp: String,
+}
+
+#[derive(Serialize, Deserialize)]
+struct Deprecations {
+    deprecation_id: i32,
+    date: String,
+    version: String,
+}
+
+#[derive(Serialize, Deserialize)]
+struct EmailValidations {
+    validation_id: i32,
+    user_id: i32,
+}
+
+#[derive(Serialize, Deserialize)]
+struct FsoItems { 
+    item_id: i32,
+    item_text: String,
+    documentation: String,
+    major_version: i32,
+    parent_id: i32,
+    table_id: i32,
+    deprecation_id: i32,
+    restriction_id: i32,
+    info_type: String,
+    table_index: i32,
+    default_value: String,
+}
+
+#[derive(Serialize, Deserialize)]
+struct FsoTables { 
+    table_id: i32,
+    name: String,
+    filename: String,
+    modular_extension: String,
+    description: String,
+}
+
+#[derive(Deserialize, Serialize)]
+struct ParseBehavior{
+    behavior_id	: i32,
+    behavior : String,
+    description : String,
+}
+
+#[derive(Deserialize, Serialize)]
+struct Restrictions {
+    restriction_id: i32,
+    min_value: f32,
+    max_value: f32,
+    max_string_length:  i32,
+    illegal_value_int:  i32,
+    illegal_value_float:  f32,
+}
+
+#[derive(Deserialize, Serialize)]
+struct Users {
+    id: i32,
+    username: String,
+    role: i32,
+    active: i32,
+    email_confirmed: i32,
+    contribution_count: i32,
+} // TODO!  I need a banned button.
 
 #[derive(Serialize, Deserialize)]
 struct Enabled{
@@ -73,10 +170,6 @@ struct Active {
     active: i32,
 }
 
-#[derive(Deserialize, Serialize)]
-struct GeneralResults{
-    rows : Vec<Vec<String>>,
-}
 
 
 pub async fn db_get_user_role(email: &String, db: &D1Database) -> worker::Result<UserRole> {
@@ -223,12 +316,6 @@ pub async fn db_user_stats_get(_: Request, _ctx: RouteContext<()>) -> worker::Re
     }            
 }
 
-#[derive(Deserialize, Serialize)]
-struct ParseBehavior{
-    behavior_id	: i32,
-    behavior : String,
-    description : String,
-}
 
 pub async fn db_get_parse_behavior_types(db : &D1Database) -> worker::Result<Response>{
     let query = db.prepare("SELECT * FROM parse_behaviors;");
