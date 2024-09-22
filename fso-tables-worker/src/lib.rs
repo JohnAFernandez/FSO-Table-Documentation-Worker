@@ -771,7 +771,7 @@ pub async fn create_random_string() -> String {
 // 2. Compare the token they gave us and see if it matches the username. 
 // 3. See if the token is still valid.
 pub async fn header_token_is_valid(req: &Request, db: &D1Database) -> (bool, String)  {
-    let return_tuple = (false, "".to_string())
+    let return_tuple = (false, "".to_string());
     
     if let Some(resp) = header_has_token(&req).await{
         return return_tuple;
