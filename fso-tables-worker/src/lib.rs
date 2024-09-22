@@ -150,7 +150,7 @@ pub async fn user_get_details(req: Request, ctx: RouteContext<()>) -> worker::Re
   
     match ctx.env.d1(DB_NAME) {
         Ok(db) => {
-            if !header_token_is_valid(&req, &db).await {
+            if !header_session_is_valid(&req, &db).await {
                 return err_not_logged_in().await
             } else {
                 if let Some(username) = req.headers().get("username").unwrap(){
@@ -180,7 +180,7 @@ pub async fn deactivate_user(mut req: Request, ctx: RouteContext<()>) -> worker:
   
     match ctx.env.d1(DB_NAME) {
         Ok(db) => {
-            if !header_token_is_valid(&req, &db).await {
+            if !header_session_is_valid(&req, &db).await {
                 return err_not_logged_in().await
             }
 
@@ -251,7 +251,7 @@ pub async fn activate_user(mut req: Request, ctx: RouteContext<()>) -> worker::R
   
     match ctx.env.d1(DB_NAME) {
         Ok(db) => {
-            if !header_token_is_valid(&req, &db).await {
+            if !header_session_is_valid(&req, &db).await {
                 return err_not_logged_in().await
             }
 
@@ -407,7 +407,7 @@ pub async fn user_change_password(mut req: Request, ctx: RouteContext<()>) -> wo
 
     match ctx.env.d1(DB_NAME){
         Ok(db) => {
-            if !header_token_is_valid(&req, &db).await {
+            if !header_session_is_valid(&req, &db).await {
                 return err_not_logged_in().await
             }
             match req.json::<Password>().await{
@@ -457,7 +457,7 @@ pub async fn user_upgrade_user_permissions(mut req: Request, ctx: RouteContext<(
   
     match ctx.env.d1(DB_NAME) {
         Ok(db) => {
-            if !header_token_is_valid(&req, &db).await {
+            if !header_session_is_valid(&req, &db).await {
                 return err_not_logged_in().await
             }
 
@@ -528,7 +528,7 @@ pub async fn user_downgrade_user_permissions(mut req: Request, ctx: RouteContext
   
     match ctx.env.d1(DB_NAME) {
         Ok(db) => {
-            if !header_token_is_valid(&req, &db).await {
+            if !header_session_is_valid(&req, &db).await {
                 return err_not_logged_in().await
             }
 
@@ -610,7 +610,7 @@ pub async fn user_add_email(mut req: Request, ctx: RouteContext<()>) -> worker::
 
     match ctx.env.d1(DB_NAME){
         Ok(db) => {
-            if !header_token_is_valid(&req, &db).await {
+            if !header_session_is_valid(&req, &db).await {
                 return err_not_logged_in().await
             }
 
@@ -706,12 +706,12 @@ pub async fn header_get_username(req: &Request) -> worker::Result<String> {
     }
 }
 
-pub async fn header_get_username(req: &Request) -> worker::Result<String> {
-    match req.headers().get("username"){
-        Ok(user) => {
-            match user {
-                Some(username) => return Ok(username),
-                None => return Err("No username found under username in header.".to_string().into()),
+pub async fn header_get_token(req: &Request) -> worker::Result<String> {
+    match req.headers().get("ganymede_token"){
+        Ok(token_option) => {
+            match token_option {
+                Some(token) => return Ok(token),
+                None => return Err("No token found in header.".to_string().into()),
             }
         },
         Err(e) => return Err(e),
@@ -770,23 +770,50 @@ pub async fn create_random_string() -> String {
 // this is going to be a big one.  We'll need to 1. Lookup an entry on username/tokens
 // 2. Compare the token they gave us and see if it matches the username. 
 // 3. See if the token is still valid.
-pub async fn header_token_is_valid(req: &Request, db: &D1Database) -> (bool, String)  {
+pub async fn header_session_is_valid(req: &Request, db: &D1Database) -> (bool, String)  {
     let return_tuple = (false, "".to_string());
     
-    if let Some(resp) = header_has_token(&req).await{
-        return return_tuple;
+    match header_has_token(&req).await {
+        Some(r) => { 
+            match r {
+                Ok(text) => return_tuple[1] = text.text().await.unwrap(),
+                Err(e) => return_tuple[1] = e.into(),
+            }
+
+            return return_tuple;
+        },
+        None()=> (),
     }
 
-    if let Some(resp) = header_has_username(&req).await {
-        return return_tuple;
+    match header_has_username(&req).await {
+        Some(r) => { 
+            match r {
+                Ok(text) => return_tuple[1] = text.text().await.unwrap(),
+                Err(e) => return_tuple[1] = e.into(),
+            }
+
+            return return_tuple;
+        },
+        None()=> (),
     }
 
-    if let Ok(username) = header_get_username(&req).await{
-        return_tuple[1] = username;
-    }
+    match header_get_token(&req).await{
+        Ok(token) => {            
+            if let Ok(username) = header_get_username(&req).await{
+                return_tuple[1] = username;
+            } else {
+                return return_tuple;
+            }
+            
+            match db_fso::db_check_token(&return_tuple[1], &token, Utc::now(), &db) {
+                Ok(result) => return_tuple[0] = result,
+                Err(e) => return_tuple[1] = e.into(),
+            }
 
-
-    
+            return_tuple
+        },
+        Err(e) => return_tuple,
+    }    
 }
 
 pub async fn send_confirmation_link(address : &String) -> worker::Result<worker::Response> {

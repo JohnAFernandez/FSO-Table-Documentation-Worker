@@ -365,3 +365,8 @@ pub async fn db_session_add(token: &String, email: &String, time: &String, db : 
         Err(e)=> return Err(e),
     }
 }
+
+
+pub async fn db_check_token(username: &String, token: &String, time: String, db: &D1Database) -> Result<bool> {
+        
+}
