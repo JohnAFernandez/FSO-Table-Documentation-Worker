@@ -368,5 +368,49 @@ pub async fn db_session_add(token: &String, email: &String, time: &String, db : 
 
 
 pub async fn db_check_token(username: &String, token: &String, time: String, db: &D1Database) -> Result<bool> {
-        
+    let final_token = &token.replace("\"", "");
+    let query = format!(SessionsQuery + " WHERE token = \"{}\" AND username = ?;", final_token, time);
+
+    match db.prepare(query).bind(&[username.into()]) {
+        Ok(statement) => {
+            match statement.run().await.results::<ParseBehavior>() {
+                Ok(results) => { 
+                    
+
+                return Ok()
+                },
+                Err(e) => return Ok(false),
+            }
+        },
+        Err(e)=> return Err(e),
+    }
+
 }
+
+// How to compare timestamps
+/*
+use chrono::{offset::{Utc, TimeZone}, TimeDelta, DateTime};
+
+fn main() {
+    let a = Utc::now();
+    let b = Utc::now() + TimeDelta::hours(2);
+    
+    let diff = b - a;
+    
+    print!("{}", diff.to_string());
+
+    if a < b {
+        print!("\nTrue!");
+    } else {
+        print!("\nFalse!");
+    }
+    
+    let aString = a.to_string();
+    let bString = b.to_string();
+    
+    print!("\n{}", aString);
+    print!("\n{}", bString);
+    let date_str = aString.parse::<DateTime<Utc>>().unwrap();
+
+    print!("\n{}", date_str.to_string());
+} */

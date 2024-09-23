@@ -805,7 +805,9 @@ pub async fn header_session_is_valid(req: &Request, db: &D1Database) -> (bool, S
                 return return_tuple;
             }
             
-            match db_fso::db_check_token(&return_tuple[1], &token, Utc::now(), &db) {
+            let hashed_token = hash_string(&username, &token).await.unwrap();
+
+            match db_fso::db_check_token(&return_tuple[1], &hashed_token, Utc::now(), &db) {
                 Ok(result) => return_tuple[0] = result,
                 Err(e) => return_tuple[1] = e.into(),
             }
