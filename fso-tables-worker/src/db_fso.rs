@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use crate::UserDetails;
 use crate::DB_NAME;
 use crate::err_specific;
+use chrono::{TimeDelta, DateTime};
 //use wasm_bindgen::JsValue;
 
 #[derive(PartialEq, PartialOrd)]
@@ -36,16 +37,24 @@ pub enum Table {
     USERS,
 }
 
-const ActionsQuery: &str = "SELECT * FROM actions";    
-const DeprecationsQuery: &str = "SELECT * FROM deprecations"; 
-const EmailValidationsQuery: &str = "SELECT validation_id, user_id FROM email_validations";
-const FsoItemsQuery: &str = "SELECT * FROM fso_items";
-const FsoTablesQuery: &str = "SELECT * FROM fso_tables";    
-const ParseBehaviorsQuery: &str = "SELECT * FROM parse_behaviors";    
-const RestrictionsQuery: &str = "SELECT * FROM restrictions";    
-const SessionsQuery: &str = "SELECT * FROM sessions";    
-const TableAliasesQuery: &str = "SELECT * FROM table_aliases";    
-const UsersQuery: &str = "SELECT id, username, role, active, email_confirmed, contribution_count FROM users";
+const ActionsQuery: &str = "SELECT * FROM actions ";    
+const DeprecationsQuery: &str = "SELECT * FROM deprecations "; 
+const EmailValidationsQuery: &str = "SELECT validation_id, user_id FROM email_validations ";
+const FsoItemsQuery: &str = "SELECT * FROM fso_items ";
+const FsoTablesQuery: &str = "SELECT * FROM fso_tables ";    
+const ParseBehaviorsQuery: &str = "SELECT * FROM parse_behaviors ";    
+const RestrictionsQuery: &str = "SELECT * FROM restrictions ";    
+const SessionsQuery: &str = "SELECT id, user, expiration,  FROM sessions ";    
+const TableAliasesQuery: &str = "SELECT * FROM table_aliases ";    
+const UsersQuery: &str = "SELECT id, username, role, active, email_confirmed, contribution_count FROM users ";
+
+const ActionsFilterId: &str = "WHERE action_id = ?";
+const ActionsFilterUserId: &str = "WHERE user_id = ?";
+const ActionsFilterApproved: &str = "WHERE approved = ?";
+const ActionsFilterUserApproved: &str = "Where user_id = ? AND approved = {}";
+
+const SessionsFilter: &str = "WHERE key = {} AND user = ?;";
+
 
 
 #[derive(Serialize, Deserialize)]
@@ -120,6 +129,12 @@ struct Users {
     email_confirmed: i32,
     contribution_count: i32,
 } // TODO!  I need a banned button.
+
+struct Session {
+    id: i32,
+    user: String,
+    expiration: String,
+}
 
 #[derive(Serialize, Deserialize)]
 struct Enabled{
@@ -369,27 +384,27 @@ pub async fn db_session_add(token: &String, email: &String, time: &String, db : 
 
 pub async fn db_check_token(username: &String, token: &String, time: String, db: &D1Database) -> Result<bool> {
     let final_token = &token.replace("\"", "");
-    let query = format!(SessionsQuery + " WHERE token = \"{}\" AND username = ?;", final_token, time);
+    let query = format!(SessionsQuery + SessionsFilter, final_token);
 
     match db.prepare(query).bind(&[username.into()]) {
         Ok(statement) => {
-            match statement.run().await.results::<ParseBehavior>() {
+            match statement.run().await.results::<Session>() {
                 Ok(results) => { 
-                    
-
-                return Ok()
+                    match results.expiration.parse::<DateTime<Utc>>(){
+                        Ok(session_time) => return Ok(time.parse::<DateTime<Utc>>().unwrap() < session_time),
+                        // TODO! Once we know this function works, two of these call need to be changed into Ok(false)
+                        Err(e) => return Err(e),
+                    }
                 },
-                Err(e) => return Ok(false),
+                Err(e) => return Err(e),
             }
         },
         Err(e)=> return Err(e),
     }
-
 }
 
 // How to compare timestamps
 /*
-use chrono::{offset::{Utc, TimeZone}, TimeDelta, DateTime};
 
 fn main() {
     let a = Utc::now();
