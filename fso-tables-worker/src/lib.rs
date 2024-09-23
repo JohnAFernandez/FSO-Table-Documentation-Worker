@@ -139,205 +139,179 @@ pub struct UserDetails{
 }
 
 
-pub async fn user_get_details(req: Request, ctx: RouteContext<()>) -> worker::Result<Response> {  
-    if let Some(resp) = header_has_token(&req).await{
-        return resp;
-    }
-
-    if let Some(resp) = header_has_username(&req).await {
-        return resp;
-    }
-  
+pub async fn user_get_details(req: Request, ctx: RouteContext<()>) -> worker::Result<Response> {    
     match ctx.env.d1(DB_NAME) {
         Ok(db) => {
-            if !header_session_is_valid(&req, &db).await {
+            let session_result = header_session_is_valid(&req, &db).await;
+            if !session_result[0] {
                 return err_not_logged_in().await
-            } else {
-                if let Some(username) = req.headers().get("username").unwrap(){
-                    match db_fso::db_get_user_details(&username, &db).await {
-                        Ok(res) => return Response::from_json(&res),
-                        Err(e) => return err_specific(e.to_string()).await,
-                    }    
-                } else {
-                    return err_specific("Header didn't have username the second time?".to_string()).await
-                }
+            }
 
-            }            
+            let username = session_result[1];
+
+            match db_fso::db_get_user_details(&username, &db).await {
+                Ok(res) => return Response::from_json(&res),
+                Err(e) => return err_specific(e.to_string()).await,
+            }    
+                  
         },
         Err(e) => return err_specific(e.to_string()).await,
     }
 }
 
 
-pub async fn deactivate_user(mut req: Request, ctx: RouteContext<()>) -> worker::Result<Response> {  
-    if let Some(resp) = header_has_token(&req).await{
-        return resp;
-    }
-
-    if let Some(resp) = header_has_username(&req).await {
-        return resp;
-    }
-  
+pub async fn deactivate_user(mut req: Request, ctx: RouteContext<()>) -> worker::Result<Response> {    
     match ctx.env.d1(DB_NAME) {
         Ok(db) => {
-            if !header_session_is_valid(&req, &db).await {
+            let session_result = header_session_is_valid(&req, &db).await;
+            if !session_result[0] {
                 return err_not_logged_in().await
             }
 
-            if let Ok(username) = header_get_username(&req).await{
-                if !db_fso::db_user_is_active(&username, &db).await {
-                    return err_user_not_active().await
-                }
-
-                match db_fso::db_get_user_role(&username, &db).await {                 
-                    Ok(authorizer_role) => {
-
-                        match req.json::<EmailSubmission>().await {                                                        
-                            Ok(target_user) =>{
-                                match db_fso::db_has_active_user(&target_user.email, &db).await {
-                                    Ok(exists) => if !exists {
-                                        return err_specific("User does not exist or may already be deactivated.".to_string()).await;
-                                    },
-                                    Err(e) => return err_specific(e.to_string()).await,
-                                };
-                    
-                                // Owners can only be deactivated by someone working directly with the database.
-                                // But otherwise, you *can* deactivate yourself.
-                                if target_user.email == username && authorizer_role != db_fso::UserRole::OWNER {
-                                    db_fso::db_deactivate_user(&username, &db).await;
-                                    return worker::Response::ok("User Deactivated")
-                                }
-
-                                // these two types are not allowed to deactivate other users
-                                match authorizer_role {
-                                    db_fso::UserRole::MAINTAINER => return err_insufficent_permissions().await,
-                                    db_fso::UserRole::VIEWER => return err_insufficent_permissions().await,
-                                    _=> (),
-                                }         
-                                                                                        
-                                match db_fso::db_get_user_role(&target_user.email, &db).await { 
-                                    Ok(target_user_role) => {
-                                        if authorizer_role < target_user_role{
-                                            db_fso::db_deactivate_user(&target_user.email, &db).await;
-                                            return worker::Response::ok("User Deactivated");
-                                        } else {
-                                            return err_insufficent_permissions().await;
-                                        }
-                                    },
-                                    Err(e) => return err_specific(e.to_string()).await,                                
-                                }               
-                            },
-                            Err(_) => return err_bad_request().await,
-                        }
-                    },
-                    Err(e) => return err_specific(e.to_string()).await, 
-                }
-            } else {
-                return err_specific("Header didn't have username the second time?".to_string()).await
+            let username = session_result[1];
+            
+            if !db_fso::db_user_is_active(&username, &db).await {
+                return err_user_not_active().await
             }
+
+            match db_fso::db_get_user_role(&username, &db).await {                 
+                Ok(authorizer_role) => {
+
+                    match req.json::<EmailSubmission>().await {                                                        
+                        Ok(target_user) =>{
+                            match db_fso::db_has_active_user(&target_user.email, &db).await {
+                                Ok(exists) => if !exists {
+                                    return err_specific("User does not exist or may already be deactivated.".to_string()).await;
+                                },
+                                Err(e) => return err_specific(e.to_string()).await,
+                            };
+                
+                            // Owners can only be deactivated by someone working directly with the database.
+                            // But otherwise, you *can* deactivate yourself.
+                            if target_user.email == username && authorizer_role != db_fso::UserRole::OWNER {
+                                db_fso::db_deactivate_user(&username, &db).await;
+                                return worker::Response::ok("User Deactivated")
+                            }
+
+                            // these two types are not allowed to deactivate other users
+                            match authorizer_role {
+                                db_fso::UserRole::MAINTAINER => return err_insufficent_permissions().await,
+                                db_fso::UserRole::VIEWER => return err_insufficent_permissions().await,
+                                _=> (),
+                            }         
+                                                                                    
+                            match db_fso::db_get_user_role(&target_user.email, &db).await { 
+                                Ok(target_user_role) => {
+                                    if authorizer_role < target_user_role{
+                                        db_fso::db_deactivate_user(&target_user.email, &db).await;
+                                        return worker::Response::ok("User Deactivated");
+                                    } else {
+                                        return err_insufficent_permissions().await;
+                                    }
+                                },
+                                Err(e) => return err_specific(e.to_string()).await,                                
+                            }               
+                        },
+                        Err(_) => return err_bad_request().await,
+                    }
+                },
+                Err(e) => return err_specific(e.to_string()).await, 
+            }
+            
         },
         Err(e) => return err_specific(e.to_string()).await,
     }
 }
 
 pub async fn activate_user(mut req: Request, ctx: RouteContext<()>) -> worker::Result<Response> {  
-    if let Some(resp) = header_has_token(&req).await{
-        return resp;
-    }
-
-    if let Some(resp) = header_has_username(&req).await {
-        return resp;
-    }
-  
     match ctx.env.d1(DB_NAME) {
         Ok(db) => {
-            if !header_session_is_valid(&req, &db).await {
+            let session_result = header_session_is_valid(&req, &db).await;
+            if !session_result[0] {
                 return err_not_logged_in().await
             }
 
-            if let Ok(username) = header_get_username(&req).await{
-                match req.json::<EmailSubmission>().await {                                                        
-                    Ok(target_user) =>{
-                        match db_fso::db_email_taken(&target_user.email, &db).await {
-                            Ok(exists) => if !exists {
-                                return err_specific("User to activate does not exist.".to_string()).await;
+            let username = session_result[1];
+
+            match req.json::<EmailSubmission>().await {                                                        
+                Ok(target_user) =>{
+                    match db_fso::db_email_taken(&target_user.email, &db).await {
+                        Ok(exists) => if !exists {
+                            return err_specific("User to activate does not exist.".to_string()).await;
+                        },
+                        Err(e) => return err_specific(e.to_string()).await,
+                    };
+
+                    // make no changes if this user already exists
+                    if db_fso::db_user_is_active(&target_user.email, &db).await {
+                        return worker::Response::ok("User is already Active")
+                    }
+
+                    // We need to see if the activating user is active, otherwise we should ignore
+                    if !db_fso::db_user_is_active(&username, &db).await {
+                        // Owners can only be deactivated by someone working directly with the database.
+                        // But otherwise, you *can* deactivate yourself.
+                        if target_user.email == username{
+                            db_fso::db_activate_user(&target_user.email, &db).await;
+                        } else {
+                            return err_user_not_active().await
+                        }                                
+                    }
+                    // NOTE! IF WE GET HERE THE USER IS ACTIVE! AND WE NEED TO DEACTIVATE ON EVERY FAILURE!
+    
+                    match db_fso::db_get_user_role(&username, &db).await {                 
+                        Ok(authorizer_role) => {
+    
+                        // these two types are not allowed to deactivate other users, and the owner can only be activated
+                        // directly.
+                        match authorizer_role {
+                            db_fso::UserRole::OWNER => {
+                                db_fso::db_deactivate_user(&target_user.email, &db).await;
+                                return err_insufficent_permissions().await
+                            }
+                            db_fso::UserRole::MAINTAINER => {
+                                if target_user.email != username{
+                                    db_fso::db_deactivate_user(&target_user.email, &db).await;
+                                    return err_insufficent_permissions().await    
+                                }
                             },
-                            Err(e) => return err_specific(e.to_string()).await,
-                        };
-
-                        // make no changes if this user already exists
-                        if db_fso::db_user_is_active(&target_user.email, &db).await {
-                            return worker::Response::ok("User is already Active")
-                        }
-
-                        // We need to see if the activating user is active, otherwise we should ignore
-                        if !db_fso::db_user_is_active(&username, &db).await {
-                            // Owners can only be deactivated by someone working directly with the database.
-                            // But otherwise, you *can* deactivate yourself.
-                            if target_user.email == username{
-                                db_fso::db_activate_user(&target_user.email, &db).await;
-                            } else {
-                                return err_user_not_active().await
-                            }                                
-                        }
-                        // NOTE! IF WE GET HERE THE USER IS ACTIVE! AND WE NEED TO DEACTIVATE ON EVERY FAILURE!
-        
-                        match db_fso::db_get_user_role(&username, &db).await {                 
-                            Ok(authorizer_role) => {
-        
-                            // these two types are not allowed to deactivate other users, and the owner can only be activated
-                            // directly.
-                            match authorizer_role {
-                                db_fso::UserRole::OWNER => {
+                            db_fso::UserRole::VIEWER => { 
+                                if target_user.email != username{
                                     db_fso::db_deactivate_user(&target_user.email, &db).await;
                                     return err_insufficent_permissions().await
                                 }
-                                db_fso::UserRole::MAINTAINER => {
-                                    if target_user.email != username{
-                                        db_fso::db_deactivate_user(&target_user.email, &db).await;
-                                        return err_insufficent_permissions().await    
+                            },
+                            _=> (),
+                        }         
+                    
+                        // activate the user
+                        match db_fso::db_get_user_role(&target_user.email, &db).await {
+                            Ok(role) => {
+                                // only allow returning accounts to be maintainers in case a bad actor decides to 
+                                // try to act via a deactivated Admin
+                                if role < db_fso::UserRole::MAINTAINER{
+                                    match db_fso::db_force_role(&target_user.email, &db, db_fso::UserRole::MAINTAINER).await {
+                                        Ok(_) => return worker::Response::ok("User Activated"),
+                                        Err(e) => return err_specific(e.to_string()).await,
                                     }
-                                },
-                                db_fso::UserRole::VIEWER => { 
-                                    if target_user.email != username{
-                                        db_fso::db_deactivate_user(&target_user.email, &db).await;
-                                        return err_insufficent_permissions().await
-                                    }
-                                },
-                                _=> (),
-                            }         
-                        
-                            // activate the user
-                            match db_fso::db_get_user_role(&target_user.email, &db).await {
-                                Ok(role) => {
-                                    // only allow returning accounts to be maintainers in case a bad actor decides to 
-                                    // try to act via a deactivated Admin
-                                    if role < db_fso::UserRole::MAINTAINER{
-                                        match db_fso::db_force_role(&target_user.email, &db, db_fso::UserRole::MAINTAINER).await {
-                                            Ok(_) => return worker::Response::ok("User Activated"),
-                                            Err(e) => return err_specific(e.to_string()).await,
-                                        }
-                                    } else {
-                                        return worker::Response::ok("User Activated")
-                                    }
-                                },
-                                Err(e) => {
-                                    db_fso::db_deactivate_user(&target_user.email, &db).await;
-                                    return err_specific(e.to_string()).await
+                                } else {
+                                    return worker::Response::ok("User Activated")
                                 }
-                            }
                             },
                             Err(e) => {
                                 db_fso::db_deactivate_user(&target_user.email, &db).await;
                                 return err_specific(e.to_string()).await
                             }
-                        }    
-                    },
-                    Err(_) => return err_bad_request().await,
-                }
-            } else {
-                return err_specific("Header didn't have username the second time?".to_string()).await
-            }
+                        }
+                        },
+                        Err(e) => {
+                            db_fso::db_deactivate_user(&target_user.email, &db).await;
+                            return err_specific(e.to_string()).await
+                        }
+                    }    
+                },
+                Err(_) => return err_bad_request().await,
+            }        
         },
         Err(e) => return err_specific(e.to_string()).await,
     }
@@ -351,7 +325,6 @@ pub struct LoginRequest{
 
 
 pub async fn user_login(mut req: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
-
     match ctx.env.d1(DB_NAME) {
         Ok(db) => {
             match req.json::<LoginRequest>().await{
@@ -397,19 +370,14 @@ pub struct Password{
 }
 
 pub async fn user_change_password(mut req: Request, ctx: RouteContext<()>) -> worker::Result<Response> {  
-    if let Some(resp) = header_has_token(&req).await{
-        return resp;
-    }
-
-    if let Some(resp) = header_has_username(&req).await {
-        return resp;
-    }
-
     match ctx.env.d1(DB_NAME){
         Ok(db) => {
-            if !header_session_is_valid(&req, &db).await {
+            let session_result = header_session_is_valid(&req, &db).await;
+            if !session_result[0] {
                 return err_not_logged_in().await
             }
+
+            let username = session_result[1];
             match req.json::<Password>().await{
                 Ok(password) => {
                     if password.password.len() < DB_MINIMUM_PASSWORD_LENGTH {
@@ -426,18 +394,13 @@ pub async fn user_change_password(mut req: Request, ctx: RouteContext<()>) -> wo
                         Err(e) => return err_specific(e.to_string()).await
                     }
                                      
-                    match header_get_username(&req).await {
-                        Ok(username) => {
-                            match hash_string(&username, &password.password).await {                             
-                                Ok(hash) => { 
-                                    db_fso::db_set_new_pass(&username, &hash, &db).await;
-                                    return worker::Response::ok("Password Changed!");
-                                },
-                                Err(e) => return err_specific(e.to_string() + &" Hashing function failed.".to_string()).await,                            
-                            }
+                    match hash_string(&username, &password.password).await {                             
+                        Ok(hash) => { 
+                            db_fso::db_set_new_pass(&username, &hash, &db).await;
+                            return worker::Response::ok("Password Changed!");
                         },
-                        Err(_) => return err_specific("Header didn't have username the second time?".to_string()).await
-                    }
+                        Err(e) => return err_specific(e.to_string() + &" Hashing function failed.".to_string()).await,
+                    }                            
                 },
                 Err(_) => return err_bad_request().await,
             }
@@ -446,71 +409,62 @@ pub async fn user_change_password(mut req: Request, ctx: RouteContext<()>) -> wo
     }
 }
 
-pub async fn user_upgrade_user_permissions(mut req: Request, ctx: RouteContext<()>) -> worker::Result<Response> {  
-    if let Some(resp) = header_has_token(&req).await{
-        return resp;
-    }
-
-    if let Some(resp) = header_has_username(&req).await {
-        return resp;
-    }
-  
+pub async fn user_upgrade_user_permissions(mut req: Request, ctx: RouteContext<()>) -> worker::Result<Response> {    
     match ctx.env.d1(DB_NAME) {
         Ok(db) => {
-            if !header_session_is_valid(&req, &db).await {
+            let session_result = header_session_is_valid(&req, &db).await;
+            if !session_result[0] {
                 return err_not_logged_in().await
             }
 
-            if let Ok(username) = header_get_username(&req).await{
-                if !db_fso::db_user_is_active(&username, &db).await {
-                    return err_user_not_active().await
-                }
+            let username = session_result[1];
 
-                match db_fso::db_get_user_role(&username, &db).await {                 
-                    Ok(authorizer_role) => {
+            if !db_fso::db_user_is_active(&username, &db).await {
+                return err_user_not_active().await
+            }
 
-                        match req.json::<EmailSubmission>().await {                                                        
-                            Ok(target_user) =>{
-                                match db_fso::db_has_active_user(&target_user.email, &db).await {
-                                    Ok(exists) => if !exists {
-                                        return err_specific("User does not exist or may be deactivated.".to_string()).await;
-                                    },
-                                    Err(e) => return err_specific(e.to_string()).await,
-                                };
-                    
-                                // You *cannot* upgrade yourself.
-                                if target_user.email == username {
-                                    return err_specific("You cannot upgrade your own account.".to_string()).await
-                                }
+            match db_fso::db_get_user_role(&username, &db).await {                 
+                Ok(authorizer_role) => {
 
-                                // these two types are not allowed to deactivate other users
-                                match authorizer_role {
-                                    db_fso::UserRole::MAINTAINER => return err_insufficent_permissions().await,
-                                    db_fso::UserRole::VIEWER => return err_insufficent_permissions().await,
-                                    _=> (),
-                                }         
+                    match req.json::<EmailSubmission>().await {                                                        
+                        Ok(target_user) =>{
+                            match db_fso::db_has_active_user(&target_user.email, &db).await {
+                                Ok(exists) => if !exists {
+                                    return err_specific("User does not exist or may be deactivated.".to_string()).await;
+                                },
+                                Err(e) => return err_specific(e.to_string()).await,
+                            };
+                
+                            // You *cannot* upgrade yourself.
+                            if target_user.email == username {
+                                return err_specific("You cannot upgrade your own account.".to_string()).await
+                            }
 
-                                // TODO! Extra check needed?                                                                                        
-                                match db_fso::db_get_user_role(&target_user.email, &db).await { 
-                                    Ok(target_user_role) => {
-                                        // We cannot upgrade Admins here.  Only when directly accessing the database.
-                                        if authorizer_role < target_user_role && target_user_role > db_fso::UserRole::ADMIN {
-                                            //db_upgrade_user(&target_user.email, &db).await;
-                                            return worker::Response::ok("User Upgraded");
-                                        } else {
-                                            return err_insufficent_permissions().await;
-                                        }
-                                    },
-                                    Err(e) => return err_specific(e.to_string()).await,                                
-                                }               
-                            },
-                            Err(_) => return err_bad_request().await,
-                        }
-                    },
-                    Err(e) => return err_specific(e.to_string()).await, 
-                }
-            } else {
-                return err_specific("Header didn't have username the second time?".to_string()).await
+                            // these two types are not allowed to deactivate other users
+                            match authorizer_role {
+                                db_fso::UserRole::MAINTAINER => return err_insufficent_permissions().await,
+                                db_fso::UserRole::VIEWER => return err_insufficent_permissions().await,
+                                _=> (),
+                            }         
+
+                            // TODO! Extra check needed?                                                                                        
+                            match db_fso::db_get_user_role(&target_user.email, &db).await { 
+                                Ok(target_user_role) => {
+                                    // We cannot upgrade Admins here.  Only when directly accessing the database.
+                                    if authorizer_role < target_user_role && target_user_role > db_fso::UserRole::ADMIN {
+                                        //db_upgrade_user(&target_user.email, &db).await;
+                                        return worker::Response::ok("User Upgraded");
+                                    } else {
+                                        return err_insufficent_permissions().await;
+                                    }
+                                },
+                                Err(e) => return err_specific(e.to_string()).await,                                
+                            }               
+                        },
+                        Err(_) => return err_bad_request().await,
+                    }
+                },
+                Err(e) => return err_specific(e.to_string()).await, 
             }
         },
         Err(e) => return err_specific(e.to_string()).await,
@@ -518,70 +472,62 @@ pub async fn user_upgrade_user_permissions(mut req: Request, ctx: RouteContext<(
 }
 
 pub async fn user_downgrade_user_permissions(mut req: Request, ctx: RouteContext<()>) -> worker::Result<Response> {  
-    if let Some(resp) = header_has_token(&req).await{
-        return resp;
-    }
-
-    if let Some(resp) = header_has_username(&req).await {
-        return resp;
-    }
   
     match ctx.env.d1(DB_NAME) {
         Ok(db) => {
-            if !header_session_is_valid(&req, &db).await {
+            let session_result = header_session_is_valid(&req, &db).await;
+            if !session_result[0] {
                 return err_not_logged_in().await
             }
 
-            if let Ok(username) = header_get_username(&req).await{
-                if !db_fso::db_user_is_active(&username, &db).await {
-                    return err_user_not_active().await
-                }
+            let username = session_result[1];
 
-                match db_fso::db_get_user_role(&username, &db).await {                 
-                    Ok(authorizer_role) => {
+            if !db_fso::db_user_is_active(&username, &db).await {
+                return err_user_not_active().await
+            }
 
-                        match req.json::<EmailSubmission>().await {                                                        
-                            Ok(target_user) =>{
-                                match db_fso::db_has_active_user(&target_user.email, &db).await {
-                                    Ok(exists) => if !exists {
-                                        return err_specific("User does not exist or may be deactivated.".to_string()).await;
-                                    },
-                                    Err(e) => return err_specific(e.to_string()).await,
-                                };
-                    
-                                // You *cannot* upgrade yourself.
-                                if target_user.email == username {
-                                    return err_specific("You cannot downgrade your own account.".to_string()).await
-                                }
+            match db_fso::db_get_user_role(&username, &db).await {                 
+                Ok(authorizer_role) => {
 
-                                // these two types are not allowed to deactivate other users
-                                match authorizer_role {
-                                    db_fso::UserRole::MAINTAINER => return err_insufficent_permissions().await,
-                                    db_fso::UserRole::VIEWER => return err_insufficent_permissions().await,
-                                    _=> (),
-                                }         
+                    match req.json::<EmailSubmission>().await {                                                        
+                        Ok(target_user) =>{
+                            match db_fso::db_has_active_user(&target_user.email, &db).await {
+                                Ok(exists) => if !exists {
+                                    return err_specific("User does not exist or may be deactivated.".to_string()).await;
+                                },
+                                Err(e) => return err_specific(e.to_string()).await,
+                            };
+                
+                            // You *cannot* upgrade yourself.
+                            if target_user.email == username {
+                                return err_specific("You cannot downgrade your own account.".to_string()).await
+                            }
 
-                                // TODO! Do we need extra checks here?                                                                                        
-                                match db_fso::db_get_user_role(&target_user.email, &db).await { 
-                                    Ok(target_user_role) => {
-                                        // We cannot downgrade viewers.  Deactivating them is a different code path
-                                        if authorizer_role < target_user_role && target_user_role < db_fso::UserRole::VIEWER {
-                                            //db_downgrade_user(&target_user.email, &db).await;
-                                            return worker::Response::ok("User Upgraded");
-                                        } else {
-                                            return err_insufficent_permissions().await;
-                                        }
-                                    },
-                                    Err(e) => return err_specific(e.to_string()).await,                                
-                                }               
-                            },
-                            Err(_) => return err_bad_request().await,
-                        }
-                    },
-                    Err(e) => return err_specific(e.to_string()).await, 
-                }
-            } else {
-                return err_specific("Header didn't have username the second time?".to_string()).await
+                            // these two types are not allowed to deactivate other users
+                            match authorizer_role {
+                                db_fso::UserRole::MAINTAINER => return err_insufficent_permissions().await,
+                                db_fso::UserRole::VIEWER => return err_insufficent_permissions().await,
+                                _=> (),
+                            }         
+
+                            // TODO! Do we need extra checks here?                                                                                        
+                            match db_fso::db_get_user_role(&target_user.email, &db).await { 
+                                Ok(target_user_role) => {
+                                    // We cannot downgrade viewers.  Deactivating them is a different code path
+                                    if authorizer_role < target_user_role && target_user_role < db_fso::UserRole::VIEWER {
+                                        //db_downgrade_user(&target_user.email, &db).await;
+                                        return worker::Response::ok("User Upgraded");
+                                    } else {
+                                        return err_insufficent_permissions().await;
+                                    }
+                                },
+                                Err(e) => return err_specific(e.to_string()).await,                                
+                            }               
+                        },
+                        Err(_) => return err_bad_request().await,
+                    }
+                },
+                Err(e) => return err_specific(e.to_string()).await, 
             }
         },
         Err(e) => return err_specific(e.to_string()).await,
@@ -596,38 +542,28 @@ pub async fn get_parse_types(_: Request, ctx: RouteContext<()>) -> worker::Resul
         },
         Err(e) => return err_specific(e.to_string()).await,
     }
-
 }
+
 /*  I don't think I actualyl need this ...
 pub async fn user_add_email(mut req: Request, ctx: RouteContext<()>) -> worker::Result<Response> {  
-    if let Some(resp) = header_has_token(&req).await{
-        return resp;
-    }
-
-    if let Some(resp) = header_has_username(&req).await {
-        return resp;
-    }
-
     match ctx.env.d1(DB_NAME){
         Ok(db) => {
-            if !header_session_is_valid(&req, &db).await {
+            let session_result = header_session_is_valid(&req, &db).await;
+            if !session_result[0] {
                 return err_not_logged_in().await
             }
 
-            match header_get_username(&req).await {
-                Ok(username) => {
-                    match req.json::<EmailSubmission>().await {                                                        
-                        Ok (email) => {
-                            // db_replace_email
-                            // send_email for confirmation
-                        },
-                        Err(_) => return err_bad_request().await,
-                        }
+            let username = session_result[1];
 
-                    
+            match req.json::<EmailSubmission>().await {                                                        
+                Ok (email) => {
+                    // db_replace_email
+                    // send_email for confirmation
                 },
-                Err(_) => return err_specific("Header didn't have username the second time?".to_string()).await
-            }
+                Err(_) => return err_bad_request().await,
+                }
+
+            
 
             return err_api_under_construction().await
         },
