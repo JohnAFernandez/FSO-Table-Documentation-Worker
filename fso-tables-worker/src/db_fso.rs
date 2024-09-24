@@ -46,7 +46,7 @@ const ParseBehaviorsQuery: &str = "SELECT * FROM parse_behaviors ";
 const RestrictionsQuery: &str = "SELECT * FROM restrictions ";    
 const SessionsQuery: &str = "SELECT id, user, expiration,  FROM sessions ";    
 const TableAliasesQuery: &str = "SELECT * FROM table_aliases ";    
-const UsersQuery: &str = "SELECT id, username, role, active, email_confirmed, contribution_count FROM users ";
+const UsersQuery: &str = "SELECT id, username, role, active, email_confirmed, contribution_count, banned FROM users ";
 
 const ActionsFilterId: &str = "WHERE action_id = ?";
 const ActionsFilterUserId: &str = "WHERE user_id = ?";
@@ -128,6 +128,7 @@ struct Users {
     active: i32,
     email_confirmed: i32,
     contribution_count: i32,
+    banned: i32,
 } // TODO!  I need a banned button.
 
 struct Session {
