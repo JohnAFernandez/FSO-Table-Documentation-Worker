@@ -279,8 +279,43 @@ pub async fn db_generic_query(table: &Table, mode: i8 , key1: &String, key2: &St
                     }
 
                 },
+            }
 
-                
+            let prepped_query = db.prepare(query).bind(&[key1.into()]);
+
+            match prepped_query {
+                Ok(bound_query) => {
+                    match table {
+                        Table::ACTIONS => {
+                            match bound_query.run().await {
+                                Ok(things) =>,
+                                Err(e)=>
+                            }
+                        },
+                        let query = db.prepare("SELECT * FROM parse_behaviors;");
+
+                        match query.all().await {
+                            Ok(results) => {
+                                match results.results::<ParseBehavior>() {
+                                    Ok(result) => return Response::from_json(&result),
+                                    Err(e) => return err_specific(e.to_string()).await,
+                                }
+                            },
+                            Err(e) => return err_specific(e.to_string()).await,
+                        }    
+                    
+                        Table::DEPRECATIONS => {},
+                        Table::EMAIL_VALIDATIONS => {},
+                        Table::FSO_ITEMS => {},
+                        Table::FSO_TABLES => {},
+                        Table::PARSE_BEHAVIORS => {},
+                        Table::RESTRICTIONS => {},
+                        Table::SESSIONS => {},
+                        Table::TABLE_ALIASES => {},
+                        Table::USERS => {},
+                    }        
+                },
+                Err(e) => return Error(e.into()),            
             }
         },
         Err(e) => return Error(e.into()),
