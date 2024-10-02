@@ -48,14 +48,41 @@ const SessionsQuery: &str = "SELECT id, user, expiration,  FROM sessions ";
 const TableAliasesQuery: &str = "SELECT * FROM table_aliases ";    
 const UsersQuery: &str = "SELECT id, username, role, active, email_confirmed, contribution_count, banned FROM users ";
 
-const ActionsFilterId: &str = "WHERE action_id = ?";
-const ActionsFilterUserId: &str = "WHERE user_id = ?";
-const ActionsFilterApproved: &str = "WHERE approved = ?";
-const ActionsFilterUserApproved: &str = "Where user_id = ? AND approved = {}";
+const ActionsFilterId: &str = "WHERE action_id = ?;";
+const ActionsFilterUserId: &str = "WHERE user_id = ?;";
+const ActionsFilterApproved: &str = "WHERE approved = ?;";
+const ActionsFilterUserApproved: &str = "Where user_id = ? AND approved = {};";
 
+const DeprecationsFilter: &str = "WHERE deprecation_id = ?;";
+
+const EmailValidationPendingFilter: &str = "WHERE user_id = ?;";
+const EmailValidationsVerifyFilter: &str = "WHERE user_id = ? AND secure_key = {};";
+
+const FsoTablesFilter: &str = "WHERE table_id = ?;";
+
+const ParseBehaviorsFilter: &str = "WHERE behavior_id = ?;";
+
+const RestrictionsFilter: &str = "WHERE restriction_id = ?;";
+
+// This may need more effort, but I wanted to try the rest first.  Also need to restrict mode zero on this one.
 const SessionsFilter: &str = "WHERE key = {} AND user = ?;";
 
+const TableAliasesFIlter: &str = "WHERE alias_id = ?;";
 
+const UsersUsernameFilter: &str = "WHERE username = ?;";
+const UsersUserIdFilter: &str = "WHERE user_id = ?;";
+
+struct FsoTablesQueryResults {
+    actions: Vec<Actions>,
+    deprecations: Vec<Deprecations>,
+    email_validations: Vec<EmailValidations>,
+    fso_items: Vec<FsoItems>,
+    fso_tables: Vec<FsoTables>,
+    parse_behaviors: Vec<ParseBehavior>,
+    restrictions: Vec<Restrictions>,
+    users: Vec<Users>,
+    session: Vec<Users>,
+}
 
 #[derive(Serialize, Deserialize)]
 struct Actions {
@@ -129,7 +156,7 @@ struct Users {
     email_confirmed: i32,
     contribution_count: i32,
     banned: i32,
-} // TODO!  I need a banned button.
+}
 
 struct Session {
     id: i32,
@@ -142,7 +169,31 @@ struct Enabled{
     active: i32,
 }
 
-// SECTION!! generic database tasks 
+pub async fn db_generic_query(table: &Table, mode: i8 , key1: &String, key2: &String, key3: &String, ctx: &RouteContext<()>) -> Result<FsoTablesQueryResults> {
+    match ctx.env.d1(DB_NAME){
+        Ok(db) => {
+            let query = "".to_string();
+
+            match table {
+                Table::ACTIONS => {
+
+                },
+                Table::DEPRECATIONS => ,
+                Table::EMAIL_VALIDATIONS => , 
+                Table::FSO_ITEMS => ,
+                Table::FSO_TABLES => ,
+                Table::PARSE_BEHAVIORS => ,
+                Table::RESTRICTIONS => ,
+                Table::SESSIONS => ,
+                Table::TABLE_ALIASES => ,
+                Table::USERS => ,
+            }
+        },
+        Err(e) => return Error(e.into()),
+    }
+}
+
+ 
 pub async fn db_has_active_user(email: &String, db: &D1Database) -> worker::Result<bool> {
     let query = db.prepare("SELECT active FROM users WHERE username = ?").bind(&[email.into()]).unwrap();
 
