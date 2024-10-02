@@ -176,17 +176,111 @@ pub async fn db_generic_query(table: &Table, mode: i8 , key1: &String, key2: &St
 
             match table {
                 Table::ACTIONS => {
+                    query += ActionsQuery; 
+
+                    match mode {
+                        0 => (),
+                        1 => query += ActionsFilterId,
+                        2 => query += ActionsFilterUserId,
+                        3 => query += ActionsFilterApproved,
+                        4 => query += ActionsFilterUserApproved, 
+                        _ => return Error("Internal Server Error: Out of range mode in Actions generic query.".into()),
+                    }
+                },
+                Table::DEPRECATIONS => {
+                    query += DeprecationsQuery; 
+
+                    match mode {
+                        0 => (),
+                        1 => query += DeprecationsFilter,
+                        _ => return Error("Internal Server Error: Out of range mode in Deprecations generic query.".into()),
+                    }
 
                 },
-                Table::DEPRECATIONS => ,
-                Table::EMAIL_VALIDATIONS => , 
-                Table::FSO_ITEMS => ,
-                Table::FSO_TABLES => ,
-                Table::PARSE_BEHAVIORS => ,
-                Table::RESTRICTIONS => ,
-                Table::SESSIONS => ,
-                Table::TABLE_ALIASES => ,
-                Table::USERS => ,
+                Table::EMAIL_VALIDATIONS => {
+                    query += EmailValidationsQuery; 
+
+                    match mode {
+                        0 => (),
+                        1 => query += EmailValidationPendingFilter,
+                        2 => query += EmailValidationsVerifyFilter,
+                        _ => return Error("Internal Server Error: Out of range mode in Email Validations generic query.".into()),
+                    }
+
+                }, 
+                // This is definitely not done.  Figuring out all the relevant stuff for FSO items is a lot of effort.
+                Table::FSO_ITEMS => {
+                    query += FsoItemsQuery; 
+
+                    match mode {
+                        0 => (),
+                        _ => return Error("Internal Server Error: Out of range mode in FSO_ITEMS generic query.".into()),
+                    }
+
+                },
+                Table::FSO_TABLES => {
+                    query += FsoTablesQuery; 
+
+                    match mode {
+                        0 => (),
+                        1 => query += FsoTablesFilter,
+                        _ => return Error("Internal Server Error: Out of range mode in FSO_Tables generic query.".into()),
+                    }
+
+                },
+                Table::PARSE_BEHAVIORS => {
+                    query += ParseBehaviorsQuery; 
+
+                    match mode {
+                        0 => (),
+                        1 => query += ParseBehaviorsFilter,
+                        _ => return Error("Internal Server Error: Out of range mode in Parse Behaviors generic query.".into()),
+                    }
+
+                },
+                Table::RESTRICTIONS => {
+                    query += RestrictionsQuery; 
+
+                    match mode {
+                        0 => (),
+                        1 => query += RestrictionsFilter,
+                        _ => return Error("Internal Server Error: Out of range mode in Restrictions generic query.".into()),
+                    }
+
+                },
+                Table::SESSIONS => {
+                    query += SessionsQuery; 
+
+                    match mode {
+                        0 => (),
+                        1 => query += SessionsFilter,
+                        _ => return Error("Internal Server Error: Out of range mode in Sessions generic query.".into()),
+                    }
+
+                },
+                Table::TABLE_ALIASES => {
+                    query += TableAliasesQuery; 
+
+                    match mode {
+                        0 => (),
+                        1 => query += TableAliasesFIlter,
+                        _ => return Error("Internal Server Error: Out of range mode in Table Aliases generic query.".into()),
+                    }
+
+                },
+                Table::USERS => {
+                    query += UsersQuery; 
+
+                    match mode {
+                        0 => (),
+                        1 => query += UsersUserIdFilter,
+                        2 => query += UsersUsernameFilter,
+                        _ => return Error("Internal Server Error: Out of range mode in Usernames generic query.".into()),
+                    }
+
+                },
+
+                
             }
         },
         Err(e) => return Error(e.into()),
