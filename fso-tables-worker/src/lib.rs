@@ -143,11 +143,11 @@ pub async fn user_get_details(req: Request, ctx: RouteContext<()>) -> worker::Re
     match ctx.env.d1(DB_NAME) {
         Ok(db) => {
             let session_result = header_session_is_valid(&req, &db).await;
-            if !session_result[0] {
+            if !session_result.0 {
                 return err_not_logged_in().await
             }
 
-            let username = session_result[1];
+            let username = session_result.1;
 
             match db_fso::db_get_user_details(&username, &db).await {
                 Ok(res) => return Response::from_json(&res),
@@ -164,11 +164,11 @@ pub async fn deactivate_user(mut req: Request, ctx: RouteContext<()>) -> worker:
     match ctx.env.d1(DB_NAME) {
         Ok(db) => {
             let session_result = header_session_is_valid(&req, &db).await;
-            if !session_result[0] {
+            if !session_result.0 {
                 return err_not_logged_in().await
             }
 
-            let username = session_result[1];
+            let username = session_result.1;
             
             if !db_fso::db_user_is_active(&username, &db).await {
                 return err_user_not_active().await
@@ -227,11 +227,11 @@ pub async fn activate_user(mut req: Request, ctx: RouteContext<()>) -> worker::R
     match ctx.env.d1(DB_NAME) {
         Ok(db) => {
             let session_result = header_session_is_valid(&req, &db).await;
-            if !session_result[0] {
+            if !session_result.0 {
                 return err_not_logged_in().await
             }
 
-            let username = session_result[1];
+            let username = session_result.1;
 
             match req.json::<EmailSubmission>().await {                                                        
                 Ok(target_user) =>{
@@ -373,11 +373,11 @@ pub async fn user_change_password(mut req: Request, ctx: RouteContext<()>) -> wo
     match ctx.env.d1(DB_NAME){
         Ok(db) => {
             let session_result = header_session_is_valid(&req, &db).await;
-            if !session_result[0] {
+            if !session_result.0 {
                 return err_not_logged_in().await
             }
 
-            let username = session_result[1];
+            let username = session_result.1;
             match req.json::<Password>().await{
                 Ok(password) => {
                     if password.password.len() < DB_MINIMUM_PASSWORD_LENGTH {
@@ -413,11 +413,11 @@ pub async fn user_upgrade_user_permissions(mut req: Request, ctx: RouteContext<(
     match ctx.env.d1(DB_NAME) {
         Ok(db) => {
             let session_result = header_session_is_valid(&req, &db).await;
-            if !session_result[0] {
+            if !session_result.0 {
                 return err_not_logged_in().await
             }
 
-            let username = session_result[1];
+            let username = session_result.1;
 
             if !db_fso::db_user_is_active(&username, &db).await {
                 return err_user_not_active().await
@@ -476,11 +476,11 @@ pub async fn user_downgrade_user_permissions(mut req: Request, ctx: RouteContext
     match ctx.env.d1(DB_NAME) {
         Ok(db) => {
             let session_result = header_session_is_valid(&req, &db).await;
-            if !session_result[0] {
+            if !session_result.0 {
                 return err_not_logged_in().await
             }
 
-            let username = session_result[1];
+            let username = session_result.1;
 
             if !db_fso::db_user_is_active(&username, &db).await {
                 return err_user_not_active().await
@@ -549,11 +549,11 @@ pub async fn user_add_email(mut req: Request, ctx: RouteContext<()>) -> worker::
     match ctx.env.d1(DB_NAME){
         Ok(db) => {
             let session_result = header_session_is_valid(&req, &db).await;
-            if !session_result[0] {
+            if !session_result.0 {
                 return err_not_logged_in().await
             }
 
-            let username = session_result[1];
+            let username = session_result.1;
 
             match req.json::<EmailSubmission>().await {                                                        
                 Ok (email) => {
@@ -707,51 +707,53 @@ pub async fn create_random_string() -> String {
 // 2. Compare the token they gave us and see if it matches the username. 
 // 3. See if the token is still valid.
 pub async fn header_session_is_valid(req: &Request, db: &D1Database) -> (bool, String)  {
-    let return_tuple = (false, "".to_string());
+    let mut return_tuple = (false, "".to_string());
     
     match header_has_token(&req).await {
         Some(r) => { 
             match r {
-                Ok(text) => return_tuple[1] = text.text().await.unwrap(),
-                Err(e) => return_tuple[1] = e.into(),
+                Ok(mut text) => return_tuple.1 = text.text().await.unwrap(),
+                Err(e) => return_tuple.1 = e.to_string(),
             }
 
             return return_tuple;
         },
-        None()=> (),
+        None => (),
     }
 
     match header_has_username(&req).await {
         Some(r) => { 
             match r {
-                Ok(text) => return_tuple[1] = text.text().await.unwrap(),
-                Err(e) => return_tuple[1] = e.into(),
+                Ok(mut text) => return_tuple.1 = text.text().await.unwrap(),
+                Err(e) => return_tuple.1 = e.to_string(),
             }
 
             return return_tuple;
         },
-        None()=> (),
+        None => (),
     }
 
     match header_get_token(&req).await{
         Ok(token) => {            
             if let Ok(username) = header_get_username(&req).await{
-                return_tuple[1] = username;
+                return_tuple.1 = username;
             } else {
                 return return_tuple;
             }
             
-            let hashed_token = hash_string(&username, &token).await.unwrap();
+            let hashed_token = hash_string(&return_tuple.1, &token).await.unwrap();
 
-            match db_fso::db_check_token(&return_tuple[1], &hashed_token, Utc::now(), &db) {
-                Ok(result) => return_tuple[0] = result,
-                Err(e) => return_tuple[1] = e.into(),
+            match db_fso::db_check_token(&return_tuple.1, &hashed_token, Utc::now().to_string(), &db).await {
+                Ok(result) => return_tuple.0 = result,
+                Err(e) => return_tuple.1 = e.to_string(),
             }
 
-            return_tuple
+            return return_tuple
         },
-        Err(e) => return_tuple,
+        Err(e) => return_tuple.1 = e.to_string(),     
     }    
+    
+    return return_tuple
 }
 
 pub async fn send_confirmation_link(address : &String) -> worker::Result<worker::Response> {

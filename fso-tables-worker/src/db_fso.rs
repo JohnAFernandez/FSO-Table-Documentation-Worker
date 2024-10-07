@@ -85,6 +85,22 @@ struct FsoTablesQueryResults {
     session: Vec<Users>,
 }
 
+impl FsoTablesQueryResults {
+    async fn new_results() -> FsoTablesQueryResults{
+        FsoTablesQueryResults{
+            actions : Vec::new(),
+            deprecations : Vec::new(),
+            email_validations : Vec::new(),
+            fso_items : Vec::new(),
+            fso_tables : Vec::new(),
+            parse_behaviors : Vec::new(),
+            restrictions : Vec::new(),
+            users : Vec::new(),
+            session : Vec::new(),
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize)]
 struct Actions {
     action_id: i32,
@@ -174,7 +190,7 @@ struct Enabled{
 pub async fn db_generic_query(table: &Table, mode: i8 , key1: &String, key2: &String, key3: &String, ctx: &RouteContext<()>) -> Result<FsoTablesQueryResults> {
     match ctx.env.d1(DB_NAME){
         Ok(db) => {
-            let query = "".to_string();
+            let mut query = "".to_string();
 
             match table {
                 Table::Actions => {
@@ -283,28 +299,25 @@ pub async fn db_generic_query(table: &Table, mode: i8 , key1: &String, key2: &St
                 },
             }
 
-            let prepped_query = db.prepare(query).bind(&[key1.into()]);
+            let mut query_return = FsoTablesQueryResults::new_results().await;
 
-            match prepped_query {
+            match db.prepare(query).bind(&[key1.into()]) {
                 Ok(bound_query) => {
                     match table {
                         Table::Actions => {
-                            match bound_query.run().await {
-                                Ok(things) =>{},
-                                Err(e)=> {},
+                            match bound_query.all().await {
+                                Ok(results) =>{
+                                    match results.results::<Actions>() {
+                                        Ok(result) => {
+                                            query_return.actions = result;
+                                            return Ok(query_return);
+                                        },
+                                        Err(e) => return Err(e),
+                                    }
+                                },
+                                Err(e)=> return Err(e),
                             }
                         },
-                        let query = db.prepare("SELECT * FROM parse_behaviors;");
-
-                        match query.all().await {
-                            Ok(results) => {
-                                match results.results::<ParseBehavior>() {
-                                    Ok(result) => return Response::from_json(&result),
-                                    Err(e) => return err_specific(e.to_string()).await,
-                                }
-                            },
-                            Err(e) => return err_specific(e.to_string()).await,
-                        }    
                     
                         Table::Deprecations => {},
                         Table::EmailValidations => {},
