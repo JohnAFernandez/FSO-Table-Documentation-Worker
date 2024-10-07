@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use crate::UserDetails;
 use crate::DB_NAME;
 use crate::err_specific;
-use chrono::{TimeDelta, DateTime};
+use chrono::DateTime;
 //use wasm_bindgen::JsValue;
 
 #[derive(PartialEq, PartialOrd)]
@@ -25,52 +25,53 @@ pub async fn number_to_role(n: i32) -> worker::Result<UserRole> {
 }
 
 pub enum Table {
-    ACTIONS,
-    DEPRECATIONS,
-    EMAIL_VALIDATIONS, 
-    FSO_ITEMS,
-    FSO_TABLES,
-    PARSE_BEHAVIORS,
-    RESTRICTIONS,
-    SESSIONS,
-    TABLE_ALIASES,
-    USERS,
+    Actions,
+    Deprecations,
+    EmailValidations, 
+    FsoItems,
+    FsoTables,
+    ParseBehaviors,
+    Restrictions,
+    Sessions,
+    TableAliases,
+    Users,
 }
 
-const ActionsQuery: &str = "SELECT * FROM actions ";    
-const DeprecationsQuery: &str = "SELECT * FROM deprecations "; 
-const EmailValidationsQuery: &str = "SELECT validation_id, user_id FROM email_validations ";
-const FsoItemsQuery: &str = "SELECT * FROM fso_items ";
-const FsoTablesQuery: &str = "SELECT * FROM fso_tables ";    
-const ParseBehaviorsQuery: &str = "SELECT * FROM parse_behaviors ";    
-const RestrictionsQuery: &str = "SELECT * FROM restrictions ";    
-const SessionsQuery: &str = "SELECT id, user, expiration,  FROM sessions ";    
-const TableAliasesQuery: &str = "SELECT * FROM table_aliases ";    
-const UsersQuery: &str = "SELECT id, username, role, active, email_confirmed, contribution_count, banned FROM users ";
+const ACTIONS_QUERY: &str = "SELECT * FROM actions ";    
+const DEPRECATIONS_QUERY: &str = "SELECT * FROM deprecations "; 
+const EMAIL_VALIDATIONS_QUERY: &str = "SELECT validation_id, user_id FROM email_validations ";
+const FSO_ITEMS_QUERY: &str = "SELECT * FROM fso_items ";
+const FSO_TABLES_QUERY: &str = "SELECT * FROM fso_tables ";    
+const PARSE_BEHAVIORS_QUERY: &str = "SELECT * FROM parse_behaviors ";    
+const RESTRICTIONS_QUERY: &str = "SELECT * FROM restrictions ";    
+const SESSIONS_QUERY: &str = "SELECT id, user, expiration,  FROM sessions ";    
+const TABLE_ALIASES_QUERY: &str = "SELECT * FROM table_aliases ";    
+const USERS_QUERY: &str = "SELECT id, username, role, active, email_confirmed, contribution_count, banned FROM users ";
 
-const ActionsFilterId: &str = "WHERE action_id = ?;";
-const ActionsFilterUserId: &str = "WHERE user_id = ?;";
-const ActionsFilterApproved: &str = "WHERE approved = ?;";
-const ActionsFilterUserApproved: &str = "Where user_id = ? AND approved = {};";
+const ACTIONS_FILTER_ID: &str = "WHERE action_id = ?;";
+const ACTIONS_FILTER_USER_ID: &str = "WHERE user_id = ?;";
+const ACTIONS_FILTER_APPROVED: &str = "WHERE approved = ?;";
+const ACTIONS_FILTER_USER_APPROVED: &str = "Where user_id = ? AND approved = {};";
 
-const DeprecationsFilter: &str = "WHERE deprecation_id = ?;";
+const DEPRECATIONS_FILTER: &str = "WHERE deprecation_id = ?;";
 
-const EmailValidationPendingFilter: &str = "WHERE user_id = ?;";
-const EmailValidationsVerifyFilter: &str = "WHERE user_id = ? AND secure_key = {};";
+const EMAIL_VALIDATION_PENDING_FILTER: &str = "WHERE user_id = ?;";
+const EMAIL_VALIDATIONS_VERIFY_FILTER: &str = "WHERE user_id = ? AND secure_key = {};";
 
-const FsoTablesFilter: &str = "WHERE table_id = ?;";
+const FSO_TABLES_FILTER: &str = "WHERE table_id = ?;";
 
-const ParseBehaviorsFilter: &str = "WHERE behavior_id = ?;";
+const PARSE_BEHAVIORS_FILTER: &str = "WHERE behavior_id = ?;";
 
-const RestrictionsFilter: &str = "WHERE restriction_id = ?;";
+const RESTRICTIONS_FILTER: &str = "WHERE restriction_id = ?;";
 
 // This may need more effort, but I wanted to try the rest first.  Also need to restrict mode zero on this one.
-const SessionsFilter: &str = "WHERE key = {} AND user = ?;";
+const SESSIONS_FILTER_A: &str = "WHERE key = {";
+const SESSIONS_FILTER_B: &str = " AND user = ?;";
 
-const TableAliasesFIlter: &str = "WHERE alias_id = ?;";
+const TABLE_ALIASES_FILTER: &str = "WHERE alias_id = ?;";
 
-const UsersUsernameFilter: &str = "WHERE username = ?;";
-const UsersUserIdFilter: &str = "WHERE user_id = ?;";
+const USERS_USERNAME_FILTER: &str = "WHERE username = ?;";
+const USERS_USER_ID_FILTER: &str = "WHERE user_id = ?;";
 
 struct FsoTablesQueryResults {
     actions: Vec<Actions>,
@@ -158,6 +159,7 @@ struct Users {
     banned: i32,
 }
 
+#[derive(Deserialize, Serialize)]
 struct Session {
     id: i32,
     user: String,
@@ -175,107 +177,107 @@ pub async fn db_generic_query(table: &Table, mode: i8 , key1: &String, key2: &St
             let query = "".to_string();
 
             match table {
-                Table::ACTIONS => {
-                    query += ActionsQuery; 
+                Table::Actions => {
+                    query += ACTIONS_QUERY; 
 
                     match mode {
                         0 => (),
-                        1 => query += ActionsFilterId,
-                        2 => query += ActionsFilterUserId,
-                        3 => query += ActionsFilterApproved,
-                        4 => query += ActionsFilterUserApproved, 
-                        _ => return Error("Internal Server Error: Out of range mode in Actions generic query.".into()),
+                        1 => query += ACTIONS_FILTER_ID,
+                        2 => query += ACTIONS_FILTER_USER_ID,
+                        3 => query += ACTIONS_FILTER_APPROVED,
+                        4 => query += ACTIONS_FILTER_USER_APPROVED, 
+                        _ => return Err("Internal Server Error: Out of range mode in Actions generic query.".to_string().into()),
                     }
                 },
-                Table::DEPRECATIONS => {
-                    query += DeprecationsQuery; 
+                Table::Deprecations => {
+                    query += DEPRECATIONS_QUERY; 
 
                     match mode {
                         0 => (),
-                        1 => query += DeprecationsFilter,
-                        _ => return Error("Internal Server Error: Out of range mode in Deprecations generic query.".into()),
+                        1 => query += DEPRECATIONS_FILTER,
+                        _ => return Err("Internal Server Error: Out of range mode in Deprecations generic query.".into()),
                     }
 
                 },
-                Table::EMAIL_VALIDATIONS => {
-                    query += EmailValidationsQuery; 
+                Table::EmailValidations => {
+                    query += EMAIL_VALIDATIONS_QUERY; 
 
                     match mode {
                         0 => (),
-                        1 => query += EmailValidationPendingFilter,
-                        2 => query += EmailValidationsVerifyFilter,
-                        _ => return Error("Internal Server Error: Out of range mode in Email Validations generic query.".into()),
+                        1 => query += EMAIL_VALIDATION_PENDING_FILTER,
+                        2 => query += EMAIL_VALIDATIONS_VERIFY_FILTER,
+                        _ => return Err("Internal Server Error: Out of range mode in Email Validations generic query.".into()),
                     }
 
                 }, 
                 // This is definitely not done.  Figuring out all the relevant stuff for FSO items is a lot of effort.
-                Table::FSO_ITEMS => {
-                    query += FsoItemsQuery; 
+                Table::FsoItems => {
+                    query += FSO_ITEMS_QUERY; 
 
                     match mode {
                         0 => (),
-                        _ => return Error("Internal Server Error: Out of range mode in FSO_ITEMS generic query.".into()),
+                        _ => return Err("Internal Server Error: Out of range mode in FSO_ITEMS generic query.".into()),
                     }
 
                 },
-                Table::FSO_TABLES => {
-                    query += FsoTablesQuery; 
+                Table::FsoTables => {
+                    query += FSO_TABLES_QUERY; 
 
                     match mode {
                         0 => (),
-                        1 => query += FsoTablesFilter,
-                        _ => return Error("Internal Server Error: Out of range mode in FSO_Tables generic query.".into()),
+                        1 => query += FSO_TABLES_FILTER,
+                        _ => return Err("Internal Server Error: Out of range mode in FSO_Tables generic query.".into()),
                     }
 
                 },
-                Table::PARSE_BEHAVIORS => {
-                    query += ParseBehaviorsQuery; 
+                Table::ParseBehaviors => {
+                    query += PARSE_BEHAVIORS_QUERY; 
 
                     match mode {
                         0 => (),
-                        1 => query += ParseBehaviorsFilter,
-                        _ => return Error("Internal Server Error: Out of range mode in Parse Behaviors generic query.".into()),
+                        1 => query += PARSE_BEHAVIORS_FILTER,
+                        _ => return Err("Internal Server Error: Out of range mode in Parse Behaviors generic query.".into()),
                     }
 
                 },
-                Table::RESTRICTIONS => {
-                    query += RestrictionsQuery; 
+                Table::Restrictions => {
+                    query += RESTRICTIONS_QUERY; 
 
                     match mode {
                         0 => (),
-                        1 => query += RestrictionsFilter,
-                        _ => return Error("Internal Server Error: Out of range mode in Restrictions generic query.".into()),
+                        1 => query += RESTRICTIONS_FILTER,
+                        _ => return Err("Internal Server Error: Out of range mode in Restrictions generic query.".into()),
                     }
 
                 },
-                Table::SESSIONS => {
-                    query += SessionsQuery; 
+                Table::Sessions => {
+                    query += SESSIONS_QUERY; 
 
                     match mode {
                         0 => (),
-                        1 => query += SessionsFilter,
-                        _ => return Error("Internal Server Error: Out of range mode in Sessions generic query.".into()),
+                        1 => query += SESSIONS_FILTER_A,
+                        _ => return Err("Internal Server Error: Out of range mode in Sessions generic query.".into()),
                     }
 
                 },
-                Table::TABLE_ALIASES => {
-                    query += TableAliasesQuery; 
+                Table::TableAliases => {
+                    query += TABLE_ALIASES_QUERY; 
 
                     match mode {
                         0 => (),
-                        1 => query += TableAliasesFIlter,
-                        _ => return Error("Internal Server Error: Out of range mode in Table Aliases generic query.".into()),
+                        1 => query += TABLE_ALIASES_FILTER,
+                        _ => return Err("Internal Server Error: Out of range mode in Table Aliases generic query.".into()),
                     }
 
                 },
-                Table::USERS => {
-                    query += UsersQuery; 
+                Table::Users => {
+                    query += USERS_QUERY; 
 
                     match mode {
                         0 => (),
-                        1 => query += UsersUserIdFilter,
-                        2 => query += UsersUsernameFilter,
-                        _ => return Error("Internal Server Error: Out of range mode in Usernames generic query.".into()),
+                        1 => query += USERS_USER_ID_FILTER,
+                        2 => query += USERS_USERNAME_FILTER,
+                        _ => return Err("Internal Server Error: Out of range mode in Usernames generic query.".into()),
                     }
 
                 },
@@ -286,10 +288,10 @@ pub async fn db_generic_query(table: &Table, mode: i8 , key1: &String, key2: &St
             match prepped_query {
                 Ok(bound_query) => {
                     match table {
-                        Table::ACTIONS => {
+                        Table::Actions => {
                             match bound_query.run().await {
-                                Ok(things) =>,
-                                Err(e)=>
+                                Ok(things) =>{},
+                                Err(e)=> {},
                             }
                         },
                         let query = db.prepare("SELECT * FROM parse_behaviors;");
@@ -304,21 +306,22 @@ pub async fn db_generic_query(table: &Table, mode: i8 , key1: &String, key2: &St
                             Err(e) => return err_specific(e.to_string()).await,
                         }    
                     
-                        Table::DEPRECATIONS => {},
-                        Table::EMAIL_VALIDATIONS => {},
-                        Table::FSO_ITEMS => {},
-                        Table::FSO_TABLES => {},
-                        Table::PARSE_BEHAVIORS => {},
-                        Table::RESTRICTIONS => {},
-                        Table::SESSIONS => {},
-                        Table::TABLE_ALIASES => {},
-                        Table::USERS => {},
-                    }        
+                        Table::Deprecations => {},
+                        Table::EmailValidations => {},
+                        Table::FsoItems => {},
+                        Table::FsoTables => {},
+                        Table::ParseBehaviors => {},
+                        Table::Restrictions => {},
+                        Table::Sessions => {},
+                        Table::TableAliases => {},
+                        Table::Users => {},
+                    }
+                    return Err("Not yet implemented.".to_string().into());        
                 },
-                Err(e) => return Error(e.into()),            
+                Err(e) => return Err(e.into()),            
             }
         },
-        Err(e) => return Error(e.into()),
+        Err(e) => return Err(e.into()),
     }
 }
 
@@ -565,19 +568,23 @@ pub async fn db_session_add(token: &String, email: &String, time: &String, db : 
 
 pub async fn db_check_token(username: &String, token: &String, time: String, db: &D1Database) -> Result<bool> {
     let final_token = &token.replace("\"", "");
-    let query = format!(SessionsQuery + SessionsFilter, final_token);
+    let query = SESSIONS_QUERY.to_owned() + &SESSIONS_FILTER_A + &format!("{}", final_token) + &SESSIONS_FILTER_B;
 
     match db.prepare(query).bind(&[username.into()]) {
         Ok(statement) => {
-            match statement.run().await.results::<Session>() {
-                Ok(results) => { 
-                    match results.expiration.parse::<DateTime<Utc>>(){
-                        Ok(session_time) => return Ok(time.parse::<DateTime<Utc>>().unwrap() < session_time),
-                        // TODO! Once we know this function works, two of these call need to be changed into Ok(false)
-                        Err(e) => return Err(e),
-                    }
-                },
-                Err(e) => return Err(e),
+            match statement.run().await {
+                Ok(result) =>
+                    match result.results::<Session>() {
+                        Ok(results) => { 
+                            match results[0].expiration.parse::<DateTime<chrono::Utc>>(){
+                                Ok(session_time) => return Ok(time.parse::<DateTime<chrono::Utc>>().unwrap() < session_time),
+                                // TODO! Once we know this function works, two of these call need to be changed into Ok(false)
+                                Err(e) => return Err(e.to_string().into()),
+                            }
+                        },
+                        Err(e) => return Err(e),        
+                    },
+                Err(e)=> Err(e),
             }
         },
         Err(e)=> return Err(e),
