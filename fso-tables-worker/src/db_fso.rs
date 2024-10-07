@@ -51,12 +51,14 @@ const USERS_QUERY: &str = "SELECT id, username, role, active, email_confirmed, c
 const ACTIONS_FILTER_ID: &str = "WHERE action_id = ?;";
 const ACTIONS_FILTER_USER_ID: &str = "WHERE user_id = ?;";
 const ACTIONS_FILTER_APPROVED: &str = "WHERE approved = ?;";
-const ACTIONS_FILTER_USER_APPROVED: &str = "Where user_id = ? AND approved = {};";
+const ACTIONS_FILTER_USER_APPROVED_A: &str = "Where user_id = ? AND approved = ";
+const ACTIONS_FILTER_USER_APPROVED_B: &str = ";";
 
 const DEPRECATIONS_FILTER: &str = "WHERE deprecation_id = ?;";
 
 const EMAIL_VALIDATION_PENDING_FILTER: &str = "WHERE user_id = ?;";
-const EMAIL_VALIDATIONS_VERIFY_FILTER: &str = "WHERE user_id = ? AND secure_key = {};";
+const EMAIL_VALIDATIONS_VERIFY_FILTER_A: &str = "WHERE user_id = ? AND secure_key = ";
+const EMAIL_VALIDATIONS_VERIFY_FILTER_B: &str = ";";
 
 const FSO_TABLES_FILTER: &str = "WHERE table_id = ?;";
 
@@ -65,7 +67,7 @@ const PARSE_BEHAVIORS_FILTER: &str = "WHERE behavior_id = ?;";
 const RESTRICTIONS_FILTER: &str = "WHERE restriction_id = ?;";
 
 // This may need more effort, but I wanted to try the rest first.  Also need to restrict mode zero on this one.
-const SESSIONS_FILTER_A: &str = "WHERE key = {";
+const SESSIONS_FILTER_A: &str = "WHERE key = ";
 const SESSIONS_FILTER_B: &str = " AND user = ?;";
 
 const TABLE_ALIASES_FILTER: &str = "WHERE alias_id = ?;";
@@ -187,7 +189,7 @@ struct Enabled{
     active: i32,
 }
 
-pub async fn db_generic_query(table: &Table, mode: i8 , key1: &String, key2: &String, key3: &String, ctx: &RouteContext<()>) -> Result<FsoTablesQueryResults> {
+pub async fn db_generic_query(table: &Table, mode: i8 , key1: &String, key2: &String, ctx: &RouteContext<()>) -> Result<FsoTablesQueryResults> {
     match ctx.env.d1(DB_NAME){
         Ok(db) => {
             let mut query = "".to_string();
@@ -201,7 +203,7 @@ pub async fn db_generic_query(table: &Table, mode: i8 , key1: &String, key2: &St
                         1 => query += ACTIONS_FILTER_ID,
                         2 => query += ACTIONS_FILTER_USER_ID,
                         3 => query += ACTIONS_FILTER_APPROVED,
-                        4 => query += ACTIONS_FILTER_USER_APPROVED, 
+                        4 => query += ACTIONS_FILTER_USER_APPROVED_A + format!("{}", key2) + ACTIONS_FILTER_USER_APPROVED_B, 
                         _ => return Err("Internal Server Error: Out of range mode in Actions generic query.".to_string().into()),
                     }
                 },
@@ -221,7 +223,7 @@ pub async fn db_generic_query(table: &Table, mode: i8 , key1: &String, key2: &St
                     match mode {
                         0 => (),
                         1 => query += EMAIL_VALIDATION_PENDING_FILTER,
-                        2 => query += EMAIL_VALIDATIONS_VERIFY_FILTER,
+                        2 => query += EMAIL_VALIDATIONS_VERIFY_FILTER_A + format!("{}", key2) + EMAIL_VALIDATIONS_VERIFY_FILTER_B,
                         _ => return Err("Internal Server Error: Out of range mode in Email Validations generic query.".into()),
                     }
 
@@ -271,7 +273,7 @@ pub async fn db_generic_query(table: &Table, mode: i8 , key1: &String, key2: &St
 
                     match mode {
                         0 => (),
-                        1 => query += SESSIONS_FILTER_A,
+                        1 => query += SESSIONS_FILTER_A + format!("{}", key2) + SESSIONS_FILTER_B,
                         _ => return Err("Internal Server Error: Out of range mode in Sessions generic query.".into()),
                     }
 
