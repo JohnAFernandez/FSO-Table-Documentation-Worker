@@ -189,7 +189,49 @@ struct Enabled{
     active: i32,
 }
 
-pub async fn db_generic_query(table: &Table, mode: i8 , key1: &String, key2: &String, ctx: &RouteContext<()>) -> Result<FsoTablesQueryResults> {
+/// Searches any table in the FSO table database
+/// 
+/// Mode 0 for any table is generic table dump (except for sensitive information, which is only checked against), which will not use the keys.
+/// 
+/// Format:
+/// Table 
+///  Mode Key1 Field1, Key2 Field2
+/// 
+/// Actions 
+///  1 Action_id 
+///  2 User_id 
+///  3 Approved 
+///  4 Key1 User_id, Key2 approved
+/// 
+/// Deprecations
+///  1 deprecation_id
+/// 
+/// Email Validations 
+///  1 User_id
+///  2 Key1, Key2 secure_key
+/// 
+/// FSO Items -- Not complete TODO!!
+/// 
+/// FSO Tables:
+///  1 table_id
+/// 
+/// Parse Behaviors
+///  1 behavior_id
+/// 
+/// Restrictions
+///  1 Restriction_id
+/// 
+/// Sessions
+///  1 key1 user, key2 (session) key 
+/// 
+/// Table Aliases
+///  1 alias_id
+/// 
+/// Users
+///  1 user_id
+///  2 username
+/// 
+pub async fn db_generic_search_query(table: &Table, mode: i8 , key1: &String, key2: &String, ctx: &RouteContext<()>) -> Result<FsoTablesQueryResults> {
     match ctx.env.d1(DB_NAME){
         Ok(db) => {
             let mut query = "".to_string();
