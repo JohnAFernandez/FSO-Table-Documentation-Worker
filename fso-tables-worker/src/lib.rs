@@ -70,6 +70,7 @@ async fn fetch(req: Request, env: Env, _ctx: Context,) -> worker::Result<Respons
         .post_async("/users/activate", activate_user).put_async("/users/activate", activate_user).patch_async("/users/activate", activate_user)
         .get_async("/users/login", user_login)
         .get_async("/tables/parse-types", get_parse_types)
+        .get_async("/test", test_all)
         /* 
         .route("/users/:username/upgrade", put(upgrade_user_permissions).patch(upgrade_user_permissions))
         .route("/users/:username/downgrade", put(downgrade_user_permissions).patch(downgrade_user_permissions))
@@ -81,6 +82,54 @@ async fn fetch(req: Request, env: Env, _ctx: Context,) -> worker::Result<Respons
 
 }
 
+pub async fn test_all(_: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
+    
+    let mut return_object = db_fso::FsoTablesQueryResults::new_results().await;
+
+    match db_fso::db_generic_search_query(&db_fso::Table::Actions, 0, &"".to_string(), &"".to_string(), &ctx).await {
+        Ok(mut results) => {
+            return_object.actions.append(&mut results.actions);
+        },
+        Err(e) => return err_specific(e.to_string()).await,
+    }
+
+    match db_fso::db_generic_search_query(&db_fso::Table::Actions, 1, &"".to_string(), &"".to_string(), &ctx).await {
+        Ok(mut results) => {
+            return_object.actions.append(&mut results.actions);
+        },
+        Err(e) => return err_specific(e.to_string()).await,
+    }
+
+    match db_fso::db_generic_search_query(&db_fso::Table::Actions, 2, &"".to_string(), &"".to_string(), &ctx).await {
+        Ok(mut results) => {
+            return_object.actions.append(&mut results.actions);
+        },
+        Err(e) => return err_specific(e.to_string()).await,
+    }
+
+    match db_fso::db_generic_search_query(&db_fso::Table::Actions, 3, &"".to_string(), &"".to_string(), &ctx).await {
+        Ok(mut results) => {
+            return_object.actions.append(&mut results.actions);
+        },
+        Err(e) => return err_specific(e.to_string()).await,
+    }
+
+    match db_fso::db_generic_search_query(&db_fso::Table::Deprecations, 0, &"".to_string(), &"".to_string(), &ctx).await {
+        Ok(mut results) => {
+            return_object.deprecations.append(&mut results.deprecations);
+        },
+        Err(e) => return err_specific(e.to_string()).await,
+    }    
+
+    match db_fso::db_generic_search_query(&db_fso::Table::Actions, 0, &"".to_string(), &"".to_string(), &ctx).await {
+        Ok(mut results) => {
+            return_object.actions.append(&mut results.actions);
+        },
+        Err(e) => return err_specific(e.to_string()).await,
+    }
+
+    return Response::from_json(&return_object);
+}
 
 pub async fn root_get(_: Request, _ctx: RouteContext<()>) -> worker::Result<Response> {   
     Response::ok("You have accessed the Freespace Open Table Option Databse API.\n\nRoutes are users, tables, items, deprecations, and behaviors.\n\nThis API is currently under construction!".to_string())

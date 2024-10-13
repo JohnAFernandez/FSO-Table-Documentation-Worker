@@ -75,21 +75,22 @@ const TABLE_ALIASES_FILTER: &str = "WHERE alias_id = ?;";
 const USERS_USERNAME_FILTER: &str = "WHERE username = ?;";
 const USERS_USER_ID_FILTER: &str = "WHERE user_id = ?;";
 
+#[derive(Serialize, Deserialize)]
 pub struct FsoTablesQueryResults {
-    actions: Vec<Actions>,
-    deprecations: Vec<Deprecations>,
-    email_validations: Vec<EmailValidations>,
-    fso_items: Vec<FsoItems>,
-    fso_tables: Vec<FsoTables>,
-    parse_behaviors: Vec<ParseBehavior>,
-    restrictions: Vec<Restrictions>,
-    users: Vec<Users>,
-    sessions: Vec<Session>,
-    table_aliases: Vec<TableAlias>,
+    pub actions: Vec<Actions>,
+    pub deprecations: Vec<Deprecations>,
+    pub email_validations: Vec<EmailValidations>,
+    pub fso_items: Vec<FsoItems>,
+    pub fso_tables: Vec<FsoTables>,
+    pub parse_behaviors: Vec<ParseBehavior>,
+    pub restrictions: Vec<Restrictions>,
+    pub users: Vec<Users>,
+    pub sessions: Vec<Session>,
+    pub table_aliases: Vec<TableAlias>,
 }
 
 impl FsoTablesQueryResults {
-    async fn new_results() -> FsoTablesQueryResults{
+    pub async fn new_results() -> FsoTablesQueryResults{
         FsoTablesQueryResults{
             actions : Vec::new(),
             deprecations : Vec::new(),
@@ -106,7 +107,7 @@ impl FsoTablesQueryResults {
 }
 
 #[derive(Serialize, Deserialize)]
-struct Actions {
+pub struct Actions {
     action_id: i32,
     user_id: i32,
     action: String,
@@ -115,20 +116,20 @@ struct Actions {
 }
 
 #[derive(Serialize, Deserialize)]
-struct Deprecations {
+pub struct Deprecations {
     deprecation_id: i32,
     date: String,
     version: String,
 }
 
 #[derive(Serialize, Deserialize)]
-struct EmailValidations {
+pub struct EmailValidations {
     validation_id: i32,
     user_id: i32,
 }
 
 #[derive(Serialize, Deserialize)]
-struct FsoItems { 
+pub struct FsoItems { 
     item_id: i32,
     item_text: String,
     documentation: String,
@@ -143,7 +144,7 @@ struct FsoItems {
 }
 
 #[derive(Serialize, Deserialize)]
-struct FsoTables { 
+pub struct FsoTables { 
     table_id: i32,
     name: String,
     filename: String,
@@ -152,14 +153,14 @@ struct FsoTables {
 }
 
 #[derive(Deserialize, Serialize)]
-struct ParseBehavior{
+pub struct ParseBehavior{
     behavior_id	: i32,
     behavior : String,
     description : String,
 }
 
 #[derive(Deserialize, Serialize)]
-struct Restrictions {
+pub struct Restrictions {
     restriction_id: i32,
     min_value: f32,
     max_value: f32,
@@ -169,21 +170,21 @@ struct Restrictions {
 }
 
 #[derive(Deserialize, Serialize)]
-struct Session {
+pub struct Session {
     id: i32,
     user: String,
     expiration: String,
 }
 
 #[derive(Deserialize, Serialize)]
-struct TableAlias {
+pub struct TableAlias {
     alias_id: i32,
     table_id: String,
     filename: String,
 }
 
 #[derive(Deserialize, Serialize)]
-struct Users {
+pub struct Users {
     id: i32,
     username: String,
     role: i32,
@@ -354,155 +355,161 @@ pub async fn db_generic_search_query(table: &Table, mode: i8 , key1: &String, ke
 
             let mut query_return = FsoTablesQueryResults::new_results().await;
 
-            match db.prepare(query).bind(&[key1.into()]) {
-                Ok(bound_query) => {
-                    match table {
-                        Table::Actions => {
-                            match bound_query.all().await {
-                                Ok(results) =>{
-                                    match results.results::<Actions>() {
-                                        Ok(result) => {
-                                            query_return.actions = result;
-                                            return Ok(query_return);
-                                        },
-                                        Err(e) => return Err(e),
-                                    }
-                                },
-                                Err(e)=> return Err(e),
-                            }
-                        },                    
-                        Table::Deprecations => {
-                            match bound_query.all().await {
-                                Ok(results) =>{
-                                    match results.results::<Deprecations>() {
-                                        Ok(result) => {
-                                            query_return.deprecations = result;
-                                            return Ok(query_return);
-                                        },
-                                        Err(e) => return Err(e),
-                                    }
-                                },
-                                Err(e)=> return Err(e),
-                            }
-                        },
-                        Table::EmailValidations => {
-                            match bound_query.all().await {
-                                Ok(results) =>{
-                                    match results.results::<EmailValidations>() {
-                                        Ok(result) => {
-                                            query_return.email_validations = result;
-                                            return Ok(query_return);
-                                        },
-                                        Err(e) => return Err(e),
-                                    }
-                                },
-                                Err(e)=> return Err(e),
-                            }
-                        },
-                        Table::FsoItems => {
-                            match bound_query.all().await {
-                                Ok(results) =>{
-                                    match results.results::<FsoItems>() {
-                                        Ok(result) => {
-                                            query_return.fso_items = result;
-                                            return Ok(query_return);
-                                        },
-                                        Err(e) => return Err(e),
-                                    }
-                                },
-                                Err(e)=> return Err(e),
-                            }
-                        },
-                        Table::FsoTables => {
-                            match bound_query.all().await {
-                                Ok(results) =>{
-                                    match results.results::<FsoTables>() {
-                                        Ok(result) => {
-                                            query_return.fso_tables = result;
-                                            return Ok(query_return);
-                                        },
-                                        Err(e) => return Err(e),
-                                    }
-                                },
-                                Err(e)=> return Err(e),
-                            }
-                        },
-                        Table::ParseBehaviors => {
-                            match bound_query.all().await {
-                                Ok(results) =>{
-                                    match results.results::<ParseBehavior>() {
-                                        Ok(result) => {
-                                            query_return.parse_behaviors = result;
-                                            return Ok(query_return);
-                                        },
-                                        Err(e) => return Err(e),
-                                    }
-                                },
-                                Err(e)=> return Err(e),
-                            }
-                        },
-                        Table::Restrictions => {
-                            match bound_query.all().await {
-                                Ok(results) =>{
-                                    match results.results::<Restrictions>() {
-                                        Ok(result) => {
-                                            query_return.restrictions = result;
-                                            return Ok(query_return);
-                                        },
-                                        Err(e) => return Err(e),
-                                    }
-                                },
-                                Err(e)=> return Err(e),
-                            }
-                        },
-                        Table::Sessions => {
-                            match bound_query.all().await {
-                                Ok(results) =>{
-                                    match results.results::<Session>() {
-                                        Ok(result) => {
-                                            query_return.sessions = result;
-                                            return Ok(query_return);
-                                        },
-                                        Err(e) => return Err(e),
-                                    }
-                                },
-                                Err(e)=> return Err(e),
-                            }
-                        },
-                        Table::TableAliases => {
-                            match bound_query.all().await {
-                                Ok(results) =>{
-                                    match results.results::<TableAlias>() {
-                                        Ok(result) => {
-                                            query_return.table_aliases = result;
-                                            return Ok(query_return);
-                                        },
-                                        Err(e) => return Err(e),
-                                    }
-                                },
-                                Err(e)=> return Err(e),
-                            }
-                        },
-                        Table::Users => {
-                            match bound_query.all().await {
-                                Ok(results) =>{
-                                    match results.results::<Actions>() {
-                                        Ok(result) => {
-                                            query_return.actions = result;
-                                            return Ok(query_return);
-                                        },
-                                        Err(e) => return Err(e),
-                                    }
-                                },
-                                Err(e)=> return Err(e),
-                            }
-                        },
-                    }
-                },
-                Err(e) => return Err(e.into()),            
+            let bound_query : D1PreparedStatement;
+            if mode == 0 {
+                bound_query = db.prepare(query);
+            } else {
+                match db.prepare(query).bind(&[key1.into()]){
+                    Ok(prepped_query)=> bound_query = prepped_query,
+                    Err(e) => return Err(e),
+                }
             }
-        },
-        Err(e) => return Err(e.into()),
+
+
+                match table {
+                    Table::Actions => {
+                        match bound_query.all().await {
+                            Ok(results) =>{
+                                match results.results::<Actions>() {
+                                    Ok(result) => {
+                                        query_return.actions = result;
+                                        return Ok(query_return);
+                                    },
+                                    Err(e) => return Err(e),
+                                }
+                            },
+                            Err(e)=> return Err(e),
+                        }
+                    },                    
+                    Table::Deprecations => {
+                        match bound_query.all().await {
+                            Ok(results) =>{
+                                match results.results::<Deprecations>() {
+                                    Ok(result) => {
+                                        query_return.deprecations = result;
+                                        return Ok(query_return);
+                                    },
+                                    Err(e) => return Err(e),
+                                }
+                            },
+                            Err(e)=> return Err(e),
+                        }
+                    },
+                    Table::EmailValidations => {
+                        match bound_query.all().await {
+                            Ok(results) =>{
+                                match results.results::<EmailValidations>() {
+                                    Ok(result) => {
+                                        query_return.email_validations = result;
+                                        return Ok(query_return);
+                                    },
+                                    Err(e) => return Err(e),
+                                }
+                            },
+                            Err(e)=> return Err(e),
+                        }
+                    },
+                    Table::FsoItems => {
+                        match bound_query.all().await {
+                            Ok(results) =>{
+                                match results.results::<FsoItems>() {
+                                    Ok(result) => {
+                                        query_return.fso_items = result;
+                                        return Ok(query_return);
+                                    },
+                                    Err(e) => return Err(e),
+                                }
+                            },
+                            Err(e)=> return Err(e),
+                        }
+                    },
+                    Table::FsoTables => {
+                        match bound_query.all().await {
+                            Ok(results) =>{
+                                match results.results::<FsoTables>() {
+                                    Ok(result) => {
+                                        query_return.fso_tables = result;
+                                        return Ok(query_return);
+                                    },
+                                    Err(e) => return Err(e),
+                                }
+                            },
+                            Err(e)=> return Err(e),
+                        }
+                    },
+                    Table::ParseBehaviors => {
+                        match bound_query.all().await {
+                            Ok(results) =>{
+                                match results.results::<ParseBehavior>() {
+                                    Ok(result) => {
+                                        query_return.parse_behaviors = result;
+                                        return Ok(query_return);
+                                    },
+                                    Err(e) => return Err(e),
+                                }
+                            },
+                            Err(e)=> return Err(e),
+                        }
+                    },
+                    Table::Restrictions => {
+                        match bound_query.all().await {
+                            Ok(results) =>{
+                                match results.results::<Restrictions>() {
+                                    Ok(result) => {
+                                        query_return.restrictions = result;
+                                        return Ok(query_return);
+                                    },
+                                    Err(e) => return Err(e),
+                                }
+                            },
+                            Err(e)=> return Err(e),
+                        }
+                    },
+                    Table::Sessions => {
+                        match bound_query.all().await {
+                            Ok(results) =>{
+                                match results.results::<Session>() {
+                                    Ok(result) => {
+                                        query_return.sessions = result;
+                                        return Ok(query_return);
+                                    },
+                                    Err(e) => return Err(e),
+                                }
+                            },
+                            Err(e)=> return Err(e),
+                        }
+                    },
+                    Table::TableAliases => {
+                        match bound_query.all().await {
+                            Ok(results) =>{
+                                match results.results::<TableAlias>() {
+                                    Ok(result) => {
+                                        query_return.table_aliases = result;
+                                        return Ok(query_return);
+                                    },
+                                    Err(e) => return Err(e),
+                                }
+                            },
+                            Err(e)=> return Err(e),
+                        }
+                    },
+                    Table::Users => {
+                        match bound_query.all().await {
+                            Ok(results) =>{
+                                match results.results::<Actions>() {
+                                    Ok(result) => {
+                                        query_return.actions = result;
+                                        return Ok(query_return);
+                                    },
+                                    Err(e) => return Err(e),
+                                }
+                            },
+                            Err(e)=> return Err(e),
+                        }
+                    },
+                }                
+            },
+        Err(e)=> return Err(e),            
     }
 }
 
