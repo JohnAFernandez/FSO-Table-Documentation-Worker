@@ -75,7 +75,7 @@ const TABLE_ALIASES_FILTER: &str = "WHERE alias_id = ?;";
 const USERS_USERNAME_FILTER: &str = "WHERE username = ?;";
 const USERS_USER_ID_FILTER: &str = "WHERE user_id = ?;";
 
-struct FsoTablesQueryResults {
+pub struct FsoTablesQueryResults {
     actions: Vec<Actions>,
     deprecations: Vec<Deprecations>,
     email_validations: Vec<EmailValidations>,
@@ -85,7 +85,7 @@ struct FsoTablesQueryResults {
     restrictions: Vec<Restrictions>,
     users: Vec<Users>,
     sessions: Vec<Session>,
-//    table_aliases: Vec<Tab
+    table_aliases: Vec<TableAlias>,
 }
 
 impl FsoTablesQueryResults {
@@ -100,6 +100,7 @@ impl FsoTablesQueryResults {
             restrictions : Vec::new(),
             users : Vec::new(),
             sessions : Vec::new(),
+            table_aliases : Vec::new(),
         }
     }
 }
@@ -175,7 +176,7 @@ struct Session {
 }
 
 #[derive(Deserialize, Serialize)]
-struct TableAlises {
+struct TableAlias {
     alias_id: i32,
     table_id: String,
     filename: String,
@@ -253,7 +254,7 @@ pub async fn db_generic_search_query(table: &Table, mode: i8 , key1: &String, ke
                         1 => query += ACTIONS_FILTER_ID,
                         2 => query += ACTIONS_FILTER_USER_ID,
                         3 => query += ACTIONS_FILTER_APPROVED,
-                        4 => query += ACTIONS_FILTER_USER_APPROVED_A + format!("{}", key2) + ACTIONS_FILTER_USER_APPROVED_B, 
+                        4 => query = query + ACTIONS_FILTER_USER_APPROVED_A + key2 + ACTIONS_FILTER_USER_APPROVED_B, 
                         _ => return Err("Internal Server Error: Out of range mode in Actions generic query.".to_string().into()),
                     }
                 },
@@ -273,7 +274,7 @@ pub async fn db_generic_search_query(table: &Table, mode: i8 , key1: &String, ke
                     match mode {
                         0 => (),
                         1 => query += EMAIL_VALIDATION_PENDING_FILTER,
-                        2 => query += EMAIL_VALIDATIONS_VERIFY_FILTER_A + format!("{}", key2) + EMAIL_VALIDATIONS_VERIFY_FILTER_B,
+                        2 => query = query + EMAIL_VALIDATIONS_VERIFY_FILTER_A + key2 + EMAIL_VALIDATIONS_VERIFY_FILTER_B,
                         _ => return Err("Internal Server Error: Out of range mode in Email Validations generic query.".into()),
                     }
 
@@ -323,7 +324,7 @@ pub async fn db_generic_search_query(table: &Table, mode: i8 , key1: &String, ke
 
                     match mode {
                         0 => (),
-                        1 => query += SESSIONS_FILTER_A + format!("{}", key2) + SESSIONS_FILTER_B,
+                        1 => query = query + SESSIONS_FILTER_A + key2,// + SESSIONS_FILTER_B,
                         _ => return Err("Internal Server Error: Out of range mode in Sessions generic query.".into()),
                     }
 
@@ -429,7 +430,7 @@ pub async fn db_generic_search_query(table: &Table, mode: i8 , key1: &String, ke
                         Table::ParseBehaviors => {
                             match bound_query.all().await {
                                 Ok(results) =>{
-                                    match results.results::<ParseBehaviors>() {
+                                    match results.results::<ParseBehavior>() {
                                         Ok(result) => {
                                             query_return.parse_behaviors = result;
                                             return Ok(query_return);
@@ -457,7 +458,7 @@ pub async fn db_generic_search_query(table: &Table, mode: i8 , key1: &String, ke
                         Table::Sessions => {
                             match bound_query.all().await {
                                 Ok(results) =>{
-                                    match results.results::<Sessions>() {
+                                    match results.results::<Session>() {
                                         Ok(result) => {
                                             query_return.sessions = result;
                                             return Ok(query_return);
@@ -471,9 +472,9 @@ pub async fn db_generic_search_query(table: &Table, mode: i8 , key1: &String, ke
                         Table::TableAliases => {
                             match bound_query.all().await {
                                 Ok(results) =>{
-                                    match results.results::<TableAliases>() {
+                                    match results.results::<TableAlias>() {
                                         Ok(result) => {
-                                            query_return.table = result;
+                                            query_return.table_aliases = result;
                                             return Ok(query_return);
                                         },
                                         Err(e) => return Err(e),
@@ -497,7 +498,6 @@ pub async fn db_generic_search_query(table: &Table, mode: i8 , key1: &String, ke
                             }
                         },
                     }
-                    return Err("Not yet implemented.".to_string().into());        
                 },
                 Err(e) => return Err(e.into()),            
             }
