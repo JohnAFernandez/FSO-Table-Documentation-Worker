@@ -85,29 +85,8 @@ async fn fetch(req: Request, env: Env, _ctx: Context,) -> worker::Result<Respons
 pub async fn test_all(_: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
     
     let mut return_object = db_fso::FsoTablesQueryResults::new_results().await;
-
+/*
     match db_fso::db_generic_search_query(&db_fso::Table::Actions, 0, &"".to_string(), &"".to_string(), &ctx).await {
-        Ok(mut results) => {
-            return_object.actions.append(&mut results.actions);
-        },
-        Err(e) => return err_specific(e.to_string()).await,
-    }
-
-    match db_fso::db_generic_search_query(&db_fso::Table::Actions, 1, &"".to_string(), &"".to_string(), &ctx).await {
-        Ok(mut results) => {
-            return_object.actions.append(&mut results.actions);
-        },
-        Err(e) => return err_specific(e.to_string()).await,
-    }
-
-    match db_fso::db_generic_search_query(&db_fso::Table::Actions, 2, &"".to_string(), &"".to_string(), &ctx).await {
-        Ok(mut results) => {
-            return_object.actions.append(&mut results.actions);
-        },
-        Err(e) => return err_specific(e.to_string()).await,
-    }
-
-    match db_fso::db_generic_search_query(&db_fso::Table::Actions, 3, &"".to_string(), &"".to_string(), &ctx).await {
         Ok(mut results) => {
             return_object.actions.append(&mut results.actions);
         },
@@ -121,12 +100,64 @@ pub async fn test_all(_: Request, ctx: RouteContext<()>) -> worker::Result<Respo
         Err(e) => return err_specific(e.to_string()).await,
     }    
 
-    match db_fso::db_generic_search_query(&db_fso::Table::Actions, 0, &"".to_string(), &"".to_string(), &ctx).await {
+    match db_fso::db_generic_search_query(&db_fso::Table::EmailValidations, 0, &"".to_string(), &"".to_string(), &ctx).await {
         Ok(mut results) => {
-            return_object.actions.append(&mut results.actions);
+            return_object.email_validations.append(&mut results.email_validations);
         },
         Err(e) => return err_specific(e.to_string()).await,
     }
+     */
+
+    match db_fso::db_generic_search_query(&db_fso::Table::FsoItems, 0, &"".to_string(), &"".to_string(), &ctx).await {
+        Ok(mut results) => {
+            return_object.fso_items.append(&mut results.fso_items);
+        },
+        Err(e) => return err_specific(e.to_string()).await,
+    }
+/*
+    match db_fso::db_generic_search_query(&db_fso::Table::FsoTables, 0, &"".to_string(), &"".to_string(), &ctx).await {
+        Ok(mut results) => {
+            return_object.fso_tables.append(&mut results.fso_tables);
+        },
+        Err(e) => return err_specific(e.to_string()).await,
+    }
+
+    match db_fso::db_generic_search_query(&db_fso::Table::ParseBehaviors, 0, &"".to_string(), &"".to_string(), &ctx).await {
+        Ok(mut results) => {
+            return_object.parse_behaviors.append(&mut results.parse_behaviors);
+        },
+        Err(e) => return err_specific(e.to_string()).await,
+    }
+              
+ 
+    match db_fso::db_generic_search_query(&db_fso::Table::Restrictions, 0, &"".to_string(), &"".to_string(), &ctx).await {
+        Ok(mut results) => {
+            return_object.restrictions.append(&mut results.restrictions);
+        },
+        Err(e) => return err_specific(e.to_string()).await,
+    }
+   
+    match db_fso::db_generic_search_query(&db_fso::Table::Sessions, 0, &"".to_string(), &"".to_string(), &ctx).await {
+        Ok(mut results) => {
+            return_object.sessions.append(&mut results.sessions);
+        },
+        Err(e) => return err_specific(e.to_string()).await,
+    }
+ 
+    match db_fso::db_generic_search_query(&db_fso::Table::TableAliases, 0, &"".to_string(), &"".to_string(), &ctx).await {
+        Ok(mut results) => {
+            return_object.table_aliases.append(&mut results.table_aliases);
+        },
+        Err(e) => return err_specific(e.to_string()).await,
+    }
+ 
+    match db_fso::db_generic_search_query(&db_fso::Table::Users, 0, &"".to_string(), &"".to_string(), &ctx).await {
+        Ok(mut results) => {
+            return_object.users.append(&mut results.users);
+        },
+        Err(e) => return err_specific(e.to_string()).await,
+    }                
+ */
 
     return Response::from_json(&return_object);
 }

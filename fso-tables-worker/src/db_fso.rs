@@ -40,11 +40,11 @@ pub enum Table {
 const ACTIONS_QUERY: &str = "SELECT * FROM actions ";    
 const DEPRECATIONS_QUERY: &str = "SELECT * FROM deprecations "; 
 const EMAIL_VALIDATIONS_QUERY: &str = "SELECT validation_id, user_id FROM email_validations ";
-const FSO_ITEMS_QUERY: &str = "SELECT * FROM fso_items ";
+const FSO_ITEMS_QUERY: &str = "SELECT item_id, item_text, documentation, major_version, parent_id, table_id, deprecation_id, restriction_id, info_type, table_index, default_value FROM fso_items LIMIT 1";
 const FSO_TABLES_QUERY: &str = "SELECT * FROM fso_tables ";    
 const PARSE_BEHAVIORS_QUERY: &str = "SELECT * FROM parse_behaviors ";    
 const RESTRICTIONS_QUERY: &str = "SELECT * FROM restrictions ";    
-const SESSIONS_QUERY: &str = "SELECT id, user, expiration,  FROM sessions ";    
+const SESSIONS_QUERY: &str = "SELECT id, user, expiration FROM sessions ";    
 const TABLE_ALIASES_QUERY: &str = "SELECT * FROM table_aliases ";    
 const USERS_QUERY: &str = "SELECT id, username, role, active, email_confirmed, contribution_count, banned FROM users ";
 
@@ -133,7 +133,7 @@ pub struct FsoItems {
     item_id: i32,
     item_text: String,
     documentation: String,
-    major_version: i32,
+    major_version: String,
     parent_id: i32,
     table_id: i32,
     deprecation_id: i32,
@@ -413,11 +413,12 @@ pub async fn db_generic_search_query(table: &Table, mode: i8 , key1: &String, ke
                         match bound_query.all().await {
                             Ok(results) =>{
                                 match results.results::<FsoItems>() {
-                                    Ok(result) => {
+                                    Ok(result) => {                                      
                                         query_return.fso_items = result;
                                         return Ok(query_return);
                                     },
-                                    Err(e) => return Err(e),
+                                    Err(e) => {
+                                        return Err(e.to_string().into())},
                                 }
                             },
                             Err(e)=> return Err(e),
@@ -496,9 +497,9 @@ pub async fn db_generic_search_query(table: &Table, mode: i8 , key1: &String, ke
                     Table::Users => {
                         match bound_query.all().await {
                             Ok(results) =>{
-                                match results.results::<Actions>() {
+                                match results.results::<Users>() {
                                     Ok(result) => {
-                                        query_return.actions = result;
+                                        query_return.users = result;
                                         return Ok(query_return);
                                     },
                                     Err(e) => return Err(e),
