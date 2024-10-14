@@ -71,6 +71,8 @@ async fn fetch(req: Request, env: Env, _ctx: Context,) -> worker::Result<Respons
         .get_async("/users/login", user_login)
         .get_async("/tables/parse-types", get_parse_types)
         .get_async("/test", test_all)
+        .get_async("/tables", get_tables)
+        .get_async("/tables/items", get_items)
         /* 
         .route("/users/:username/upgrade", put(upgrade_user_permissions).patch(upgrade_user_permissions))
         .route("/users/:username/downgrade", put(downgrade_user_permissions).patch(downgrade_user_permissions))
@@ -85,7 +87,8 @@ async fn fetch(req: Request, env: Env, _ctx: Context,) -> worker::Result<Respons
 pub async fn test_all(_: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
     
     let mut return_object = db_fso::FsoTablesQueryResults::new_results().await;
-/*
+
+    return Response::ok("Test API is deactivated as tests were successful.");
     match db_fso::db_generic_search_query(&db_fso::Table::Actions, 0, &"".to_string(), &"".to_string(), &ctx).await {
         Ok(mut results) => {
             return_object.actions.append(&mut results.actions);
@@ -106,7 +109,7 @@ pub async fn test_all(_: Request, ctx: RouteContext<()>) -> worker::Result<Respo
         },
         Err(e) => return err_specific(e.to_string()).await,
     }
-     */
+     
 
     match db_fso::db_generic_search_query(&db_fso::Table::FsoItems, 0, &"".to_string(), &"".to_string(), &ctx).await {
         Ok(mut results) => {
@@ -114,7 +117,7 @@ pub async fn test_all(_: Request, ctx: RouteContext<()>) -> worker::Result<Respo
         },
         Err(e) => return err_specific(e.to_string()).await,
     }
-/*
+
     match db_fso::db_generic_search_query(&db_fso::Table::FsoTables, 0, &"".to_string(), &"".to_string(), &ctx).await {
         Ok(mut results) => {
             return_object.fso_tables.append(&mut results.fso_tables);
@@ -157,7 +160,7 @@ pub async fn test_all(_: Request, ctx: RouteContext<()>) -> worker::Result<Respo
         },
         Err(e) => return err_specific(e.to_string()).await,
     }                
- */
+ 
 
     return Response::from_json(&return_object);
 }
@@ -245,7 +248,7 @@ pub async fn deactivate_user(mut req: Request, ctx: RouteContext<()>) -> worker:
         Ok(db) => {
             let session_result = header_session_is_valid(&req, &db).await;
             if !session_result.0 {
-                return err_not_logged_in().await
+                return err_specific(session_result.1).await
             }
 
             let username = session_result.1;
@@ -621,6 +624,28 @@ pub async fn get_parse_types(_: Request, ctx: RouteContext<()>) -> worker::Resul
             return db_fso::db_get_parse_behavior_types(&db).await;
         },
         Err(e) => return err_specific(e.to_string()).await,
+    }
+}
+
+pub async fn get_items(_: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
+    match db_fso::db_generic_search_query(&db_fso::Table::FsoItems, 0, &"".to_string(), &"".to_string(), &ctx).await {
+        Ok(result) => {
+            return Response::from_json(&result.fso_items);
+        },
+        Err(e) => {
+            return err_specific(e.to_string()).await;
+        }
+    }
+}
+
+pub async fn get_tables(_: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
+    match db_fso::db_generic_search_query(&db_fso::Table::FsoTables, 0, &"".to_string(), &"".to_string(), &ctx).await {
+        Ok(result) => {
+            return Response::from_json(&result.fso_tables);
+        },
+        Err(e) => {
+            return err_specific(e.to_string()).await;
+        }
     }
 }
 

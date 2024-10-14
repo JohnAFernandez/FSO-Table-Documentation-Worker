@@ -40,7 +40,7 @@ pub enum Table {
 const ACTIONS_QUERY: &str = "SELECT * FROM actions ";    
 const DEPRECATIONS_QUERY: &str = "SELECT * FROM deprecations "; 
 const EMAIL_VALIDATIONS_QUERY: &str = "SELECT validation_id, user_id FROM email_validations ";
-const FSO_ITEMS_QUERY: &str = "SELECT item_id, item_text, documentation, major_version, parent_id, table_id, deprecation_id, restriction_id, info_type, table_index, default_value FROM fso_items LIMIT 1";
+const FSO_ITEMS_QUERY: &str = "SELECT item_id, item_text, documentation, major_version, parent_id, table_id, deprecation_id, restriction_id, info_type, table_index, default_value FROM fso_items";
 const FSO_TABLES_QUERY: &str = "SELECT * FROM fso_tables ";    
 const PARSE_BEHAVIORS_QUERY: &str = "SELECT * FROM parse_behaviors ";    
 const RESTRICTIONS_QUERY: &str = "SELECT * FROM restrictions ";    
@@ -67,8 +67,8 @@ const PARSE_BEHAVIORS_FILTER: &str = "WHERE behavior_id = ?;";
 const RESTRICTIONS_FILTER: &str = "WHERE restriction_id = ?;";
 
 // This may need more effort, but I wanted to try the rest first.  Also need to restrict mode zero on this one.
-const SESSIONS_FILTER_A: &str = "WHERE key = ";
-const SESSIONS_FILTER_B: &str = " AND user = ?;";
+const SESSIONS_FILTER_A: &str = "WHERE key = \"";
+const SESSIONS_FILTER_B: &str = "\" AND user = ?;";
 
 const TABLE_ALIASES_FILTER: &str = "WHERE alias_id = ?;";
 
@@ -723,7 +723,7 @@ pub async fn db_get_parse_behavior_types(db : &D1Database) -> worker::Result<Res
 pub async fn db_session_add(token: &String, email: &String, time: &String, db : &D1Database) -> worker::Result<()> {
 
     // METACOMMENT! The below didn't end up working.  I did trick the JsValue constructor to use the 
-    // vector, but the database code said, "MUAAAAAH I CAN'T USE AN OBJECT!!!!"
+    // vector, but the database code said, "MUAAAAAH I CAN'T USE AN OBJECT!!!!" In any case, back to regular comments...
     // It may not be possible, but I think I have to trick it to create an array object.
     // I'm just not sure how.
     
@@ -758,15 +758,18 @@ pub async fn db_session_add(token: &String, email: &String, time: &String, db : 
 pub async fn db_check_token(username: &String, token: &String, time: String, db: &D1Database) -> Result<bool> {
     let final_token = &token.replace("\"", "");
     let query = SESSIONS_QUERY.to_owned() + &SESSIONS_FILTER_A + &format!("{}", final_token) + &SESSIONS_FILTER_B;
-
+    
     match db.prepare(query).bind(&[username.into()]) {
         Ok(statement) => {
             match statement.run().await {
                 Ok(result) =>
                     match result.results::<Session>() {
-                        Ok(results) => { 
+                        Ok(results) => {                             
+                            if results.is_empty() {
+                                return Ok(false);
+                            }
                             match results[0].expiration.parse::<DateTime<chrono::Utc>>(){
-                                Ok(session_time) => return Ok(time.parse::<DateTime<chrono::Utc>>().unwrap() < session_time),
+                                Ok(session_time) => { return Ok(time.parse::<DateTime<chrono::Utc>>().unwrap() < session_time); },
                                 // TODO! Once we know this function works, two of these call need to be changed into Ok(false)
                                 Err(e) => return Err(e.to_string().into()),
                             }
