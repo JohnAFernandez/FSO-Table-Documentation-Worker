@@ -575,6 +575,17 @@ pub async fn get_tables(_: Request, ctx: RouteContext<()>) -> worker::Result<Res
     }
 }
 
+pub async fn get_aliases(_: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
+    match db_fso::db_generic_search_query(&db_fso::Table::TableAliases, 0, &"".to_string(), &"".to_string(), &ctx).await {
+        Ok(result) => {
+            return Response::from_json(&result.fso_tables);
+        },
+        Err(e) => {
+            return err_specific(e.to_string()).await;
+        }
+    }
+}
+
 /*  I don't think I actualyl need this ...
 pub async fn user_add_email(mut req: Request, ctx: RouteContext<()>) -> worker::Result<Response> {  
     match ctx.env.d1(DB_NAME){
