@@ -14,7 +14,6 @@ use rand::*;
 use rand::distributions::Alphanumeric;
 use wasm_bindgen::JsValue;
 use chrono::{Utc, TimeDelta};
-//use random_string;
 mod secrets;
 mod db_fso;
 
@@ -90,7 +89,7 @@ async fn fetch(req: Request, env: Env, _ctx: Context,) -> worker::Result<Respons
         //.delete_alias("/tables/aliases/:id", delete_alias)
         .get_async("/tables/:id", get_table)
         //.get_async("/tables/:id/items", get_tables_items)
-        .get_async("/tables/resrictions", get_restrictions)
+        .get_async("/tables/restrictions", get_restrictions)
         .get_async("/tables/restrictions/:id", get_restriction)
         //.post_async("/tables/items/:id/restriction", post_restriction) // Requires login
         //.patch_async("/tables/restriction/:id", update_restriction).put_async("/tables/restriction/:id", update_restriction) // Requires login

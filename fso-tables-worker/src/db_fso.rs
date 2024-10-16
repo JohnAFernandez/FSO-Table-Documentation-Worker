@@ -4,7 +4,6 @@ use crate::UserDetails;
 use crate::DB_NAME;
 use crate::err_specific;
 use chrono::DateTime;
-//use wasm_bindgen::JsValue;
 
 #[derive(PartialEq, PartialOrd)]
 pub enum UserRole {
@@ -770,11 +769,10 @@ pub async fn db_check_token(username: &String, token: &String, time: String, db:
                             }
                             match results[0].expiration.parse::<DateTime<chrono::Utc>>(){
                                 Ok(session_time) => { return Ok(time.parse::<DateTime<chrono::Utc>>().unwrap() < session_time); },
-                                // TODO! Once we know this function works, two of these call need to be changed into Ok(false)
-                                Err(e) => return Err(e.to_string().into()),
+                                Err(_) => return Ok(false),
                             }
                         },
-                        Err(e) => return Err(e),        
+                        Err(_) => return Ok(false),        
                     },
                 Err(e)=> Err(e),
             }
