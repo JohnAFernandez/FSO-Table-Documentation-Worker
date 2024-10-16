@@ -73,41 +73,41 @@ async fn fetch(req: Request, env: Env, _ctx: Context,) -> worker::Result<Respons
         .post_async("/users/activate", activate_user).put_async("/users/activate", activate_user).patch_async("/users/activate", activate_user)
         .delete_async("/users", deactivate_user)
         .get_async("/tables/parse-types", get_parse_types)
-        .get_async("/tables/parse-types/:id:", get_parse_type)
+        .get_async("/tables/parse-types/:id", get_parse_type)
         //.post_async("/tables/parse-types", post_parse_behavior)
-        //.patch_async("/tables/parse-types/:id:", update_parse_type).put_async("/tables/parse-types/:id:", update_parse_type)
-        //.delete_async("/tables/parse-types/:id:", delete_parse_type)
+        //.patch_async("/tables/parse-types/:id", update_parse_type).put_async("/tables/parse-types/:id", update_parse_type)
+        //.delete_async("/tables/parse-types/:id", delete_parse_type)
         .get_async("/tables", get_tables) // tables just need to be done manually on my end, because we don't have many tables *and* it's less effort than just populating.
         .get_async("/tables/items", get_items)
-        //.get_async("/tables/items/:id:", get_item)
+        .get_async("/tables/items/:id", get_item)
         //.post_async("/tables/items", post_item) // Requires login
-        //.patch_async("/tables/items/:id:", update_item).put_async("/tables/items/:id:", update_item) //Requires login 
-        //.delete_async("/tables/items/:id:", delete_item)
+        //.patch_async("/tables/items/:id", update_item).put_async("/tables/items/:id", update_item) //Requires login 
+        //.delete_async("/tables/items/:id", delete_item)
         .get_async("/tables/aliases", get_aliases)
-        //.get_async("/tables/aliases/:id:", get_alias) 
-        //.post_async("/tables/:id:/alias", post_alias) // Requires login
-        //.patch_async("/tables/aliases/:id:", update_alias).put_async("/tables/aliases/:id:", update_alias) // Requires login
-        //.delete_alias("/tables/aliases/:id:", delete_alias)
-        //.get_async("/tables/:id:", get_table)
-        //.get_async("/tables/:id:/items", get_tables_items)
-        //.get_async("/tables/resrictions", get_restrictions)
-        //.get_async("/tables/restrictions/:id:", get_restriction)
-        //.post_async("/tables/items/:id:/restriction", post_restriction) // Requires login
-        //.patch_async("/tables/restriction/:id:", update_restriction).put_async("/tables/restriction/:id:", update_restriction) // Requires login
-        //.delete_async("/tables/restrictions/:id:", delete_restriction) // Requires login
-        //.get_async("/tables/deprecations", get_deprecations) 
-        //.get_async("/tables/deprecations/:id:", get_deprecation)
+        .get_async("/tables/aliases/:id", get_alias) 
+        //.post_async("/tables/:id/alias", post_alias) // Requires login
+        //.patch_async("/tables/aliases/:id", update_alias).put_async("/tables/aliases/:id", update_alias) // Requires login
+        //.delete_alias("/tables/aliases/:id", delete_alias)
+        .get_async("/tables/:id", get_table)
+        //.get_async("/tables/:id/items", get_tables_items)
+        .get_async("/tables/resrictions", get_restrictions)
+        .get_async("/tables/restrictions/:id", get_restriction)
+        //.post_async("/tables/items/:id/restriction", post_restriction) // Requires login
+        //.patch_async("/tables/restriction/:id", update_restriction).put_async("/tables/restriction/:id", update_restriction) // Requires login
+        //.delete_async("/tables/restrictions/:id", delete_restriction) // Requires login
+        .get_async("/tables/deprecations", get_deprecations) 
+        .get_async("/tables/deprecations/:id", get_deprecation)
         //.post_async("/tables/deprecations", post_deprecation) // Requires login
-        //.patch_async("/tables/deprecations/:id:", update_deprecation).put_async("/tables/deprecations/:id:", update_deprecation) // Requires login
-        //.delete_async("/tables/deprecations/:id:", delete_deprecation) // Requires login
+        //.patch_async("/tables/deprecations/:id", update_deprecation).put_async("/tables/deprecations/:id", update_deprecation) // Requires login
+        //.delete_async("/tables/deprecations/:id", delete_deprecation) // Requires login
         //.get_async("/tables/actions/history", get_completed_history) // Requires login
-        //.get_async("/tables/actions/history/:id:", get_completed_user_history) // Requires login
+        //.get_async("/tables/actions/history/:id", get_completed_user_history) // Requires login
         //.get_async("/tables/actions/approvals", get_approval_requests) // Requires login
-        //.get_async("/tables/actions/approvals/:id:", get_approval_requests_user) // Requires login, for seeing just mine, or admin seeing specific other user
+        //.get_async("/tables/actions/approvals/:id", get_approval_requests_user) // Requires login, for seeing just mine, or admin seeing specific other user
         //.get_async("/tables/actions/rejections", get_rejected_requests) // Requires login
         //.get_async("/tables/actions/rejections/:id": get_rejcted_requests_user) // Requires login
-        //.post_async("/tables/actions/:id:/approve", approve_request) // Requires login and admin
-        //.post_async("/tables/actions/:id:/reject", reject_request) // Requries login and admin
+        //.post_async("/tables/actions/:id/approve", approve_request) // Requires login and admin
+        //.post_async("/tables/actions/:id/reject", reject_request) // Requries login and admin
         .get_async("/test", test_all) // This might eventually be my CI test, but for now it's been deactivated.
         .or_else_any_method_async("/", err_api_fallback) // TODO, this does not work.
         .run(req, env)
@@ -121,9 +121,9 @@ async fn fetch(req: Request, env: Env, _ctx: Context,) -> worker::Result<Respons
         .route("/users/activate/:code", post(confirm_email_address)) */
 }
 
-pub async fn test_all(_: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
+pub async fn test_all(_: Request, _ctx: RouteContext<()>) -> worker::Result<Response> {
     
-    let mut return_object = db_fso::FsoTablesQueryResults::new_results().await;
+    let mut _return_object = db_fso::FsoTablesQueryResults::new_results().await;
 
     return Response::ok("Test API is deactivated as tests were successful.");
 }
@@ -580,13 +580,20 @@ pub async fn user_downgrade_user_permissions(mut req: Request, ctx: RouteContext
     }
 }
 
-
 pub async fn get_parse_types(_: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
-    match ctx.env.d1(DB_NAME) {
-        Ok(db) => {
-            return db_fso::db_get_parse_behavior_types(&db).await;
-        },
+    match db_fso::db_generic_search_query(&db_fso::Table::ParseBehaviors, 0, &"".to_string(), &"".to_string(), &ctx).await {
+        Ok(results) => return Response::from_json(&results.parse_behaviors),
         Err(e) => return err_specific(e.to_string()).await,
+    }
+}
+
+pub async fn get_parse_type(_: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
+    match ctx.param("id"){
+        Some(parameter) => match db_fso::db_generic_search_query(&db_fso::Table::ParseBehaviors, 1, parameter, &"".to_string(), &ctx).await {
+            Ok(results) => return Response::from_json(&results.parse_behaviors),
+            Err(e) => return err_specific(e.to_string()).await,
+        },
+        None => return err_specific("Internal Server Error, route parameter mismatch!".to_string()).await,
     }
 }
 
@@ -601,6 +608,16 @@ pub async fn get_items(_: Request, ctx: RouteContext<()>) -> worker::Result<Resp
     }
 }
 
+pub async fn get_item(_: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
+    match ctx.param("id"){
+        Some(parameter) => match db_fso::db_generic_search_query(&db_fso::Table::FsoItems, 1, parameter, &"".to_string(), &ctx).await {
+            Ok(results) => return Response::from_json(&results.fso_items),
+            Err(e) => return err_specific(e.to_string()).await,
+        },
+        None => return err_specific("Internal Server Error, route parameter mismatch!".to_string()).await,
+    }
+}
+
 pub async fn get_tables(_: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
     match db_fso::db_generic_search_query(&db_fso::Table::FsoTables, 0, &"".to_string(), &"".to_string(), &ctx).await {
         Ok(result) => {
@@ -609,6 +626,16 @@ pub async fn get_tables(_: Request, ctx: RouteContext<()>) -> worker::Result<Res
         Err(e) => {
             return err_specific(e.to_string()).await;
         }
+    }
+}
+
+pub async fn get_table(_: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
+    match ctx.param("id"){
+        Some(parameter) => match db_fso::db_generic_search_query(&db_fso::Table::FsoTables, 1, parameter, &"".to_string(), &ctx).await {
+            Ok(results) => return Response::from_json(&results.fso_tables),
+            Err(e) => return err_specific(e.to_string()).await,
+        },
+        None => return err_specific("Internal Server Error, route parameter mismatch!".to_string()).await,
     }
 }
 
@@ -622,6 +649,61 @@ pub async fn get_aliases(_: Request, ctx: RouteContext<()>) -> worker::Result<Re
         }
     }
 }
+
+pub async fn get_alias(_: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
+    match ctx.param("id"){
+        Some(parameter) => match db_fso::db_generic_search_query(&db_fso::Table::TableAliases, 1, parameter, &"".to_string(), &ctx).await {
+            Ok(results) => return Response::from_json(&results.table_aliases),
+            Err(e) => return err_specific(e.to_string()).await,
+        },
+        None => return err_specific("Internal Server Error, route parameter mismatch!".to_string()).await,
+    }
+}
+
+pub async fn get_restrictions(_: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
+    match db_fso::db_generic_search_query(&db_fso::Table::Restrictions, 0, &"".to_string(), &"".to_string(), &ctx).await {
+        Ok(result) => {
+            return Response::from_json(&result.restrictions);
+        },
+        Err(e) => {
+            return err_specific(e.to_string()).await;
+        }
+    }
+}
+
+pub async fn get_restriction(_: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
+    match ctx.param("id"){
+        Some(parameter) => match db_fso::db_generic_search_query(&db_fso::Table::Restrictions, 1, parameter, &"".to_string(), &ctx).await {
+            Ok(results) => return Response::from_json(&results.restrictions),
+            Err(e) => return err_specific(e.to_string()).await,
+        },
+        None => return err_specific("Internal Server Error, route parameter mismatch!".to_string()).await,
+    }
+}
+
+pub async fn get_deprecations(_: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
+    match db_fso::db_generic_search_query(&db_fso::Table::Deprecations, 0, &"".to_string(), &"".to_string(), &ctx).await {
+        Ok(result) => {
+            return Response::from_json(&result.deprecations);
+        },
+        Err(e) => {
+            return err_specific(e.to_string()).await;
+        }
+    }
+}
+
+pub async fn get_deprecation(_: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
+    match ctx.param("id"){
+        Some(parameter) => match db_fso::db_generic_search_query(&db_fso::Table::Deprecations, 1, parameter, &"".to_string(), &ctx).await {
+            Ok(results) => return Response::from_json(&results.deprecations),
+            Err(e) => return err_specific(e.to_string()).await,
+        },
+        None => return err_specific("Internal Server Error, route parameter mismatch!".to_string()).await,
+    }
+}
+
+
+
 
 /*  I don't think I actualyl need this ...
 pub async fn user_add_email(mut req: Request, ctx: RouteContext<()>) -> worker::Result<Response> {  
@@ -662,24 +744,6 @@ pub async fn user_confirm_email_address(_: Request, ctx: RouteContext<()>) -> wo
     }
 }
 
-/*
-    .route("/tables", get(table_stats_get).post(table_post).delete(api_insufficent_permissions))
-    .route("/tables", )
-    .route("/tables", get(table_stats_get))
-    .route("/tables", get(table_stats_get))
-    .route("/tables", get(table_stats_get))
-    .route("/tables/:tid", get(table_get_details))
- */
-/*
-    .route("/deprecations/", get(user))
- */
-
- //:id for the taco rocket of doom
-
-
-//pub async fn table_get_details(params(":tid")) -> &'static str {
-//    "FINISH ME! = Table get details"
-//}
 
 
 // SECTION!! generic server tasks
