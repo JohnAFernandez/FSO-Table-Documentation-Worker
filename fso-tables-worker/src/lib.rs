@@ -105,9 +105,10 @@ async fn fetch(req: Request, env: Env, _ctx: Context,) -> worker::Result<Respons
         //.get_async("/tables/actions/approvals/:id", get_approval_requests_user) // Requires login, for seeing just mine, or admin seeing specific other user
         //.get_async("/tables/actions/rejections", get_rejected_requests) // Requires login
         //.get_async("/tables/actions/rejections/:id": get_rejcted_requests_user) // Requires login
-        //.post_async("/tables/actions/:id/approve", approve_request) // Requires login and admin
-        //.post_async("/tables/actions/:id/reject", reject_request) // Requries login and admin
-        .get_async("/test", test_all) // This might eventually be my CI test, but for now it's been deactivated.
+        //.post_async("/tables/actions/:id:/approve", approve_request) // Requires login and admin
+        //.post_async("/tables/actions/:id:/reject", reject_request) // Requries login and admin
+        //.post_bug_report("/bugreport", send_bug_report)
+        .get_async("/test", test_all) // This might eventually be a "CI" test, but for now it just displays a message.
         .or_else_any_method_async("/", err_api_fallback) // TODO, this does not work.
         .run(req, env)
         .await
