@@ -641,7 +641,7 @@ pub async fn get_table(_: Request, ctx: RouteContext<()>) -> worker::Result<Resp
 pub async fn get_aliases(_: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
     match db_fso::db_generic_search_query(&db_fso::Table::TableAliases, 0, &"".to_string(), &"".to_string(), &ctx).await {
         Ok(result) => {
-            return Response::from_json(&result.fso_tables);
+            return Response::from_json(&result.table_aliases);
         },
         Err(e) => {
             return err_specific(e.to_string()).await;

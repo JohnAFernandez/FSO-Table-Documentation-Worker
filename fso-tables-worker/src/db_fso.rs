@@ -178,7 +178,7 @@ pub struct Session {
 #[derive(Deserialize, Serialize)]
 pub struct TableAlias {
     alias_id: i32,
-    table_id: String,
+    table_id: i32,
     filename: String,
 }
 
