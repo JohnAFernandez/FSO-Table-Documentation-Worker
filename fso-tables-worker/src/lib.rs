@@ -44,12 +44,12 @@ struct EmailMessage {
 }
 
 impl EmailMessage {
-    fn create_activation_email() -> EmailMessage{
+    fn create_activation_email(code: &String) -> EmailMessage{
         EmailMessage{
             sender : FullEmailAddress::create_full_email("FSO Tables Database Activations".to_string(), "table@fsotables.com".to_string()),
             to : vec![], 
             subject : "Account Confirmation Link".to_string(),
-            htmlContent : "<h1>testing</h1>".to_string(),
+            htmlContent : format!("<h1 style=\"text-align:center\">Welcome to the Fresspace Open Table Database!</h1><br><br><h3><a href=\"{}\"</h3>", code),
         }
     }
 }
@@ -66,6 +66,7 @@ async fn fetch(req: Request, env: Env, _ctx: Context,) -> worker::Result<Respons
         .get_async("/", root_get)
         .get_async("/users", db_fso::db_user_stats_get)       // No Post, put, patch, or delete for overarching category
         .post_async("/users/register", user_register_new)
+        .post_async("/users/validation/:id" user_confirm_email)
         .get_async("/users/myaccount", user_get_details)
         .post_async("/users/myaccount/password", user_change_password)
         .get_async("/users/login", user_login)
@@ -118,7 +119,7 @@ async fn fetch(req: Request, env: Env, _ctx: Context,) -> worker::Result<Respons
         .route("/users/:username/upgrade", put(upgrade_user_permissions).patch(upgrade_user_permissions))
         .route("/users/:username/downgrade", put(downgrade_user_permissions).patch(downgrade_user_permissions))
         .route("/users/:username/email", post(add_email).put(add_email).patch(add_email).delete(api_insufficent_permissions))
-        .route("/users/activate/:code", post(confirm_email_address)) */
+        */
 }
 
 pub async fn test_all(_: Request, _ctx: RouteContext<()>) -> worker::Result<Response> {
@@ -175,6 +176,11 @@ pub async fn user_register_new(mut req: Request, ctx: RouteContext<()>) -> worke
     }
 
 }
+
+pub async fn user_confirm_email(mut: req, ctx: RouteContext<()>) -> worker::Result<Response> {
+    
+}
+
 
 #[derive(Serialize, Deserialize)]
 pub struct UserDetails{
@@ -732,17 +738,6 @@ pub async fn user_add_email(mut req: Request, ctx: RouteContext<()>) -> worker::
     }
 }
  */
-
-pub async fn user_confirm_email_address(_: Request, ctx: RouteContext<()>) -> worker::Result<Response> {  
-    let db = ctx.env.d1(DB_NAME);
-    match &db{
-        Ok(_) => {
-            
-            return err_api_under_construction().await            
-        },
-        Err(e) => return err_specific(e.to_string()).await,
-    }
-}
 
 
 
