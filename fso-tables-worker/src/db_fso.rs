@@ -55,8 +55,8 @@ const ACTIONS_FILTER_USER_APPROVED_B: &str = ";";
 
 const DEPRECATIONS_FILTER: &str = "WHERE deprecation_id = ?;";
 
-const EMAIL_VALIDATION_PENDING_FILTER: &str = "WHERE user_id = ?;";
-const EMAIL_VALIDATIONS_VERIFY_FILTER_A: &str = "WHERE user_id = ? AND secure_key = ";
+const EMAIL_VALIDATION_PENDING_FILTER: &str = "WHERE username = ?;";
+const EMAIL_VALIDATIONS_VERIFY_FILTER_A: &str = "WHERE username = ? AND secure_key = ";
 const EMAIL_VALIDATIONS_VERIFY_FILTER_B: &str = ";";
 
 const FSO_TABLES_FILTER: &str = "WHERE table_id = ?;";
@@ -124,7 +124,7 @@ pub struct Deprecations {
 #[derive(Serialize, Deserialize)]
 pub struct EmailValidations {
     validation_id: i32,
-    user_id: i32,
+    username: i32,
 }
 
 #[derive(Serialize, Deserialize)]

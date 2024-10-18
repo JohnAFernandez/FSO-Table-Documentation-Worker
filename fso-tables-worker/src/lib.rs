@@ -1,5 +1,6 @@
 use std::io::Read;
 
+use db_fso::db_generic_search_query;
 use serde::{Deserialize, Serialize};
 use worker::*;
 use email_address::*;
@@ -49,7 +50,7 @@ impl EmailMessage {
             sender : FullEmailAddress::create_full_email("FSO Tables Database Activations".to_string(), "table@fsotables.com".to_string()),
             to : vec![], 
             subject : "Account Confirmation Link".to_string(),
-            htmlContent : format!("<h1 style=\"text-align:center\">Welcome to the Fresspace Open Table Database!</h1><br><br><h3><a href=\"{}\"</h3>", code),
+            htmlContent : format!("<h1 style=\"text-align:center\">Welcome to the Fresspace Open Table Database!</h1><br><br><h3>Please <a href=\"{}\">confirm your email</a>.</h3>", code),
         }
     }
 }
@@ -66,7 +67,7 @@ async fn fetch(req: Request, env: Env, _ctx: Context,) -> worker::Result<Respons
         .get_async("/", root_get)
         .get_async("/users", db_fso::db_user_stats_get)       // No Post, put, patch, or delete for overarching category
         .post_async("/users/register", user_register_new)
-        .post_async("/users/validation/:id" user_confirm_email)
+        .post_async("/users/validation/:email/:id", user_confirm_email)
         .get_async("/users/myaccount", user_get_details)
         .post_async("/users/myaccount/password", user_change_password)
         .get_async("/users/login", user_login)
@@ -167,18 +168,65 @@ pub async fn user_register_new(mut req: Request, ctx: RouteContext<()>) -> worke
                         return err_specific(e.to_string()).await;
                     }
 
-                    return send_confirmation_link(&email.email).await
                 },
                 Err(e) => return err_specific(e.to_string()).await,
             }
+
+            let mut success = false;
+            let mut error_message = "".to_string();
+            let activation_string = create_random_string().await;
+
+            match hash_string(&email.email, &activation_string).await {
+                Ok(scrambled_string) => {
+                    match &db1.prepare(format!("INSERT INTO email_validations (username, secure_key) VALUES (?, \"{}\")", &scrambled_string)).bind(&[email.email.clone().into()]) {
+                        Ok(q) => {
+                            // if this fails, then we need to delete the inserted row.        
+                            if let Err(e) = q.run().await {
+                                error_message = e.to_string();
+                            } else {
+                                success = true;
+                            }
+        
+                        },
+                        Err(e) => error_message = e.to_string(),
+                    }
+                },
+                Err(e) =>{ error_message = e.to_string()},
+            }
+            
+            if (success){
+                return send_confirmation_link(&email.email, &activation_string).await
+            } else {
+                let statement = db1.prepare("DELETE FROM email_validations WHERE username = ?").bind(&[email.email.clone().into()]);
+                match &statement {
+                    Ok(q) => {
+                        if let Err(e) = q.run().await {
+                            return err_specific(e.to_string()).await;
+                        }
+    
+                    },
+                    Err(e) => return err_specific(e.to_string()).await,
+                }    
+                return err_specific(error_message).await;
+            }
+
         },
         Err(e) => return err_specific(e.to_string()).await,
     }
 
 }
 
-pub async fn user_confirm_email(mut: req, ctx: RouteContext<()>) -> worker::Result<Response> {
-    
+pub async fn user_confirm_email(mut req: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
+    match ctx.param("id") {
+        Some(string) => {
+            match ctx.param("username"){
+                Some(username) => db_generic_search_query(&db_fso::Table::EmailValidations, mode, key1, key2, &ctx),
+                None => return err_specific("Activation failed. Missing username.".to_string()).await,
+            }
+        },
+        None => return err_specific("Activation failed.  Missing activation code.".to_string()).await,
+    }
+    return err_specific("Endpoint under construction".to_string()).await
 }
 
 
@@ -894,7 +942,7 @@ pub async fn header_session_is_valid(req: &Request, db: &D1Database) -> (bool, S
     return return_tuple
 }
 
-pub async fn send_confirmation_link(address : &String) -> worker::Result<worker::Response> {
+pub async fn send_confirmation_link(address : &String, activation_key : &String) -> worker::Result<worker::Response> {
     if !(EmailAddress::is_valid(&address)){
         return err_specific(format!("Tried to send automated email to invalid email address {}", address)).await
     }
@@ -915,8 +963,8 @@ pub async fn send_confirmation_link(address : &String) -> worker::Result<worker:
         Err(e) => return err_specific(e.to_string()).await,
     }
 
-    let mut message: EmailMessage = EmailMessage::create_activation_email();
-    message.to.push(FullEmailAddress::create_full_email("Lob".to_string(), address.to_string()));
+    let mut message: EmailMessage = EmailMessage::create_activation_email(activation_key);
+    message.to.push(FullEmailAddress::create_full_email("User".to_string(), address.to_string()));
 
     let jvalue_out : JsValue;
 
