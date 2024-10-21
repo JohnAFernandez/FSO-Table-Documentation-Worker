@@ -681,14 +681,21 @@ pub async fn db_check_password(email: &String, password: &String, db: &D1Databas
     }    
 }
 
-pub async fn db_set_new_pass(email: &String, password: &String, db: &D1Database) -> String {
-    let query_string = format!("UPDATE users SET password = \"{}\" WHERE username = ?", password);
+pub async fn db_set_new_pass(email: &String, password: &String, ctx: &RouteContext<()>) -> Result<()> {
+    let db = ctx.env.d1(DB_NAME);
 
-    let query = db.prepare(&query_string).bind(&[email.into()]).unwrap();
-    
-    match query.first::<UserDetails>(None).await {
-        Ok(_) => return "Success!".to_string(),
-        Err(e) => return e.to_string(),
+    match &db{
+        Ok(connection) => {
+            let query_string = format!("UPDATE users SET password = \"{}\" WHERE username = ?", password);
+
+            let query = connection.prepare(&query_string).bind(&[email.into()]).unwrap();
+            
+            match query.first::<UserDetails>(None).await {
+                Ok(_) => return Ok(()),
+                Err(e) => return Err(e.to_string().into()),
+            }
+        },
+        Err(e) => return Err(e.to_string().into()),
     }
 }
 

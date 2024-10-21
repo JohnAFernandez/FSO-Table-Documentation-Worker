@@ -68,7 +68,7 @@ async fn fetch(req: Request, env: Env, _ctx: Context,) -> worker::Result<Respons
         .get_async("/users", db_fso::db_user_stats_get)       // No Post, put, patch, or delete for overarching category
         .post_async("/users/register", user_register_new)
         .post_async("/users/validation/:email/:id", user_confirm_email)
-        //.post_async("/users/validation/:email/:id", set_first_password)
+        .post_async("/users/validation/:email/:id/password", user_confirm_email)
         .get_async("/users/myaccount", user_get_details)
         .post_async("/users/myaccount/password", user_change_password)
         .get_async("/users/login", user_login)
@@ -217,18 +217,47 @@ pub async fn user_register_new(mut req: Request, ctx: RouteContext<()>) -> worke
 
 }
 
-pub async fn user_confirm_email(_: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
+pub async fn user_confirm_email(req: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
     match ctx.param("id") {
-        Some(string) => {
+        Some(key) => {
             match ctx.param("username"){
                 Some(username) => { 
-                    match db_generic_search_query(&db_fso::Table::EmailValidations, 0, &username, &string, &ctx).await{
+                    match db_generic_search_query(&db_fso::Table::EmailValidations, 0, &username, &key, &ctx).await{
                         Ok(result) => {
                             if result.email_validations.is_empty() {
                                 return err_specific("Bad credentials, please resubmit".to_string()).await
                             } 
                             
-                            return Response::ok("GO AHEAD AND SET THAT THERE PASSWORD SON");
+                            match req.headers().has("password"){
+                                Ok(contains)=> { 
+                                    if contains {
+                                        match req.headers().get("password"){
+                                            Ok(option) => {
+                                                match option {
+                                                    Some(password) => {
+                                                        match hash_string(&username, &password).await {
+                                                            Ok(hashed_password) => {
+                                                                match db_fso::db_set_new_pass(&username, &hashed_password, &ctx).await {
+                                                                    Ok(_) => (),
+                                                                    Err(e) => return err_specific(e.to_string()).await,
+                                                                }
+
+                                                                return Response::ok("Request successful, but I can't send you a login token yet.");    
+                                                            },
+                                                            Err(e) => err_specific(e.to_string()).await,
+                                                        }
+                                                    },
+                                                    None => return Err("Password missing from headers".to_string().into()),
+                                                }
+                                            },
+                                            Err(e) => return Err(e),
+                                        }                                        
+                                    } else {
+                                        return Response::ok("GO AHEAD AND SET THAT THERE PASSWORD SON")
+                                    }
+                                },
+                                Err(_) => return Response::ok("GO AHEAD AND SET THAT THERE PASSWORD SON"),
+                            }
                         },
                         Err(e) => return err_specific(e.to_string()).await,
                     }
@@ -238,7 +267,6 @@ pub async fn user_confirm_email(_: Request, ctx: RouteContext<()>) -> worker::Re
         },
         None => return err_specific("Activation failed.  Missing activation code.".to_string()).await,
     }
-    return err_specific("Endpoint under construction".to_string()).await
 }
 
 
@@ -482,8 +510,9 @@ pub struct Password{
 }
 
 pub async fn user_change_password(mut req: Request, ctx: RouteContext<()>) -> worker::Result<Response> {  
-    match ctx.env.d1(DB_NAME){
+    match ctx.env.d1(DB_NAME) {
         Ok(db) => {
+
             let session_result = header_session_is_valid(&req, &db).await;
             if !session_result.0 {
                 return err_not_logged_in().await
@@ -492,24 +521,17 @@ pub async fn user_change_password(mut req: Request, ctx: RouteContext<()>) -> wo
             let username = session_result.1;
             match req.json::<Password>().await{
                 Ok(password) => {
-                    if password.password.len() < DB_MINIMUM_PASSWORD_LENGTH {
-                        return err_specific("Password is too short".to_string()).await
+                    match check_password_requirements(&password.password).await{
+                        Ok(_) => (),
+                        Err(e) => return err_specific(e.to_string()).await,
                     }
-
-                    match Regex::new(DB_ALLOWED_PASSWORD_CHARACTERS) {
-                        Ok(search_set) => {
-                            match search_set.find(&password.password) {
-                                Some(_) => return err_specific("Disallowed password characters".to_string()).await,
-                                None => (),
-                            }    
-                        },
-                        Err(e) => return err_specific(e.to_string()).await
-                    }
-                                     
+                    
                     match hash_string(&username, &password.password).await {                             
                         Ok(hash) => { 
-                            db_fso::db_set_new_pass(&username, &hash, &db).await;
-                            return worker::Response::ok("Password Changed!");
+                            match db_fso::db_set_new_pass(&username, &hash, &ctx).await {
+                                Ok(_) => return worker::Response::ok("Password Changed!"),
+                                Err(e) => return err_specific(e.to_string()).await,
+                            }
                         },
                         Err(e) => return err_specific(e.to_string() + &" Hashing function failed.".to_string()).await,
                     }                            
@@ -517,7 +539,23 @@ pub async fn user_change_password(mut req: Request, ctx: RouteContext<()>) -> wo
                 Err(_) => return err_bad_request().await,
             }
         },
-        Err(e) => return err_specific(e.to_string()).await,
+        Err(e)=> err_specific(e.to_string()).await,
+    }
+}
+
+pub async fn check_password_requirements(password: &String) -> Result<()> {
+    if password.len() < DB_MINIMUM_PASSWORD_LENGTH {
+        return Err("Password is too short, please submit a new password".to_string().into())
+    }
+
+    match Regex::new(DB_ALLOWED_PASSWORD_CHARACTERS) {
+        Ok(search_set) => {
+            match search_set.find(&password) {
+                Some(_) => return Err("Disallowed password characters found, please submit a new password.".to_string().into()),
+                None => return Ok(()),
+            }    
+        },
+        Err(e) => return Err(e.to_string().into())
     }
 }
 
