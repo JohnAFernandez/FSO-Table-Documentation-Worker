@@ -542,6 +542,15 @@ pub async fn db_email_taken(email: &String, db: &D1Database) -> worker::Result<b
     }    
 }
 
+pub async fn db_set_email_confirmed(email: &String, db: &D1Database) {
+    let query = db.prepare("UPDATE users SET email_confirmed = 1 WHERE username = ?").bind(&[email.into()]).unwrap();
+    
+    match query.first::<UserDetails>(None).await {
+        Ok(_) => (),
+        Err(e) => panic!("{}", e.to_string()),
+    }
+}
+
 #[derive(Serialize, Deserialize)]
 struct Role{
     role: i32,

@@ -68,6 +68,7 @@ async fn fetch(req: Request, env: Env, _ctx: Context,) -> worker::Result<Respons
         .get_async("/users", db_fso::db_user_stats_get)       // No Post, put, patch, or delete for overarching category
         .post_async("/users/register", user_register_new)
         .post_async("/users/validation/:email/:id", user_confirm_email)
+        //.post_async("/users/validation/:email/:id", set_first_password)
         .get_async("/users/myaccount", user_get_details)
         .post_async("/users/myaccount/password", user_change_password)
         .get_async("/users/login", user_login)
@@ -194,7 +195,7 @@ pub async fn user_register_new(mut req: Request, ctx: RouteContext<()>) -> worke
                 Err(e) =>{ error_message = e.to_string()},
             }
             
-            if (success){
+            if success{
                 return send_confirmation_link(&email.email, &activation_string).await
             } else {
                 let statement = db1.prepare("DELETE FROM email_validations WHERE username = ?").bind(&[email.email.clone().into()]);
@@ -216,11 +217,22 @@ pub async fn user_register_new(mut req: Request, ctx: RouteContext<()>) -> worke
 
 }
 
-pub async fn user_confirm_email(mut req: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
+pub async fn user_confirm_email(_: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
     match ctx.param("id") {
         Some(string) => {
             match ctx.param("username"){
-                Some(username) => db_generic_search_query(&db_fso::Table::EmailValidations, mode, key1, key2, &ctx),
+                Some(username) => { 
+                    match db_generic_search_query(&db_fso::Table::EmailValidations, 0, &username, &string, &ctx).await{
+                        Ok(result) => {
+                            if result.email_validations.is_empty() {
+                                return err_specific("Bad credentials, please resubmit".to_string()).await
+                            } 
+                            
+                            return Response::ok("GO AHEAD AND SET THAT THERE PASSWORD SON");
+                        },
+                        Err(e) => return err_specific(e.to_string()).await,
+                    }
+                },
                 None => return err_specific("Activation failed. Missing username.".to_string()).await,
             }
         },

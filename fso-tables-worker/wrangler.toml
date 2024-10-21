@@ -11,5 +11,5 @@ database_name = "fso-modoption-d1-db"
 database_id = "facc22be-76a1-43c2-8655-0b043059f646"
 
 # wrangler.toml (wrangler v3.78.6^)
-[observability]
-enabled = true
+# [observability]
+# enabled = true
