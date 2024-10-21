@@ -222,6 +222,7 @@ pub async fn user_confirm_email(req: Request, ctx: RouteContext<()>) -> worker::
         Some(key) => {
             match ctx.param("username"){
                 Some(username) => { 
+                    // TODO!!! the email validations search query needs to have two binds, not just one.  See instructions on discord.
                     match db_generic_search_query(&db_fso::Table::EmailValidations, 0, &username, &key, &ctx).await{
                         Ok(result) => {
                             if result.email_validations.is_empty() {
@@ -241,6 +242,8 @@ pub async fn user_confirm_email(req: Request, ctx: RouteContext<()>) -> worker::
                                                                     Ok(_) => (),
                                                                     Err(e) => return err_specific(e.to_string()).await,
                                                                 }
+
+                                                                //match db_fso::db_delete_email_validation
 
                                                                 return Response::ok("Request successful, but I can't send you a login token yet.");    
                                                             },

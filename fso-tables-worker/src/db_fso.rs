@@ -720,21 +720,6 @@ pub async fn db_user_stats_get(_: Request, _ctx: RouteContext<()>) -> worker::Re
 }
 
 
-pub async fn db_get_parse_behavior_types(db : &D1Database) -> worker::Result<Response>{
-    let query = db.prepare("SELECT * FROM parse_behaviors;");
-
-    match query.all().await {
-        Ok(results) => {
-            match results.results::<ParseBehavior>() {
-                Ok(result) => return Response::from_json(&result),
-                Err(e) => return err_specific(e.to_string()).await,
-            }
-        },
-        Err(e) => return err_specific(e.to_string()).await,
-    }    
-}
-
-
 pub async fn db_session_add(token: &String, email: &String, time: &String, db : &D1Database) -> worker::Result<()> {
 
     // METACOMMENT! The below didn't end up working.  I did trick the JsValue constructor to use the 
