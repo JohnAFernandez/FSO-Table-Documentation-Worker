@@ -1,9 +1,11 @@
 use worker::*;
 use serde::{Deserialize, Serialize};
+use chrono::DateTime;
 use crate::UserDetails;
 use crate::DB_NAME;
 use crate::err_specific;
-use chrono::DateTime;
+use crate::JsValue;
+
 
 #[derive(PartialEq, PartialOrd)]
 pub enum UserRole {
@@ -47,6 +49,17 @@ const SESSIONS_QUERY: &str = "SELECT id, user, expiration FROM sessions ";
 const TABLE_ALIASES_QUERY: &str = "SELECT * FROM table_aliases ";    
 const USERS_QUERY: &str = "SELECT id, username, role, active, email_confirmed, contribution_count, banned FROM users ";
 
+const ACTIONS_DELETE_QUERY: &str = "DELETE FROM actions ";    
+const DEPRECATIONS_DELETE_QUERY: &str = "DELETE FROM deprecations "; 
+const EMAIL_VALIDATIONS_DELETE_QUERY: &str = "DELETE FROM email_validations ";
+const FSO_ITEMS_DELETE_QUERY: &str = "DELETE FROM fso_items";
+const FSO_TABLES_DELETE_QUERY: &str = "DELETE FROM fso_tables ";    
+const PARSE_BEHAVIORS_DELETE_QUERY: &str = "DELETE FROM parse_behaviors ";    
+const RESTRICTIONS_DELETE_QUERY: &str = "DELETE FROM restrictions ";    
+const SESSIONS_DELETE_QUERY: &str = "DELETE FROM sessions ";    
+const TABLE_ALIASES_DELETE_QUERY: &str = "DELETE FROM table_aliases ";    
+const USERS_DELETE_QUERY: &str = "DELETE FROM users ";
+
 const ACTIONS_FILTER_ID: &str = "WHERE action_id = ?;";
 const ACTIONS_FILTER_USER_ID: &str = "WHERE user_id = ?;";
 const ACTIONS_FILTER_APPROVED: &str = "WHERE approved = ?;";
@@ -56,8 +69,7 @@ const ACTIONS_FILTER_USER_APPROVED_B: &str = ";";
 const DEPRECATIONS_FILTER: &str = "WHERE deprecation_id = ?;";
 
 const EMAIL_VALIDATION_PENDING_FILTER: &str = "WHERE username = ?;";
-const EMAIL_VALIDATIONS_VERIFY_FILTER_A: &str = "WHERE username = ? AND secure_key = ";
-const EMAIL_VALIDATIONS_VERIFY_FILTER_B: &str = ";";
+const EMAIL_VALIDATIONS_VERIFY_FILTER: &str = "WHERE username = ?1 AND secure_key = ?2;";
 
 const FSO_TABLES_FILTER: &str = "WHERE table_id = ?;";
 
@@ -68,6 +80,7 @@ const RESTRICTIONS_FILTER: &str = "WHERE restriction_id = ?;";
 // This may need more effort, but I wanted to try the rest first.  Also need to restrict mode zero on this one.
 const SESSIONS_FILTER_A: &str = "WHERE key = \"";
 const SESSIONS_FILTER_B: &str = "\" AND user = ?;";
+const SESSIONS_USER_ONLY_FILTER: &str = "WHERE user = ?;";
 
 const TABLE_ALIASES_FILTER: &str = "WHERE alias_id = ?;";
 
@@ -197,6 +210,10 @@ pub struct Users {
 struct Enabled{
     active: i32,
 }
+
+//pub async fn  db_delete_email_validation(_key: &String) -> Result<()>{
+//    return Err("Not yet implemented.".to_string().into());
+//}
 
 /// Searches any table in the FSO table database
 /// 
@@ -513,6 +530,58 @@ pub async fn db_generic_search_query(table: &Table, mode: i8 , key1: &String, ke
     }
 }
 
+// Email validations and sessions requires username as id to delete
+pub async fn db_generic_delete(table: Table, id: &String, ctx: &RouteContext<()>) -> Result<()> {
+    match ctx.env.d1(DB_NAME){
+        Ok(db) => {
+            let query: String;
+
+            match table {
+                Table::Actions => {
+                    query = ACTIONS_DELETE_QUERY.to_owned() + ACTIONS_FILTER_ID;                    
+                },
+                Table::Deprecations => {
+                    query = DEPRECATIONS_DELETE_QUERY.to_owned() + DEPRECATIONS_FILTER;                    
+                },
+                Table::EmailValidations => {
+                    query = EMAIL_VALIDATIONS_DELETE_QUERY.to_owned() + EMAIL_VALIDATION_PENDING_FILTER;                    
+                },
+                Table::FsoItems => {
+                    query = FSO_ITEMS_DELETE_QUERY.to_owned() + FSO_TABLES_FILTER;                    
+                },
+                Table::FsoTables => {
+                    return Err("Deletion of tables not available at the api level.".to_string().into());
+                },
+                Table::ParseBehaviors => {
+                    query = PARSE_BEHAVIORS_DELETE_QUERY.to_owned() + PARSE_BEHAVIORS_FILTER;                    
+                },
+                Table::Restrictions => {
+                    query = RESTRICTIONS_DELETE_QUERY.to_owned() + RESTRICTIONS_FILTER;                    
+                },
+                Table::Sessions => {
+                    query = SESSIONS_DELETE_QUERY.to_owned() + SESSIONS_USER_ONLY_FILTER;                    
+                },
+                Table::TableAliases => {
+                    query = TABLE_ALIASES_DELETE_QUERY.to_owned() + TABLE_ALIASES_FILTER;                    
+                },
+                Table::Users => {
+                    return Err("Deletion of users not available at the api level.".to_string().into());
+                },
+            }
+
+            match db.prepare(query).bind(&[id.into()]){
+                Ok(prepped_query)=> {
+                    match prepped_query.run().await {
+                        Ok(_) => return Ok(()),
+                        Err(e) => return Err(e),
+                    }        
+                },
+                Err(e) => return Err(e),
+            }
+        },
+        Err(e) => return Err(e),
+    }
+}
  
 pub async fn db_has_active_user(email: &String, db: &D1Database) -> worker::Result<bool> {
     let query = db.prepare("SELECT active FROM users WHERE username = ?").bind(&[email.into()]).unwrap();
