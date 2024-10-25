@@ -291,7 +291,28 @@ pub async fn db_generic_search_query(table: &Table, mode: i8 , key1: &String, ke
                     match mode {
                         0 => (),
                         1 => query += EMAIL_VALIDATION_PENDING_FILTER,
-                        2 => query = query + EMAIL_VALIDATIONS_VERIFY_FILTER_A + key2 + EMAIL_VALIDATIONS_VERIFY_FILTER_B,
+                        // Double Binding requires special case here
+                        2 => { 
+                            query = query + EMAIL_VALIDATIONS_VERIFY_FILTER;
+                            match db.prepare(query).bind(&[JsValue::from(key1), JsValue::from(key2)]){
+                                Ok(prepped_query)=> {
+                                    match prepped_query.all().await {
+                                        Ok(results) =>  {
+                                            match results.results::<EmailValidations>(){
+                                                Ok(validations) => {
+                                                    let mut query_return = FsoTablesQueryResults::new_results().await;
+                                                    query_return.email_validations = validations;
+                                                    return Ok(query_return);
+                                                },
+                                                Err(e) => return Err(e),                                            
+                                            }
+                                        },
+                                        Err(e) => return Err(e),
+                                    }
+                                },
+                                Err(e) => return Err(e),
+                            }
+                        },
                         _ => return Err("Internal Server Error: Out of range mode in Email Validations generic query.".into()),
                     }
 
