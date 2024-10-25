@@ -47,10 +47,10 @@ struct EmailMessage {
 impl EmailMessage {
     fn create_activation_email(code: &String) -> EmailMessage{
         EmailMessage{
-            sender : FullEmailAddress::create_full_email("FSO Tables Database Activations".to_string(), "table@fsotables.com".to_string()),
+            sender : FullEmailAddress::create_full_email("FSO Tables Database User Activations".to_string(), "activations@fsotables.com".to_string()),
             to : vec![], 
             subject : "Account Confirmation Link".to_string(),
-            htmlContent : format!("<h1 style=\"text-align:center\">Welcome to the Fresspace Open Table Database!</h1><br><br><h3>Please <a href=\"{}\">confirm your email</a>.</h3>", code),
+            htmlContent : format!("<h1 style=\"text-align:center\">Welcome to the Fresspace Open Table Database!</h1><br><br><h3>Please <a href=\"https://fso-tables-worker.johnandrewfernandez12.workers.dev/{}\">confirm your email</a>.</h3>", code),
         }
     }
 }
