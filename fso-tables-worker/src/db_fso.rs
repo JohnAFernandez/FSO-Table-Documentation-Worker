@@ -53,12 +53,12 @@ const ACTIONS_DELETE_QUERY: &str = "DELETE FROM actions ";
 const DEPRECATIONS_DELETE_QUERY: &str = "DELETE FROM deprecations "; 
 const EMAIL_VALIDATIONS_DELETE_QUERY: &str = "DELETE FROM email_validations ";
 const FSO_ITEMS_DELETE_QUERY: &str = "DELETE FROM fso_items";
-const FSO_TABLES_DELETE_QUERY: &str = "DELETE FROM fso_tables ";    
+//const FSO_TABLES_DELETE_QUERY: &str = "DELETE FROM fso_tables ";    
 const PARSE_BEHAVIORS_DELETE_QUERY: &str = "DELETE FROM parse_behaviors ";    
 const RESTRICTIONS_DELETE_QUERY: &str = "DELETE FROM restrictions ";    
 const SESSIONS_DELETE_QUERY: &str = "DELETE FROM sessions ";    
 const TABLE_ALIASES_DELETE_QUERY: &str = "DELETE FROM table_aliases ";    
-const USERS_DELETE_QUERY: &str = "DELETE FROM users ";
+//const USERS_DELETE_QUERY: &str = "DELETE FROM users ";
 
 const ACTIONS_FILTER_ID: &str = "WHERE action_id = ?;";
 const ACTIONS_FILTER_USER_ID: &str = "WHERE user_id = ?;";
@@ -197,13 +197,13 @@ pub struct TableAlias {
 
 #[derive(Deserialize, Serialize)]
 pub struct Users {
-    id: i32,
-    username: String,
-    role: i32,
-    active: i32,
-    email_confirmed: i32,
-    contribution_count: i32,
-    banned: i32,
+    pub id: i32,
+    pub username: String,
+    pub role: i32,
+    pub active: i32,
+    pub email_confirmed: i32,
+    pub contribution_count: i32,
+    pub banned: i32,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -632,15 +632,6 @@ pub async fn db_email_taken(email: &String, db: &D1Database) -> worker::Result<b
     }    
 }
 
-pub async fn db_set_email_confirmed(email: &String, db: &D1Database) {
-    let query = db.prepare("UPDATE users SET email_confirmed = 1 WHERE username = ?").bind(&[email.into()]).unwrap();
-    
-    match query.first::<UserDetails>(None).await {
-        Ok(_) => (),
-        Err(e) => panic!("{}", e.to_string()),
-    }
-}
-
 #[derive(Serialize, Deserialize)]
 struct Role{
     role: i32,
@@ -776,12 +767,12 @@ pub async fn db_set_new_pass(email: &String, password: &String, ctx: &RouteConte
 
     match &db{
         Ok(connection) => {
-            let query_string = format!("UPDATE users SET password = \"{}\" WHERE username = ?", password);
+            let query_string = format!("UPDATE users SET password = \"{}\", email_confirmed = 1 WHERE username = ?", password);
 
             let query = connection.prepare(&query_string).bind(&[email.into()]).unwrap();
             
             match query.first::<UserDetails>(None).await {
-                Ok(_) => return Ok(()),
+                Ok(_) => Ok(()),
                 Err(e) => return Err(e.to_string().into()),
             }
         },
@@ -810,7 +801,7 @@ pub async fn db_user_stats_get(_: Request, _ctx: RouteContext<()>) -> worker::Re
 }
 
 
-pub async fn db_session_add(token: &String, email: &String, time: &String, db : &D1Database) -> worker::Result<()> {
+pub async fn db_session_add(token: &String, email: &String, time: &String, ctx: &RouteContext<()>) -> worker::Result<()> {
 
     // METACOMMENT! The below didn't end up working.  I did trick the JsValue constructor to use the 
     // vector, but the database code said, "MUAAAAAH I CAN'T USE AN OBJECT!!!!" In any case, back to regular comments...
@@ -829,18 +820,26 @@ pub async fn db_session_add(token: &String, email: &String, time: &String, db : 
     let js_value2 = JsValue::from(input_vec);
     */
 
-    // So we'll just use the work around .... again... until I can find a way to bind more than one item.
-    let final_token = &token.replace("\"", "");
-    let query = format!("INSERT INTO sessions (key, user, expiration) VALUES (\"{}\", ?, \"{}\")", final_token, time);
+    let db = ctx.env.d1(DB_NAME);
 
-    match db.prepare(query).bind(&[email.into()]) {
-        Ok(statement) => {
-            match statement.run().await {
-                Ok(_) => return Ok(()),
-                Err(e) => return Err(e),
+    match &db{
+        Ok(connection)=> {
+
+            // So we'll just use the work around .... again... until I can find a way to bind more than one item.
+            let final_token = &token.replace("\"", "");
+            let query = format!("INSERT INTO sessions (key, user, expiration) VALUES (\"{}\", ?, \"{}\")", final_token, time);
+
+            match connection.prepare(query).bind(&[email.into()]) {
+                Ok(statement) => {
+                    match statement.run().await {
+                        Ok(_) => return Ok(()),
+                        Err(e) => return Err(e),
+                    }
+                },
+                Err(e)=> return Err(e),
             }
         },
-        Err(e)=> return Err(e),
+        Err(e) => return Err(e.to_string().into()),
     }
 }
 

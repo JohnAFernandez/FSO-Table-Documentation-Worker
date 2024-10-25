@@ -222,13 +222,23 @@ pub async fn user_confirm_email(req: Request, ctx: RouteContext<()>) -> worker::
         Some(key) => {
             match ctx.param("username"){
                 Some(username) => { 
-                    // TODO!!! the email validations search query needs to have two binds, not just one.  See instructions on discord.
                     match db_generic_search_query(&db_fso::Table::EmailValidations, 0, &username, &key, &ctx).await{
                         Ok(result) => {
                             if result.email_validations.is_empty() {
                                 return err_specific("Bad credentials, please resubmit".to_string()).await
                             } 
                             
+                            // double check that we haven't already validated this email.
+                            match db_generic_search_query(&db_fso::Table::Users, 1, username, &"".to_string(), &ctx).await {
+                                Ok(results) => 
+                                if results.users.is_empty() {
+                                    return err_specific("No matching user found.".to_string()).await
+                                } else if results.users[0].email_confirmed != 0 {
+                                    return err_specific("Email is either already confirmed or in error state. Please contact the admin if you cannot access your account.".to_string()).await;
+                                },
+                                Err(e) => return err_specific(e.to_string()).await,
+                            }
+
                             match req.headers().has("password"){
                                 Ok(contains)=> { 
                                     if contains {
@@ -243,9 +253,12 @@ pub async fn user_confirm_email(req: Request, ctx: RouteContext<()>) -> worker::
                                                                     Err(e) => return err_specific(e.to_string()).await,
                                                                 }
 
-                                                                //match db_fso::db_delete_email_validation
+                                                                match db_fso::db_generic_delete(db_fso::Table::EmailValidations, &username, &ctx).await {
+                                                                    Ok(_) => (),
+                                                                    Err(e) => return Err(e),
+                                                                }
 
-                                                                return Response::ok("Request successful, but I can't send you a login token yet.");    
+                                                                return create_session_and_send(&username, &ctx).await;   
                                                             },
                                                             Err(e) => err_specific(e.to_string()).await,
                                                         }
@@ -479,19 +492,7 @@ pub async fn user_login(mut req: Request, ctx: RouteContext<()>) -> worker::Resu
                     match hash_string(&login.email, &login.password).await {
                         Ok(hash) => {
                             if db_fso::db_check_password(&login.email, &hash, &db).await {
-                                let login_token = create_random_string().await;
-                                let hashed_string: String;                                
-
-                                match hash_string(&login.email, &login_token).await {
-                                    Ok(hashed) => hashed_string = hashed,
-                                    Err(e) => return err_specific(e.to_string() + "Part 1").await,
-                                }
-
-                                // We give the user two hours to do what they need to do.
-                                match db_fso::db_session_add(&hashed_string, &login.email, &(Utc::now() + TimeDelta::hours(2)).to_string(), &db).await {
-                                    Ok(_) => return worker::Response::ok(format!("{{\"token\":\"{}\"}}", login_token)),
-                                    Err(e) => return err_specific(e.to_string() + "Part 2").await,
-                                }
+                                return create_session_and_send(&login.email, &ctx).await;
                             } else {
                                 return worker::Response::error("Login unsuccessful! Part 4", 403);
                             }
@@ -890,6 +891,22 @@ pub async fn header_get_token(req: &Request) -> worker::Result<String> {
             }
         },
         Err(e) => return Err(e),
+    }
+}
+
+pub async fn create_session_and_send(email: &String, ctx: &RouteContext<()>) -> worker::Result<Response> {
+    let login_token = create_random_string().await;
+    let hashed_string: String;                                
+
+    match hash_string(&email, &login_token).await {
+        Ok(hashed) => hashed_string = hashed,
+        Err(e) => return err_specific(e.to_string() + " at create_session, 1").await,
+    }
+
+    // We give the user two hours to do what they need to do.
+    match db_fso::db_session_add(&hashed_string, &email, &(Utc::now() + TimeDelta::hours(2)).to_string(), ctx).await {
+        Ok(_) => return worker::Response::ok(format!("{{\"token\":\"{}\"}}", login_token)),
+        Err(e) => return err_specific(e.to_string() + " at create_session, 2").await,
     }
 }
 
