@@ -632,6 +632,23 @@ pub async fn db_email_taken(email: &String, db: &D1Database) -> worker::Result<b
     }    
 }
 
+pub async fn db_set_email_confirmed(email: &String, ctx: &RouteContext<()>) -> Result<()> {
+    match ctx.env.d1(DB_NAME){
+        Ok(db) => {
+            match db.prepare("UPDATE users SET email_confirmed = 1 WHERE username = ?").bind(&[email.into()]) {
+                Ok(query) => {
+                    match query.run().await {
+                        Ok(_) => Ok(()),
+                        Err(e) => Err(e),
+                    }        
+                },
+                Err(e) => Err(e),
+            }
+        },
+        Err(e) => Err(e),
+    }
+}
+
 #[derive(Serialize, Deserialize)]
 struct Role{
     role: i32,
@@ -703,21 +720,21 @@ pub async fn db_get_user_details(email: &String, db: &D1Database) -> worker::Res
     }
 }
 
-pub async fn db_deactivate_user(email: &String, db: &D1Database) {
+pub async fn db_deactivate_user(email: &String, db: &D1Database) -> Result<()> {
     let query = db.prepare("UPDATE users SET active = 0 WHERE username = ?").bind(&[email.into()]).unwrap();
     
     match query.first::<UserDetails>(None).await {
-        Ok(_) => (),
-        Err(e) => panic!("{}", e.to_string()),
+        Ok(_) => Ok(()),
+        Err(e) => Err(e),
     }
 }
 
-pub async fn db_activate_user(email: &String, db: &D1Database) {
+pub async fn db_activate_user(email: &String, db: &D1Database) -> Result<()> {
     let query = db.prepare("UPDATE users SET active = 1 WHERE username = ?").bind(&[email.into()]).unwrap();
     
     match query.first::<UserDetails>(None).await {
-        Ok(_) => (),
-        Err(e) => panic!("{}", e.to_string()),
+        Ok(_) => Ok(()),
+        Err(e) => Err(e),
     }
 }
 

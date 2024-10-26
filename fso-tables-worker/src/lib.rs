@@ -45,12 +45,12 @@ struct EmailMessage {
 }
 
 impl EmailMessage {
-    fn create_activation_email(code: &String) -> EmailMessage{
+    fn create_activation_email(email: &String, code: &String) -> EmailMessage{
         EmailMessage{
             sender : FullEmailAddress::create_full_email("FSO Tables Database User Activations".to_string(), "activations@fsotables.com".to_string()),
             to : vec![], 
             subject : "Account Confirmation Link".to_string(),
-            htmlContent : format!("<h1 style=\"text-align:center\">Welcome to the Fresspace Open Table Database!</h1><br><br><h3>Please <a href=\"https://fso-tables-worker.johnandrewfernandez12.workers.dev/{}\">confirm your email</a>.</h3>", code),
+            htmlContent : format!("<h1 style=\"text-align:center\">Welcome to the Fresspace Open Table Database!</h1><br><br><h3>Please <a href=\"https://fso-tables-worker.johnandrewfernandez12.workers.dev/users/validation/{}/{}\">confirm your email</a>.</h3>", email, code),
         }
     }
 }
@@ -269,7 +269,11 @@ pub async fn user_confirm_email(req: Request, ctx: RouteContext<()>) -> worker::
                                             Err(e) => return Err(e),
                                         }                                        
                                     } else {
-                                        return Response::ok("GO AHEAD AND SET THAT THERE PASSWORD SON")
+                                        match db_fso::db_set_email_confirmed(&username, &ctx).await {
+                                            Ok(_) => return Response::ok(&"".to_string()),
+                                            Err(e) => return err_specific(e.to_string()).await,
+                                        }
+
                                     }
                                 },
                                 Err(_) => return Response::ok("GO AHEAD AND SET THAT THERE PASSWORD SON"),
@@ -345,8 +349,12 @@ pub async fn deactivate_user(mut req: Request, ctx: RouteContext<()>) -> worker:
                             // Owners can only be deactivated by someone working directly with the database.
                             // But otherwise, you *can* deactivate yourself.
                             if target_user.email == username && authorizer_role != db_fso::UserRole::OWNER {
-                                db_fso::db_deactivate_user(&username, &db).await;
-                                return worker::Response::ok("User Deactivated")
+                                
+                                match db_fso::db_deactivate_user(&username, &db).await {
+                                    Ok(_) => return worker::Response::ok("User Deactivated"),
+                                    Err(e) => return err_specific(e.to_string()).await,
+                                }
+
                             }
 
                             // these two types are not allowed to deactivate other users
@@ -359,8 +367,10 @@ pub async fn deactivate_user(mut req: Request, ctx: RouteContext<()>) -> worker:
                             match db_fso::db_get_user_role(&target_user.email, &db).await { 
                                 Ok(target_user_role) => {
                                     if authorizer_role < target_user_role{
-                                        db_fso::db_deactivate_user(&target_user.email, &db).await;
-                                        return worker::Response::ok("User Deactivated");
+                                        match db_fso::db_deactivate_user(&target_user.email, &db).await {
+                                            Ok(_) => return worker::Response::ok("User Deactivated"),
+                                            Err(e) => return err_specific(e.to_string()).await,
+                                        }
                                     } else {
                                         return err_insufficent_permissions().await;
                                     }
@@ -408,7 +418,10 @@ pub async fn activate_user(mut req: Request, ctx: RouteContext<()>) -> worker::R
                         // Owners can only be deactivated by someone working directly with the database.
                         // But otherwise, you *can* deactivate yourself.
                         if target_user.email == username{
-                            db_fso::db_activate_user(&target_user.email, &db).await;
+                            match db_fso::db_activate_user(&target_user.email, &db).await {
+                                Ok(_) => (),
+                                Err(e) => return err_specific(e.to_string()).await,
+                            }
                         } else {
                             return err_user_not_active().await
                         }                                
@@ -422,18 +435,18 @@ pub async fn activate_user(mut req: Request, ctx: RouteContext<()>) -> worker::R
                         // directly.
                         match authorizer_role {
                             db_fso::UserRole::OWNER => {
-                                db_fso::db_deactivate_user(&target_user.email, &db).await;
+                                let _ = db_fso::db_deactivate_user(&target_user.email, &db).await;
                                 return err_insufficent_permissions().await
                             }
                             db_fso::UserRole::MAINTAINER => {
                                 if target_user.email != username{
-                                    db_fso::db_deactivate_user(&target_user.email, &db).await;
+                                    let _ = db_fso::db_deactivate_user(&target_user.email, &db).await;
                                     return err_insufficent_permissions().await    
                                 }
                             },
                             db_fso::UserRole::VIEWER => { 
                                 if target_user.email != username{
-                                    db_fso::db_deactivate_user(&target_user.email, &db).await;
+                                    let _ = db_fso::db_deactivate_user(&target_user.email, &db).await;
                                     return err_insufficent_permissions().await
                                 }
                             },
@@ -455,13 +468,13 @@ pub async fn activate_user(mut req: Request, ctx: RouteContext<()>) -> worker::R
                                 }
                             },
                             Err(e) => {
-                                db_fso::db_deactivate_user(&target_user.email, &db).await;
+                                let _ = db_fso::db_deactivate_user(&target_user.email, &db).await;
                                 return err_specific(e.to_string()).await
                             }
                         }
                         },
                         Err(e) => {
-                            db_fso::db_deactivate_user(&target_user.email, &db).await;
+                            let _ = db_fso::db_deactivate_user(&target_user.email, &db).await;
                             return err_specific(e.to_string()).await
                         }
                     }    
@@ -1033,7 +1046,7 @@ pub async fn send_confirmation_link(address : &String, activation_key : &String)
         Err(e) => return err_specific(e.to_string()).await,
     }
 
-    let mut message: EmailMessage = EmailMessage::create_activation_email(activation_key);
+    let mut message: EmailMessage = EmailMessage::create_activation_email(address, activation_key);
     message.to.push(FullEmailAddress::create_full_email("User".to_string(), address.to_string()));
 
     let jvalue_out : JsValue;
