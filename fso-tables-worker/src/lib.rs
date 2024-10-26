@@ -50,7 +50,7 @@ impl EmailMessage {
             sender : FullEmailAddress::create_full_email("FSO Tables Database User Activations".to_string(), "activations@fsotables.com".to_string()),
             to : vec![], 
             subject : "Account Confirmation Link".to_string(),
-            htmlContent : format!("<h1 style=\"text-align:center\">Welcome to the Fresspace Open Table Database!</h1><br><br><h3>Please <a href=\"https://fso-tables-worker.johnandrewfernandez12.workers.dev/users/validation/{}/{}\">confirm your email</a>.</h3>", email, code),
+            htmlContent : format!("<h1 style=\"text-align:center\">Welcome to the Fresspace Open Table Database!</h1><br><br><h3>Please <a href=\"https://fso-tables-worker.johnandrewfernandez12.workers.dev/validation/{}/{}\">confirm your email</a>.</h3>", email, code),
         }
     }
 }
@@ -217,7 +217,7 @@ pub async fn user_register_new(mut req: Request, ctx: RouteContext<()>) -> worke
 
 }
 
-pub async fn user_confirm_email(mut req: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
+pub async fn user_confirm_email(req: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
     match ctx.param("id") {
         Some(key) => {
             match ctx.param("email"){
@@ -234,8 +234,6 @@ pub async fn user_confirm_email(mut req: Request, ctx: RouteContext<()>) -> work
                             if result.email_validations.is_empty() {
                                 return err_specific("Bad credentials, please resubmit. User_confirm_email 1".to_string()).await
                             }                         
-
-                            //return err_specific("SAFE!!".to_string()).await;
 
                             // double check that we haven't already validated this email.
                             match db_generic_search_query(&db_fso::Table::Users, 2, username, &"".to_string(), &ctx).await {
@@ -278,6 +276,11 @@ pub async fn user_confirm_email(mut req: Request, ctx: RouteContext<()>) -> work
                                             Err(e) => return err_specific(e.to_string() + "User_confirm_email 9").await,
                                         }                                        
                                     } else {
+                                        match db_fso::db_generic_delete(db_fso::Table::EmailValidations, &username, &ctx).await {
+                                            Ok(_) => (),
+                                            Err(e) => return err_specific(e.to_string() + " User_confirm_email 15").await,
+                                        }
+
                                         match db_fso::db_set_email_confirmed(&username, &ctx).await {
                                             Ok(_) => return create_session_and_send(&username, &ctx).await,
                                             Err(e) => return err_specific(e.to_string() + "User_confirm_email 10").await,
