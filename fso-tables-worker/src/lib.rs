@@ -67,8 +67,8 @@ async fn fetch(req: Request, env: Env, _ctx: Context,) -> worker::Result<Respons
         .get_async("/", root_get)
         .get_async("/users", db_fso::db_user_stats_get)       // No Post, put, patch, or delete for overarching category
         .post_async("/users/register", user_register_new)
-        .post_async("/users/validation/:email/:id", user_confirm_email)
-        .post_async("/users/validation/:email/:id/password", user_confirm_email)
+        .get_async("/validation/:email/:id", user_confirm_email)
+        .get_async("/validation/:email/:id/password", user_confirm_email)
         .get_async("/users/myaccount", user_get_details)
         .post_async("/users/myaccount/password", user_change_password)
         .get_async("/users/login", user_login)
@@ -217,26 +217,35 @@ pub async fn user_register_new(mut req: Request, ctx: RouteContext<()>) -> worke
 
 }
 
-pub async fn user_confirm_email(req: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
+pub async fn user_confirm_email(mut req: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
     match ctx.param("id") {
         Some(key) => {
-            match ctx.param("username"){
-                Some(username) => { 
-                    match db_generic_search_query(&db_fso::Table::EmailValidations, 0, &username, &key, &ctx).await{
+            match ctx.param("email"){
+                Some(username) => {
+                    let hashed: String;
+                    
+                    match hash_string(username, key).await {
+                        Ok(string) => hashed = string,
+                        Err(e) => return err_specific(e.to_string() + " user confirm email new error").await,
+                    }
+
+                    match db_generic_search_query(&db_fso::Table::EmailValidations, 2, &username, &hashed, &ctx).await{
                         Ok(result) => {
                             if result.email_validations.is_empty() {
-                                return err_specific("Bad credentials, please resubmit".to_string()).await
-                            } 
-                            
+                                return err_specific("Bad credentials, please resubmit. User_confirm_email 1".to_string()).await
+                            }                         
+
+                            //return err_specific("SAFE!!".to_string()).await;
+
                             // double check that we haven't already validated this email.
-                            match db_generic_search_query(&db_fso::Table::Users, 1, username, &"".to_string(), &ctx).await {
+                            match db_generic_search_query(&db_fso::Table::Users, 2, username, &"".to_string(), &ctx).await {
                                 Ok(results) => 
                                 if results.users.is_empty() {
-                                    return err_specific("No matching user found.".to_string()).await
+                                    return err_specific("No matching user found. User_confirm_email 2".to_string()).await
                                 } else if results.users[0].email_confirmed != 0 {
-                                    return err_specific("Email is either already confirmed or in error state. Please contact the admin if you cannot access your account.".to_string()).await;
+                                    return err_specific("Email is either already confirmed or in error state. Please contact the admin if you cannot access your account. User_confirm_email 3".to_string()).await;
                                 },
-                                Err(e) => return err_specific(e.to_string()).await,
+                                Err(e) => return err_specific(e.to_string() + " User_confirm_email 4").await,
                             }
 
                             match req.headers().has("password"){
@@ -250,42 +259,42 @@ pub async fn user_confirm_email(req: Request, ctx: RouteContext<()>) -> worker::
                                                             Ok(hashed_password) => {
                                                                 match db_fso::db_set_new_pass(&username, &hashed_password, &ctx).await {
                                                                     Ok(_) => (),
-                                                                    Err(e) => return err_specific(e.to_string()).await,
+                                                                    Err(e) => return err_specific(e.to_string() + " User_confirm_email 5").await,
                                                                 }
 
                                                                 match db_fso::db_generic_delete(db_fso::Table::EmailValidations, &username, &ctx).await {
                                                                     Ok(_) => (),
-                                                                    Err(e) => return Err(e),
+                                                                    Err(e) => return err_specific(e.to_string() + " User_confirm_email 6").await,
                                                                 }
 
                                                                 return create_session_and_send(&username, &ctx).await;   
                                                             },
-                                                            Err(e) => err_specific(e.to_string()).await,
+                                                            Err(e) => err_specific(e.to_string() + "User_confirm_email 7").await,
                                                         }
                                                     },
-                                                    None => return Err("Password missing from headers".to_string().into()),
+                                                    None => return err_specific("Password missing from headers".to_string() + "User_confirm_email 8").await,
                                                 }
                                             },
-                                            Err(e) => return Err(e),
+                                            Err(e) => return err_specific(e.to_string() + "User_confirm_email 9").await,
                                         }                                        
                                     } else {
                                         match db_fso::db_set_email_confirmed(&username, &ctx).await {
-                                            Ok(_) => return Response::ok(&"".to_string()),
-                                            Err(e) => return err_specific(e.to_string()).await,
+                                            Ok(_) => return create_session_and_send(&username, &ctx).await,
+                                            Err(e) => return err_specific(e.to_string() + "User_confirm_email 10").await,
                                         }
 
                                     }
                                 },
-                                Err(_) => return Response::ok("GO AHEAD AND SET THAT THERE PASSWORD SON"),
+                                Err(_) => return Response::ok("GO AHEAD AND SET THAT THERE PASSWORD SON. User_confirm_email 11"),
                             }
                         },
                         Err(e) => return err_specific(e.to_string()).await,
                     }
                 },
-                None => return err_specific("Activation failed. Missing username.".to_string()).await,
+                None => return err_specific("Activation failed. Missing username.".to_string() + "User_confirm_email 13").await,
             }
         },
-        None => return err_specific("Activation failed.  Missing activation code.".to_string()).await,
+        None => return err_specific("Activation failed.  Missing activation code.".to_string() + "User_confirm_email 14").await,
     }
 }
 
@@ -949,6 +958,7 @@ pub async fn hash_string(username: &String, string: &String) -> worker::Result<S
             break;
         }     
     }
+
     // RandChaCha will provide a repeatable result from the username so that even if the way that cloudflare structures its servers
     // We do not need to worry about the seeds changing.
     // So we generate the salt string using the seeded rng 
@@ -957,8 +967,13 @@ pub async fn hash_string(username: &String, string: &String) -> worker::Result<S
     
     match Argon2::default().hash_password(string.as_bytes(), &salt) {
         Ok(s) => match s.hash {
-            Some(hash) => return Ok(hash.to_string()),
-            None => return Err("Hashing function gave an empty output!!".to_string().into()),
+
+            Some(hash) => {
+                return Ok(hash.to_string())
+            },
+            None => {
+                return Err("Hashing function gave an empty output!!".to_string().into())
+            },
         },
         Err(e) => return Err(e.to_string().into()),
     }

@@ -40,7 +40,7 @@ pub enum Table {
 
 const ACTIONS_QUERY: &str = "SELECT * FROM actions ";    
 const DEPRECATIONS_QUERY: &str = "SELECT * FROM deprecations "; 
-const EMAIL_VALIDATIONS_QUERY: &str = "SELECT validation_id, user_id FROM email_validations ";
+const EMAIL_VALIDATIONS_QUERY: &str = "SELECT validation_id, username FROM email_validations ";
 const FSO_ITEMS_QUERY: &str = "SELECT item_id, item_text, documentation, major_version, parent_id, table_id, deprecation_id, restriction_id, info_type, table_index, default_value FROM fso_items";
 const FSO_TABLES_QUERY: &str = "SELECT * FROM fso_tables ";    
 const PARSE_BEHAVIORS_QUERY: &str = "SELECT * FROM parse_behaviors ";    
@@ -85,7 +85,7 @@ const SESSIONS_USER_ONLY_FILTER: &str = "WHERE user = ?;";
 const TABLE_ALIASES_FILTER: &str = "WHERE alias_id = ?;";
 
 const USERS_USERNAME_FILTER: &str = "WHERE username = ?;";
-const USERS_USER_ID_FILTER: &str = "WHERE user_id = ?;";
+const USERS_USER_ID_FILTER: &str = "WHERE id = ?;";
 
 #[derive(Serialize, Deserialize)]
 pub struct FsoTablesQueryResults {
@@ -137,7 +137,7 @@ pub struct Deprecations {
 #[derive(Serialize, Deserialize)]
 pub struct EmailValidations {
     validation_id: i32,
-    username: i32,
+    username: String,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -292,7 +292,8 @@ pub async fn db_generic_search_query(table: &Table, mode: i8 , key1: &String, ke
                         0 => (),
                         1 => query += EMAIL_VALIDATION_PENDING_FILTER,
                         // Double Binding requires special case here
-                        2 => { 
+                        2 => {
+
                             query = query + EMAIL_VALIDATIONS_VERIFY_FILTER;
                             match db.prepare(query).bind(&[JsValue::from(key1), JsValue::from(key2)]){
                                 Ok(prepped_query)=> {
