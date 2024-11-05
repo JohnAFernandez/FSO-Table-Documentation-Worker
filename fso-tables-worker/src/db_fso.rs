@@ -27,6 +27,7 @@ pub async fn number_to_role(n: i32) -> worker::Result<UserRole> {
 
 pub enum Table {
     Actions,
+    BugReports,
     Deprecations,
     EmailValidations, 
     FsoItems,
@@ -39,6 +40,7 @@ pub enum Table {
 }
 
 const ACTIONS_QUERY: &str = "SELECT * FROM actions ";    
+const BUG_REPORT_QUERY: &str = "SELECT * FROM bug_reports ";
 const DEPRECATIONS_QUERY: &str = "SELECT * FROM deprecations "; 
 const EMAIL_VALIDATIONS_QUERY: &str = "SELECT validation_id, username FROM email_validations ";
 const FSO_ITEMS_QUERY: &str = "SELECT item_id, item_text, documentation, major_version, parent_id, table_id, deprecation_id, restriction_id, info_type, table_index, default_value FROM fso_items";
@@ -49,7 +51,8 @@ const SESSIONS_QUERY: &str = "SELECT id, user, expiration FROM sessions ";
 const TABLE_ALIASES_QUERY: &str = "SELECT * FROM table_aliases ";    
 const USERS_QUERY: &str = "SELECT id, username, role, active, email_confirmed, contribution_count, banned FROM users ";
 
-const ACTIONS_DELETE_QUERY: &str = "DELETE FROM actions ";    
+const ACTIONS_DELETE_QUERY: &str = "DELETE FROM actions ";
+const BUG_REPORT_DELETE_QUERY: &str = "DELETE FROM bug_reports ";    
 const DEPRECATIONS_DELETE_QUERY: &str = "DELETE FROM deprecations "; 
 const EMAIL_VALIDATIONS_DELETE_QUERY: &str = "DELETE FROM email_validations ";
 const FSO_ITEMS_DELETE_QUERY: &str = "DELETE FROM fso_items";
@@ -65,6 +68,9 @@ const ACTIONS_FILTER_USER_ID: &str = "WHERE user_id = ?;";
 const ACTIONS_FILTER_APPROVED: &str = "WHERE approved = ?;";
 const ACTIONS_FILTER_USER_APPROVED_A: &str = "Where user_id = ? AND approved = ";
 const ACTIONS_FILTER_USER_APPROVED_B: &str = ";";
+
+const BUG_REPORT_FILTER: &str = "WHERE id = ?;";
+const BUG_REPORT_STATUS_FILTER: &str = "WHERE status = ?;";
 
 const DEPRECATIONS_FILTER: &str = "WHERE deprecation_id = ?;";
 
@@ -90,6 +96,7 @@ const USERS_USER_ID_FILTER: &str = "WHERE id = ?;";
 #[derive(Serialize, Deserialize)]
 pub struct FsoTablesQueryResults {
     pub actions: Vec<Actions>,
+    pub bug_reports: Vec<BugReport>,
     pub deprecations: Vec<Deprecations>,
     pub email_validations: Vec<EmailValidations>,
     pub fso_items: Vec<FsoItems>,
@@ -105,6 +112,7 @@ impl FsoTablesQueryResults {
     pub async fn new_results() -> FsoTablesQueryResults{
         FsoTablesQueryResults{
             actions : Vec::new(),
+            bug_reports : Vec::new(),
             deprecations : Vec::new(),
             email_validations : Vec::new(),
             fso_items : Vec::new(),
@@ -131,8 +139,10 @@ pub struct Actions {
 pub struct BugReport {
     id: i32,
     user_id: i32,
-    type: String,
-    Description: String,
+    bug_type: String,
+    description: String,
+    status: i32,
+    timestamp: String,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -283,6 +293,16 @@ pub async fn db_generic_search_query(table: &Table, mode: i8 , key1: &String, ke
                         _ => return Err("Internal Server Error: Out of range mode in Actions generic query.".to_string().into()),
                     }
                 },
+                Table::BugReports => {
+                    query += BUG_REPORT_QUERY; 
+
+                    match mode {
+                        0 => (),
+                        1 => query += BUG_REPORT_FILTER,
+                        2 => query += BUG_REPORT_STATUS_FILTER,
+                        _ => return Err("Internal Server Error: Out of range mode in Deprecations generic query.".into()),
+                    }
+                }
                 Table::Deprecations => {
                     query += DEPRECATIONS_QUERY; 
 
@@ -419,6 +439,20 @@ pub async fn db_generic_search_query(table: &Table, mode: i8 , key1: &String, ke
                                 match results.results::<Actions>() {
                                     Ok(result) => {
                                         query_return.actions = result;
+                                        return Ok(query_return);
+                                    },
+                                    Err(e) => return Err(e),
+                                }
+                            },
+                            Err(e)=> return Err(e),
+                        }
+                    },
+                    Table::BugReports => {
+                        match bound_query.all().await {
+                            Ok(results) =>{
+                                match results.results::<BugReport>() {
+                                    Ok(result) => {
+                                        query_return.bug_reports = result;
                                         return Ok(query_return);
                                     },
                                     Err(e) => return Err(e),
@@ -570,6 +604,9 @@ pub async fn db_generic_delete(table: Table, id: &String, ctx: &RouteContext<()>
                 Table::Actions => {
                     query = ACTIONS_DELETE_QUERY.to_owned() + ACTIONS_FILTER_ID;                    
                 },
+                Table::BugReports => {
+                    query = BUG_REPORT_DELETE_QUERY.to_owned() + BUG_REPORT_FILTER;
+                }
                 Table::Deprecations => {
                     query = DEPRECATIONS_DELETE_QUERY.to_owned() + DEPRECATIONS_FILTER;                    
                 },

@@ -112,7 +112,7 @@ async fn fetch(req: Request, env: Env, _ctx: Context,) -> worker::Result<Respons
         //.get_async("/tables/actions/rejections/:id": get_rejcted_requests_user) // Requires login
         //.post_async("/tables/actions/:id:/approve", approve_request) // Requires login and admin
         //.post_async("/tables/actions/:id:/reject", reject_request) // Requries login and admin
-        .post_async("/bugreport", send_bug_report)
+        .post_async("/bugreport", add_bug_report)
         .get_async("/test", test_all) // This might eventually be a "CI" test, but for now it just displays a message.
         .or_else_any_method_async("/", err_api_fallback) // TODO, this does not work.
         .run(req, env)
@@ -838,12 +838,12 @@ pub async fn get_deprecation(_: Request, ctx: RouteContext<()>) -> worker::Resul
 #[derive(Serialize, Deserialize)]
 pub struct BugReport{
     user_id: i32,
-    type : String,
-    Description: String,
+    bug_type : String,
+    description: String,
 }
 
 
-pub async fn add_bug_report() {
+pub async fn add_bug_report(mut req: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
     match ctx.env.d1(DB_NAME) {
         Ok(db) => {
             let session_result = header_session_is_valid(&req, &db).await;
@@ -851,10 +851,10 @@ pub async fn add_bug_report() {
             match req.json::<BugReport>().await{
                 Ok(report) =>{
                     if report.description.is_empty() {
-                        return err_specific("Please provide a description when submitting a bug report.".to_string()).await,
+                        return err_specific("Please provide a description when submitting a bug report.".to_string()).await
                     }
 
-                    let mut username : String = "Anonymous User";
+                    let mut username = "Anonymous User".to_string();
                     if session_result.0 {
                         username = session_result.1;
                     }
@@ -870,6 +870,7 @@ pub async fn add_bug_report() {
             }
         },
         Err(e) => return err_specific(e.to_string()).await,
+    }
 }
 
 /*  I don't think I actualyl need this ...
