@@ -73,8 +73,8 @@ async fn fetch(req: Request, env: Env, _ctx: Context,) -> worker::Result<Respons
         .post_async("/users/myaccount/password", user_change_password)
         .get_async("/users/login", user_login)
         .post_async("/users/activate", activate_user).put_async("/users/activate", activate_user).patch_async("/users/activate", activate_user)
-        .post_async("/users/:username/upgrade", put(upgrade_user_permissions).patch(upgrade_user_permissions))
-        .post_async("/users/:username/downgrade", put(downgrade_user_permissions).patch(downgrade_user_permissions))
+        .post_async("/users/:username/upgrade", user_upgrade_user_permissions).patch_async("/users/:username/upgrade", user_upgrade_user_permissions)
+        .post_async("/users/:username/downgrade", user_downgrade_user_permissions).patch_async("/users/:username/downgrade", user_downgrade_user_permissions)
         .delete_async("/users", deactivate_user)
         .get_async("/tables/parse-types", get_parse_types)
         .get_async("/tables/parse-types/:id", get_parse_type)
@@ -113,6 +113,8 @@ async fn fetch(req: Request, env: Env, _ctx: Context,) -> worker::Result<Respons
         //.post_async("/tables/actions/:id:/approve", approve_request) // Requires login and admin
         //.post_async("/tables/actions/:id:/reject", reject_request) // Requries login and admin
         .post_async("/bugreport", add_bug_report)
+        //.patch_async("/bugreport/:id", resolve_bug_report)
+        //.delete_async("/bugreport/:id", delete_bug_report)
         .get_async("/test", test_all) // This might eventually be a "CI" test, but for now it just displays a message.
         .or_else_any_method_async("/", err_api_fallback) // TODO, this does not work.
         .run(req, env)
@@ -859,7 +861,10 @@ pub async fn add_bug_report(mut req: Request, ctx: RouteContext<()>) -> worker::
                         username = session_result.1;
                     }
 
-                    db_fso::post_bug_report
+                    match db_fso::db_insert_bug_report(&username, &report.bug_type, &report.description, &ctx).await {
+                        Ok(_) => Response::ok("Success!"),
+                        Err(e) => err_specific(e.to_string()).await,
+                    }
         
                 }, 
                 Err(e) => err_specific(e.to_string()).await,

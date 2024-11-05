@@ -1,6 +1,6 @@
 use worker::*;
 use serde::{Deserialize, Serialize};
-use chrono::DateTime;
+use chrono::{DateTime, Utc};
 use crate::UserDetails;
 use crate::DB_NAME;
 use crate::err_specific;
@@ -906,6 +906,46 @@ pub async fn db_session_add(token: &String, email: &String, time: &String, ctx: 
     }
 }
 
+pub async fn db_insert_bug_report(username: &String, bug_type: &String, descripton: &String,  ctx: &RouteContext<()>) -> worker::Result<()> {
+    /*user_id: i32,
+    bug_type: String,
+    description: String,
+    status: i32,
+    timestamp: String,*/
+
+    let mut user_id = -1;
+
+    if username != "Anonymous User"{
+        match db_generic_search_query(&Table::Users, 2, username, &"".to_string(), ctx).await {
+            Ok(results) => {
+                if !results.users.is_empty() {
+                    user_id = results.users.first().unwrap().id;
+                }
+            },
+            Err(_) => (),
+        }
+    }
+
+    match  ctx.env.d1(DB_NAME) {
+        Ok(db) => {
+            let query = format!("INSERT INTO bug_reports (user_id, bug_type, description, status, timestamp) VALUES (\"{}\", ?1, ?2, \"{}\", \"{}\")", user_id, 0, Utc::now());
+
+            match db.prepare(query).bind(&[JsValue::from(bug_type), JsValue::from(descripton)]) {
+                Ok(statement) => {
+                    match statement.run().await {
+                        Ok(_) => return Ok(()),
+                        Err(e) => return Err(e),
+                    }
+                },
+                Err(e)=> return Err(e),
+            }
+
+        },
+        Err(e) => return Err(e),
+    }
+
+
+}
 
 pub async fn db_check_token(username: &String, token: &String, time: String, db: &D1Database) -> Result<bool> {
     let final_token = &token.replace("\"", "");
