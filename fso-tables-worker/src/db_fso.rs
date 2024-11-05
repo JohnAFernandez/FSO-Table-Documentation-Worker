@@ -128,6 +128,14 @@ pub struct Actions {
 }
 
 #[derive(Serialize, Deserialize)]
+pub struct BugReport {
+    id: i32,
+    user_id: i32,
+    type: String,
+    Description: String,
+}
+
+#[derive(Serialize, Deserialize)]
 pub struct Deprecations {
     deprecation_id: i32,
     date: String,

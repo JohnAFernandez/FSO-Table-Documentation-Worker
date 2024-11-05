@@ -73,6 +73,8 @@ async fn fetch(req: Request, env: Env, _ctx: Context,) -> worker::Result<Respons
         .post_async("/users/myaccount/password", user_change_password)
         .get_async("/users/login", user_login)
         .post_async("/users/activate", activate_user).put_async("/users/activate", activate_user).patch_async("/users/activate", activate_user)
+        .post_async("/users/:username/upgrade", put(upgrade_user_permissions).patch(upgrade_user_permissions))
+        .post_async("/users/:username/downgrade", put(downgrade_user_permissions).patch(downgrade_user_permissions))
         .delete_async("/users", deactivate_user)
         .get_async("/tables/parse-types", get_parse_types)
         .get_async("/tables/parse-types/:id", get_parse_type)
@@ -110,7 +112,7 @@ async fn fetch(req: Request, env: Env, _ctx: Context,) -> worker::Result<Respons
         //.get_async("/tables/actions/rejections/:id": get_rejcted_requests_user) // Requires login
         //.post_async("/tables/actions/:id:/approve", approve_request) // Requires login and admin
         //.post_async("/tables/actions/:id:/reject", reject_request) // Requries login and admin
-        //.post_bug_report("/bugreport", send_bug_report)
+        .post_async("/bugreport", send_bug_report)
         .get_async("/test", test_all) // This might eventually be a "CI" test, but for now it just displays a message.
         .or_else_any_method_async("/", err_api_fallback) // TODO, this does not work.
         .run(req, env)
@@ -118,8 +120,6 @@ async fn fetch(req: Request, env: Env, _ctx: Context,) -> worker::Result<Respons
 
 
         /* // TODO? 
-        .route("/users/:username/upgrade", put(upgrade_user_permissions).patch(upgrade_user_permissions))
-        .route("/users/:username/downgrade", put(downgrade_user_permissions).patch(downgrade_user_permissions))
         .route("/users/:username/email", post(add_email).put(add_email).patch(add_email).delete(api_insufficent_permissions))
         */
 }
@@ -835,8 +835,42 @@ pub async fn get_deprecation(_: Request, ctx: RouteContext<()>) -> worker::Resul
     }
 }
 
+#[derive(Serialize, Deserialize)]
+pub struct BugReport{
+    user_id: i32,
+    type : String,
+    Description: String,
+}
 
 
+pub async fn add_bug_report() {
+    match ctx.env.d1(DB_NAME) {
+        Ok(db) => {
+            let session_result = header_session_is_valid(&req, &db).await;
+
+            match req.json::<BugReport>().await{
+                Ok(report) =>{
+                    if report.description.is_empty() {
+                        return err_specific("Please provide a description when submitting a bug report.".to_string()).await,
+                    }
+
+                    let mut username : String = "Anonymous User";
+                    if session_result.0 {
+                        username = session_result.1;
+                    }
+
+                    db_fso::post_bug_report
+        
+                }, 
+                Err(e) => err_specific(e.to_string()).await,
+
+
+
+
+            }
+        },
+        Err(e) => return err_specific(e.to_string()).await,
+}
 
 /*  I don't think I actualyl need this ...
 pub async fn user_add_email(mut req: Request, ctx: RouteContext<()>) -> worker::Result<Response> {  
