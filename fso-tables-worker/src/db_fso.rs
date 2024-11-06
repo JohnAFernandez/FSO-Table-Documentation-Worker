@@ -77,6 +77,32 @@ const TABLE_ALIASES_INSERT_QUERY: &str = "INSERT INTO table_aliases (table_id, f
 const USERS_INSERT_QUERY: &str = "INSERT INTO users ( username, role, active, email_confirmed, contribution_count, banned: i32) VALUES (?1, ?2, ?3, ?4, ?5, ?6)";
 
 
+// Other patches should be done on the database end.
+const ACTIONS_PATCH_APPROVED_QUERY: &str = "UPDATE actions SET approved_by_user = ?";
+
+const BUG_REPORT_PATCH_APPROVED_QUERY: &str = "UPDATE bug_reports SET approved_by_user = ?";
+const BUG_REPORT_PATCH_BUGTYPE_QUERY: &str = "UPDATE bug_reports SET bug_type = ?";
+const BUG_REPORT_PATCH_DESCRIPTION_QUERY: &str = "UPDATE bug_reports SET description = ?";
+const BUG_REPORT_PATCH_STATUS_QUERY: &str = "UPDATE bug_reports SET status = ?";
+
+const DEPRECATIONS_PATCH_DATE_QUERY: &str = "UPDATE deprecations SET date = ?";
+const DEPRECATIONS_PATCH_VERSION_QUERY: &str = "UPDATE deprecations SET version = ?";
+
+//No email validations updates if something is wrong with one of those it has to be done on the database side
+
+const FSO_ITEMS_PATCH_ITEM_TEXT_QUERY: &str = "UPDATE deprecations SET date = ?";
+const FSO_ITEMS_PATCH_DOCUMENTATION_QUERY: &str = "UPDATE deprecations SET date = ?";
+const FSO_ITEMS_PATCH_MAJOR_VERSION_QUERY: &str = "UPDATE deprecations SET date = ?";
+const FSO_ITEMS_PATCH_PARENT_ID_QUERY: &str = "UPDATE deprecations SET date = ?";
+const FSO_ITEMS_PATCH_TABLE_ID_QUERY: &str = "UPDATE deprecations SET date = ?";
+const FSO_ITEMS_PATCH_DEPRECATION_ID_QUERY: &str = "UPDATE deprecations SET date = ?";
+const FSO_ITEMS_PATCH_RESTRICTION_ID_QUERY: &str = "UPDATE deprecations SET date = ?";
+const FSO_ITEMS_PATCH_INFO_TYPE_QUERY: &str = "UPDATE deprecations SET date = ?";
+const FSO_ITEMS_PATCH_TABLE_INDEX_QUERY: &str = "UPDATE deprecations SET date = ?"; // THIS ONE IS COMPLICATED!!
+const FSO_ITEMS_PATCH_DEFAULT_VALUE_QUERY: &str = "UPDATE deprecations SET date = ?";
+
+//item_text, documentation, major_version, parent_id, table_id, deprecation_id, restriction_id, info_type, table_index, default_value
+
 const ACTIONS_FILTER_ID: &str = "WHERE action_id = ?;";
 const ACTIONS_FILTER_USER_ID: &str = "WHERE user_id = ?;";
 const ACTIONS_FILTER_APPROVED: &str = "WHERE approved = ?;";
