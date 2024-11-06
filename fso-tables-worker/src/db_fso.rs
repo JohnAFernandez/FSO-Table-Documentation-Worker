@@ -63,6 +63,20 @@ const SESSIONS_DELETE_QUERY: &str = "DELETE FROM sessions ";
 const TABLE_ALIASES_DELETE_QUERY: &str = "DELETE FROM table_aliases ";    
 //const USERS_DELETE_QUERY: &str = "DELETE FROM users ";
 
+// Some (maybe most) of these will end up being unused as specialized functions are already written.  
+const ACTIONS_INSERT_QUERY: &str = "INSERT INTO actions (user_id, action, approved_by_user, timestamp) VALUES (?1, ?2, ?3, ?4)";
+const BUG_REPORT_INSERT_QUERY: &str = "INSERT INTO bug_reports ( user_id, bug_type, description, status, timestamp) VALUES (?1, ?2, ?3, ?4, ?5)";    
+const DEPRECATIONS_INSERT_QUERY: &str = "INSERT INTO deprecations (date, version) VALUES (?1, ?2)"; 
+const EMAIL_VALIDATIONS_INSERT_QUERY: &str = "INSERT INTO email_validations (username) VALUES (?1)";
+const FSO_ITEMS_INSERT_QUERY: &str = "INSERT INTO fso_items (item_text, documentation, major_version, parent_id, table_id, deprecation_id, restriction_id, info_type, table_index, default_value) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)";
+//const FSO_TABLES_INSERT_QUERY: &str = "INSERT INTO fso_tables VALUES (?1, ?2)";    
+const PARSE_BEHAVIORS_INSERT_QUERY: &str = "INSERT INTO parse_behaviors (behavior, description) VALUES (?1, ?2)";    
+const RESTRICTIONS_INSERT_QUERY: &str = "INSERT INTO restrictions (min_value, max_value, max_string_length, illegal_value_int, illegal_value_float) VALUES (?1, ?2, ?3, ?4, ?5)";    
+const SESSIONS_INSERT_QUERY: &str = "INSERT INTO sessions (user, expiration) VALUES (?1, ?2)";     
+const TABLE_ALIASES_INSERT_QUERY: &str = "INSERT INTO table_aliases (table_id, filename) VALUES (?1, ?2)";    
+const USERS_INSERT_QUERY: &str = "INSERT INTO users ( username, role, active, email_confirmed, contribution_count, banned: i32) VALUES (?1, ?2, ?3, ?4, ?5, ?6)";
+
+
 const ACTIONS_FILTER_ID: &str = "WHERE action_id = ?;";
 const ACTIONS_FILTER_USER_ID: &str = "WHERE user_id = ?;";
 const ACTIONS_FILTER_APPROVED: &str = "WHERE approved = ?;";
