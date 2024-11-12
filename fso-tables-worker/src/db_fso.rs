@@ -90,18 +90,28 @@ const DEPRECATIONS_PATCH_VERSION_QUERY: &str = "UPDATE deprecations SET version 
 
 //No email validations updates if something is wrong with one of those it has to be done on the database side
 
-const FSO_ITEMS_PATCH_ITEM_TEXT_QUERY: &str = "UPDATE deprecations SET date = ?";
-const FSO_ITEMS_PATCH_DOCUMENTATION_QUERY: &str = "UPDATE deprecations SET date = ?";
-const FSO_ITEMS_PATCH_MAJOR_VERSION_QUERY: &str = "UPDATE deprecations SET date = ?";
-const FSO_ITEMS_PATCH_PARENT_ID_QUERY: &str = "UPDATE deprecations SET date = ?";
-const FSO_ITEMS_PATCH_TABLE_ID_QUERY: &str = "UPDATE deprecations SET date = ?";
-const FSO_ITEMS_PATCH_DEPRECATION_ID_QUERY: &str = "UPDATE deprecations SET date = ?";
-const FSO_ITEMS_PATCH_RESTRICTION_ID_QUERY: &str = "UPDATE deprecations SET date = ?";
-const FSO_ITEMS_PATCH_INFO_TYPE_QUERY: &str = "UPDATE deprecations SET date = ?";
-const FSO_ITEMS_PATCH_TABLE_INDEX_QUERY: &str = "UPDATE deprecations SET date = ?"; // THIS ONE IS COMPLICATED!!
-const FSO_ITEMS_PATCH_DEFAULT_VALUE_QUERY: &str = "UPDATE deprecations SET date = ?";
+const FSO_ITEMS_PATCH_ITEM_TEXT_QUERY: &str = "UPDATE deprecations SET item_text = ?";
+const FSO_ITEMS_PATCH_DOCUMENTATION_QUERY: &str = "UPDATE deprecations SET documentation = ?";
+const FSO_ITEMS_PATCH_MAJOR_VERSION_QUERY: &str = "UPDATE deprecations SET major_version = ?";
+const FSO_ITEMS_PATCH_PARENT_ID_QUERY: &str = "UPDATE deprecations SET parent_id = ?";
+const FSO_ITEMS_PATCH_TABLE_ID_QUERY: &str = "UPDATE deprecations SET table_id = ?";
+const FSO_ITEMS_PATCH_DEPRECATION_ID_QUERY: &str = "UPDATE deprecations SET deprecation_id = ?";
+const FSO_ITEMS_PATCH_RESTRICTION_ID_QUERY: &str = "UPDATE deprecations SET restriction_id = ?";
+const FSO_ITEMS_PATCH_INFO_TYPE_QUERY: &str = "UPDATE deprecations SET info_type = ?";
+const FSO_ITEMS_PATCH_TABLE_INDEX_QUERY: &str = "UPDATE deprecations SET table_index = ?"; // THIS ONE IS COMPLICATED!!
+const FSO_ITEMS_PATCH_DEFAULT_VALUE_QUERY: &str = "UPDATE deprecations SET default_value = ?";
 
-//item_text, documentation, major_version, parent_id, table_id, deprecation_id, restriction_id, info_type, table_index, default_value
+// Table Patching to be done by direct editng.
+
+const PARSE_BEHAVIORS_PATCH_BEHAVIOR_QUERY: &str = "UPDATE parse_behaviors SET behavior = ?";
+const PARSE_BEHAVIORS_PATCH_DESCRIPTION_QUERY: &str = "UPDATE parse_behaviors SET description = ?";
+
+const RESTRICTIONS_PATCH_min_value_QUERY: &str = "UPDATE restrictions SET min_value = ?";
+const RESTRICTIONS_PATCH_max_value_QUERY: &str = "UPDATE restrictions SET max_value = ?";
+const RESTRICTIONS_PATCH_MAX_STRING_LENGTH_QUERY: &str = "UPDATE restrictions SET max_string_length = ?";
+const RESTRICTIONS_PATCH_ILLEGAL_VALUE_INT_QUERY: &str = "UPDATE restrictions SET illegal_value_int = ?";
+const RESTRICTIONS_PATCH_ILLEGAL_VALUE_FLOAT_QUERY: &str = "UPDATE restrictions SET illegal_value_float = ?";
+//    min_value: f32, max_value: f32, max_string_length:  i32, illegal_value_int:  i32, illegal_value_float:  f32,
 
 const ACTIONS_FILTER_ID: &str = "WHERE action_id = ?;";
 const ACTIONS_FILTER_USER_ID: &str = "WHERE user_id = ?;";
