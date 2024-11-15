@@ -365,7 +365,7 @@ pub async fn db_generic_search_query(table: &Table, mode: i8 , key1: &String, ke
                         0 => (),
                         1 => query += BUG_REPORT_FILTER,
                         2 => query += BUG_REPORT_STATUS_FILTER,
-                        _ => return Err("Internal Server Error: Out of range mode in Deprecations generic query.".into()),
+                        _ => return Err("Internal Server Error: Out of range mode in Bug Report generic query.".into()),
                     }
                 }
                 Table::Deprecations => {
@@ -656,6 +656,134 @@ pub async fn db_generic_search_query(table: &Table, mode: i8 , key1: &String, ke
                 }                
             },
         Err(e)=> return Err(e),            
+    }
+}
+
+pub async fn db_generic_update_query(table: &Table, mode: i8 , key1: &String, key2: &String, ctx: &RouteContext<()>) -> Result<()> {
+    match ctx.env.d1(DB_NAME){
+        Ok(db) => {
+            let mut query = "".to_string();
+
+            match table {
+                Table::Actions => {
+                    query += ACTIONS_PATCH_APPROVED_QUERY + ACTIONS_FILTER_ID_BINDABLE; 
+                },
+                Table::BugReports => {
+
+                    match mode {
+                        0 => query += BUG_REPORT_PATCH_APPROVED_QUERY,
+                        1 => query += BUG_REPORT_PATCH_BUGTYPE_QUERY,
+                        2 => query += BUG_REPORT_PATCH_DESCRIPTION_QUERY,
+                        3 => query += BUG_REPORT_PATCH_STATUS_QUERY,
+                        _ => return Err("Internal Server Error: Out of range mode in Bug Report generic update query.".into()),
+                    }
+
+                    query += BUG_REPORT_FILTER_BINDABLE;
+                }
+                Table::Deprecations => {
+
+                    match mode {
+                        0 => query += DEPRECATIONS_PATCH_DATE_QUERY,
+                        1 => query += DEPRECATIONS_PATCH_VERSION_QUERY,
+                        _ => return Err("Internal Server Error: Out of range mode in Deprecations generic update query.".into()),
+                    }
+
+                    query += DEPRECATIONS_FILTER_BINDABLE;
+                },
+                Table::EmailValidations => 
+                    return Err("Internal Server Error: Server attempting to update Email Validations with generic update query.".into()), 
+                // This is definitely not done.  Figuring out all the relevant stuff for FSO items is a lot of effort.
+                Table::FsoItems => {
+                    match mode {
+                        0 => query += FSO_ITEMS_PATCH_DEFAULT_VALUE_QUERY,
+                        1 => query += FSO_ITEMS_PATCH_DEPRECATION_ID_QUERY,
+                        2 => query += FSO_ITEMS_PATCH_DOCUMENTATION_QUERY,
+                        3 => query += FSO_ITEMS_PATCH_INFO_TYPE_QUERY,
+                        4 => query += FSO_ITEMS_PATCH_ITEM_TEXT_QUERY,
+                        5 => query += FSO_ITEMS_PATCH_MAJOR_VERSION_QUERY,
+                        6 => query += FSO_ITEMS_PATCH_PARENT_ID_QUERY,
+                        7 => query += FSO_ITEMS_PATCH_RESTRICTION_ID_QUERY,
+                        8 => query += FSO_ITEMS_PATCH_TABLE_ID_QUERY,
+                        9 => query += FSO_ITEMS_PATCH_TABLE_INDEX_QUERY,
+                        _ => return Err("Internal Server Error: Out of range mode in FSO_ITEMS generic update query.".into()),
+                    }
+
+                },
+                Table::FsoTables => {
+                    query += FSO_TABLES_QUERY; 
+
+                    match mode {
+                        0 => (),
+                        1 => query += FSO_TABLES_FILTER,
+                        _ => return Err("Internal Server Error: Out of range mode in FSO_Tables generic update query.".into()),
+                    }
+
+                },
+                Table::ParseBehaviors => {
+                    query += PARSE_BEHAVIORS_QUERY; 
+
+                    match mode {
+                        0 => (),
+                        1 => query += PARSE_BEHAVIORS_FILTER,
+                        _ => return Err("Internal Server Error: Out of range mode in Parse Behaviors generic update query.".into()),
+                    }
+
+                },
+                Table::Restrictions => {
+                    query += RESTRICTIONS_QUERY; 
+
+                    match mode {
+                        0 => (),
+                        1 => query += RESTRICTIONS_FILTER,
+                        _ => return Err("Internal Server Error: Out of range mode in Restrictions generic update query.".into()),
+                    }
+
+                },
+                Table::Sessions => {
+                    query += SESSIONS_QUERY; 
+
+                    match mode {
+                        0 => (),
+                        1 => query = query + SESSIONS_FILTER_A + key2,// + SESSIONS_FILTER_B,
+                        _ => return Err("Internal Server Error: Out of range mode in Sessions generic update query.".into()),
+                    }
+
+                },
+                Table::TableAliases => {
+                    query += TABLE_ALIASES_QUERY; 
+
+                    match mode {
+                        0 => (),
+                        1 => query += TABLE_ALIASES_FILTER,
+                        _ => return Err("Internal Server Error: Out of range mode in Table Aliases generic update query.".into()),
+                    }
+
+                },
+                Table::Users => {
+                    query += USERS_QUERY; 
+
+                    match mode {
+                        0 => (),
+                        1 => query += USERS_USER_ID_FILTER,
+                        2 => query += USERS_USERNAME_FILTER,
+                        _ => return Err("Internal Server Error: Out of range mode in Usernames generic update query.".into()),
+                    }
+
+                },
+            }
+
+            match db.prepare(query).bind(&[JsValue::from(key1), JsValue::from(key2)]){
+                Ok(prepped_query)=> {
+                    match prepped_query.run() {
+                        Ok(_) => return Ok(()),
+                        Err(e) => return Err(e),
+                    }
+                },
+                Err(e) => return Err(e),
+            }
+        },
+        
+        Err(e) => return Err(e),
     }
 }
 
