@@ -76,7 +76,7 @@ const SESSIONS_INSERT_QUERY: &str = "INSERT INTO sessions (user, expiration) VAL
 const TABLE_ALIASES_INSERT_QUERY: &str = "INSERT INTO table_aliases (table_id, filename) VALUES (?1, ?2)";    
 const USERS_INSERT_QUERY: &str = "INSERT INTO users ( username, role, active, email_confirmed, contribution_count, banned: i32) VALUES (?1, ?2, ?3, ?4, ?5, ?6)";
 
-// So, these patches require more than one bind, but are only set up for one bind
+// TODO! So, these patches require more than one bind, but are only set up for one bind
 
 // Other patches should be done on the database end.
 const ACTIONS_PATCH_APPROVED_QUERY: &str = "UPDATE actions SET approved_by_user = ?";
@@ -114,6 +114,9 @@ const RESTRICTIONS_PATCH_ILLEGAL_VALUE_INT_QUERY: &str = "UPDATE restrictions SE
 const RESTRICTIONS_PATCH_ILLEGAL_VALUE_FLOAT_QUERY: &str = "UPDATE restrictions SET illegal_value_float = ?";
 
 const SESSIONS_PATCH_EXPIRATION_QUERY: &str =  "UPDATE sessions SET expiration = ?";  
+
+const TABLE_ALIASES_QUERY: &str = "UPDATE table_aliases SET table_id = ?";
+const TABLE_ALIASES_QUERY: &str = "UPDATE table_aliases SET filename = ?";
 
 
 const ACTIONS_FILTER_ID: &str = "WHERE action_id = ?;";
