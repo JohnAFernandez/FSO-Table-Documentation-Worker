@@ -76,47 +76,45 @@ const SESSIONS_INSERT_QUERY: &str = "INSERT INTO sessions (user, expiration) VAL
 const TABLE_ALIASES_INSERT_QUERY: &str = "INSERT INTO table_aliases (table_id, filename) VALUES (?1, ?2)";    
 const USERS_INSERT_QUERY: &str = "INSERT INTO users ( username, role, active, email_confirmed, contribution_count, banned: i32) VALUES (?1, ?2, ?3, ?4, ?5, ?6)";
 
-// TODO! So, these patches require more than one bind, but are only set up for one bind
-
 // Other patches should be done on the database end.
 const ACTIONS_PATCH_APPROVED_QUERY: &str = "UPDATE actions SET approved_by_user = ?1;";
 
-const BUG_REPORT_PATCH_APPROVED_QUERY: &str = "UPDATE bug_reports SET approved_by_user = ?";
-const BUG_REPORT_PATCH_BUGTYPE_QUERY: &str = "UPDATE bug_reports SET bug_type = ?";
-const BUG_REPORT_PATCH_DESCRIPTION_QUERY: &str = "UPDATE bug_reports SET description = ?";
-const BUG_REPORT_PATCH_STATUS_QUERY: &str = "UPDATE bug_reports SET status = ?";
+const BUG_REPORT_PATCH_APPROVED_QUERY: &str = "UPDATE bug_reports SET approved_by_user = ?1 ";
+const BUG_REPORT_PATCH_BUGTYPE_QUERY: &str = "UPDATE bug_reports SET bug_type = ?1 ";
+const BUG_REPORT_PATCH_DESCRIPTION_QUERY: &str = "UPDATE bug_reports SET description = ?1 ";
+const BUG_REPORT_PATCH_STATUS_QUERY: &str = "UPDATE bug_reports SET status = ?1 ";
 
-const DEPRECATIONS_PATCH_DATE_QUERY: &str = "UPDATE deprecations SET date = ?";
-const DEPRECATIONS_PATCH_VERSION_QUERY: &str = "UPDATE deprecations SET version = ?";
+const DEPRECATIONS_PATCH_DATE_QUERY: &str = "UPDATE deprecations SET date = ?1 ";
+const DEPRECATIONS_PATCH_VERSION_QUERY: &str = "UPDATE deprecations SET version = ?1 ";
 
 //No email validations updates if something is wrong with one of those it has to be done on the database side
 
-const FSO_ITEMS_PATCH_ITEM_TEXT_QUERY: &str = "UPDATE deprecations SET item_text = ?";
-const FSO_ITEMS_PATCH_DOCUMENTATION_QUERY: &str = "UPDATE deprecations SET documentation = ?";
-const FSO_ITEMS_PATCH_MAJOR_VERSION_QUERY: &str = "UPDATE deprecations SET major_version = ?";
-const FSO_ITEMS_PATCH_PARENT_ID_QUERY: &str = "UPDATE deprecations SET parent_id = ?";
-const FSO_ITEMS_PATCH_TABLE_ID_QUERY: &str = "UPDATE deprecations SET table_id = ?";
-const FSO_ITEMS_PATCH_DEPRECATION_ID_QUERY: &str = "UPDATE deprecations SET deprecation_id = ?";
-const FSO_ITEMS_PATCH_RESTRICTION_ID_QUERY: &str = "UPDATE deprecations SET restriction_id = ?";
-const FSO_ITEMS_PATCH_INFO_TYPE_QUERY: &str = "UPDATE deprecations SET info_type = ?";
-const FSO_ITEMS_PATCH_TABLE_INDEX_QUERY: &str = "UPDATE deprecations SET table_index = ?"; // THIS ONE IS COMPLICATED!!
-const FSO_ITEMS_PATCH_DEFAULT_VALUE_QUERY: &str = "UPDATE deprecations SET default_value = ?";
+const FSO_ITEMS_PATCH_ITEM_TEXT_QUERY: &str = "UPDATE deprecations SET item_text = ?1 ";
+const FSO_ITEMS_PATCH_DOCUMENTATION_QUERY: &str = "UPDATE deprecations SET documentation = ?1 ";
+const FSO_ITEMS_PATCH_MAJOR_VERSION_QUERY: &str = "UPDATE deprecations SET major_version = ?1 ";
+const FSO_ITEMS_PATCH_PARENT_ID_QUERY: &str = "UPDATE deprecations SET parent_id = ?1 ";
+const FSO_ITEMS_PATCH_TABLE_ID_QUERY: &str = "UPDATE deprecations SET table_id = ?1 ";
+const FSO_ITEMS_PATCH_DEPRECATION_ID_QUERY: &str = "UPDATE deprecations SET deprecation_id = ?1 ";
+const FSO_ITEMS_PATCH_RESTRICTION_ID_QUERY: &str = "UPDATE deprecations SET restriction_id = ?1 ";
+const FSO_ITEMS_PATCH_INFO_TYPE_QUERY: &str = "UPDATE deprecations SET info_type = ?1 ";
+const FSO_ITEMS_PATCH_TABLE_INDEX_QUERY: &str = "UPDATE deprecations SET table_index = ?1 "; // THIS ONE IS COMPLICATED!!
+const FSO_ITEMS_PATCH_DEFAULT_VALUE_QUERY: &str = "UPDATE deprecations SET default_value = ?1 ";
 
 // Table Patching to be done by direct editng.
 
-const PARSE_BEHAVIORS_PATCH_BEHAVIOR_QUERY: &str = "UPDATE parse_behaviors SET behavior = ?";
-const PARSE_BEHAVIORS_PATCH_DESCRIPTION_QUERY: &str = "UPDATE parse_behaviors SET description = ?";
+const PARSE_BEHAVIORS_PATCH_BEHAVIOR_QUERY: &str = "UPDATE parse_behaviors SET behavior = ?1 ";
+const PARSE_BEHAVIORS_PATCH_DESCRIPTION_QUERY: &str = "UPDATE parse_behaviors SET description = ?1 ";
 
-const RESTRICTIONS_PATCH_MIN_VALUE_QUERY: &str = "UPDATE restrictions SET min_value = ?";
-const RESTRICTIONS_PATCH_MAX_VALUE_QUERY: &str = "UPDATE restrictions SET max_value = ?";
-const RESTRICTIONS_PATCH_MAX_STRING_LENGTH_QUERY: &str = "UPDATE restrictions SET max_string_length = ?";
-const RESTRICTIONS_PATCH_ILLEGAL_VALUE_INT_QUERY: &str = "UPDATE restrictions SET illegal_value_int = ?";
-const RESTRICTIONS_PATCH_ILLEGAL_VALUE_FLOAT_QUERY: &str = "UPDATE restrictions SET illegal_value_float = ?";
+const RESTRICTIONS_PATCH_MIN_VALUE_QUERY: &str = "UPDATE restrictions SET min_value = ?1 ";
+const RESTRICTIONS_PATCH_MAX_VALUE_QUERY: &str = "UPDATE restrictions SET max_value = ?1 ";
+const RESTRICTIONS_PATCH_MAX_STRING_LENGTH_QUERY: &str = "UPDATE restrictions SET max_string_length = ?1 ";
+const RESTRICTIONS_PATCH_ILLEGAL_VALUE_INT_QUERY: &str = "UPDATE restrictions SET illegal_value_int = ?1 ";
+const RESTRICTIONS_PATCH_ILLEGAL_VALUE_FLOAT_QUERY: &str = "UPDATE restrictions SET illegal_value_float = ?1 ";
 
-const SESSIONS_PATCH_EXPIRATION_QUERY: &str =  "UPDATE sessions SET expiration = ?";  
+const SESSIONS_PATCH_EXPIRATION_QUERY: &str =  "UPDATE sessions SET expiration = ?1 ";  
 
-const TABLE_ALIASES_PATCH_TABLE_ID_QUERY: &str = "UPDATE table_aliases SET table_id = ?";
-const TABLE_ALIASES_PATCH_FILENAME_QUERY: &str = "UPDATE table_aliases SET filename = ?";
+const TABLE_ALIASES_PATCH_TABLE_ID_QUERY: &str = "UPDATE table_aliases SET table_id = ?1 ";
+const TABLE_ALIASES_PATCH_FILENAME_QUERY: &str = "UPDATE table_aliases SET filename = ?1 ";
 
 
 const ACTIONS_FILTER_ID: &str = "WHERE action_id = ?;";
@@ -137,6 +135,9 @@ const EMAIL_VALIDATION_PENDING_FILTER: &str = "WHERE username = ?;";
 const EMAIL_VALIDATION_PENDING_FILTER_BINDABLE: &str = "WHERE username = ?2;";
 const EMAIL_VALIDATIONS_VERIFY_FILTER: &str = "WHERE username = ?1 AND secure_key = ?2;";
 
+const FSO_ITEMS_FILTER: &str = "WHERE item_id = ?";
+const FSO_ITEMS_FILTER_BINDABLE: &str = "WHERE item_id = ?2";
+
 const FSO_TABLES_FILTER: &str = "WHERE table_id = ?;";
 const FSO_TABLES_FILTER_BINDABLE: &str = "WHERE table_id = ?2;";
 
@@ -149,6 +150,7 @@ const RESTRICTIONS_FILTER_BINDABLE: &str = "WHERE restriction_id = ?2;";
 // This may need more effort, but I wanted to try the rest first.  Also need to restrict mode zero on this one.
 const SESSIONS_FILTER_A: &str = "WHERE key = \"";
 const SESSIONS_FILTER_B: &str = "\" AND user = ?;";
+const SESSIONS_FILTER_USER_BINDABLE: &str = "WHERE user = ?2;";
 const SESSIONS_USER_ONLY_FILTER: &str = "WHERE user = ?;";
 
 const TABLE_ALIASES_FILTER: &str = "WHERE alias_id = ?;";
@@ -193,28 +195,28 @@ impl FsoTablesQueryResults {
 
 #[derive(Serialize, Deserialize)]
 pub struct Actions {
-    action_id: i32,
-    user_id: i32,
-    action: String,
-    approved_by_user: i32,
-    timestamp: String,
+    pub action_id: i32,
+    pub user_id: i32,
+    pub action: String,
+    pub approved_by_user: i32,
+    pub timestamp: String,
 }
 
 #[derive(Serialize, Deserialize)]
 pub struct BugReport {
-    id: i32,
-    user_id: i32,
-    bug_type: String,
-    description: String,
-    status: i32,
-    timestamp: String,
+    pub id: i32,
+    pub user_id: i32,
+    pub bug_type: String,
+    pub description: String,
+    pub status: i32,
+    pub timestamp: String,
 }
 
 #[derive(Serialize, Deserialize)]
 pub struct Deprecations {
-    deprecation_id: i32,
-    date: String,
-    version: String,
+    pub deprecation_id: i32,
+    pub date: String,
+    pub version: String,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -225,43 +227,43 @@ pub struct EmailValidations {
 
 #[derive(Serialize, Deserialize)]
 pub struct FsoItems { 
-    item_id: i32,
-    item_text: String,
-    documentation: String,
-    major_version: String,
-    parent_id: i32,
-    table_id: i32,
-    deprecation_id: i32,
-    restriction_id: i32,
-    info_type: String,
-    table_index: i32,
-    default_value: String,
+    pub item_id: i32,
+    pub item_text: String,
+    pub documentation: String,
+    pub major_version: String,
+    pub parent_id: i32,
+    pub table_id: i32,
+    pub deprecation_id: i32,
+    pub restriction_id: i32,
+    pub info_type: String,
+    pub table_index: i32,
+    pub default_value: String,
 }
 
 #[derive(Serialize, Deserialize)]
 pub struct FsoTables { 
-    table_id: i32,
-    name: String,
-    filename: String,
-    modular_extension: String,
-    description: String,
+    pub table_id: i32,
+    pub name: String,
+    pub filename: String,
+    pub modular_extension: String,
+    pub description: String,
 }
 
 #[derive(Deserialize, Serialize)]
 pub struct ParseBehavior{
-    behavior_id	: i32,
-    behavior : String,
-    description : String,
+    pub behavior_id	: i32,
+    pub behavior : String,
+    pub description : String,
 }
 
 #[derive(Deserialize, Serialize)]
 pub struct Restrictions {
-    restriction_id: i32,
-    min_value: f32,
-    max_value: f32,
-    max_string_length:  i32,
-    illegal_value_int:  i32,
-    illegal_value_float:  f32,
+    pub restriction_id: i32,
+    pub min_value: f32,
+    pub max_value: f32,
+    pub max_string_length:  i32,
+    pub illegal_value_int:  i32,
+    pub illegal_value_float:  f32,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -273,9 +275,9 @@ pub struct Session {
 
 #[derive(Deserialize, Serialize)]
 pub struct TableAlias {
-    alias_id: i32,
-    table_id: i32,
-    filename: String,
+    pub alias_id: i32,
+    pub table_id: i32,
+    pub filename: String,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -708,67 +710,54 @@ pub async fn db_generic_update_query(table: &Table, mode: i8 , key1: &String, ke
                         _ => return Err("Internal Server Error: Out of range mode in FSO_ITEMS generic update query.".into()),
                     }
 
+                    query += FSO_ITEMS_FILTER_BINDABLE;
+
                 },
                 Table::FsoTables => {
-                    query += FSO_TABLES_QUERY; 
-
-                    match mode {
-                        0 => (),
-                        1 => query += FSO_TABLES_FILTER,
-                        _ => return Err("Internal Server Error: Out of range mode in FSO_Tables generic update query.".into()),
-                    }
-
+                    return Err("Internal Server Error: Tables cannot be updated via the API.  This error message *should* be unreachable.  Please report!".into())
+                    
                 },
                 Table::ParseBehaviors => {
-                    query += PARSE_BEHAVIORS_QUERY; 
-
                     match mode {
-                        0 => (),
-                        1 => query += PARSE_BEHAVIORS_FILTER,
+                        0 => query += PARSE_BEHAVIORS_PATCH_BEHAVIOR_QUERY,
+                        1 => query += PARSE_BEHAVIORS_PATCH_DESCRIPTION_QUERY,
                         _ => return Err("Internal Server Error: Out of range mode in Parse Behaviors generic update query.".into()),
                     }
 
+                    query += PARSE_BEHAVIORS_FILTER_BINDABLE;
                 },
                 Table::Restrictions => {
-                    query += RESTRICTIONS_QUERY; 
-
                     match mode {
-                        0 => (),
-                        1 => query += RESTRICTIONS_FILTER,
+                        0 => query += RESTRICTIONS_PATCH_ILLEGAL_VALUE_FLOAT_QUERY,
+                        1 => query += RESTRICTIONS_PATCH_ILLEGAL_VALUE_INT_QUERY,
+                        2 => query += RESTRICTIONS_PATCH_MAX_STRING_LENGTH_QUERY,
+                        3 => query += RESTRICTIONS_PATCH_MAX_VALUE_QUERY,
+                        4 => query += RESTRICTIONS_PATCH_MIN_VALUE_QUERY,
                         _ => return Err("Internal Server Error: Out of range mode in Restrictions generic update query.".into()),
                     }
 
+                    query += RESTRICTIONS_FILTER_BINDABLE;
+
                 },
                 Table::Sessions => {
-                    query += SESSIONS_QUERY; 
-
                     match mode {
-                        0 => (),
-                        1 => query = query + SESSIONS_FILTER_A + key2,// + SESSIONS_FILTER_B,
+                        0 => query += SESSIONS_PATCH_EXPIRATION_QUERY,
                         _ => return Err("Internal Server Error: Out of range mode in Sessions generic update query.".into()),
                     }
 
+                    query += SESSIONS_FILTER_USER_BINDABLE;
                 },
                 Table::TableAliases => {
-                    query += TABLE_ALIASES_QUERY; 
-
                     match mode {
-                        0 => (),
-                        1 => query += TABLE_ALIASES_FILTER,
+                        0 => query += TABLE_ALIASES_PATCH_FILENAME_QUERY,
+                        1 => query += TABLE_ALIASES_PATCH_TABLE_ID_QUERY,
                         _ => return Err("Internal Server Error: Out of range mode in Table Aliases generic update query.".into()),
                     }
 
+                    query += TABLE_ALIASES_FILTER_BINDABLE;
                 },
                 Table::Users => {
-                    query += USERS_QUERY; 
-
-                    match mode {
-                        0 => (),
-                        1 => query += USERS_USER_ID_FILTER,
-                        2 => query += USERS_USERNAME_FILTER,
-                        _ => return Err("Internal Server Error: Out of range mode in Usernames generic update query.".into()),
-                    }
-
+                    return Err("Internal Server Error: Users cannot be updated via the generic update function.  This error message *should* be unreachable.  Please report!".into()),
                 },
             }
 

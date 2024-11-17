@@ -79,7 +79,7 @@ async fn fetch(req: Request, env: Env, _ctx: Context,) -> worker::Result<Respons
         .get_async("/tables/parse-types", get_parse_types)
         .get_async("/tables/parse-types/:id", get_parse_type)
         //.post_async("/tables/parse-types", post_parse_behavior)
-        //.patch_async("/tables/parse-types/:id", update_parse_type).put_async("/tables/parse-types/:id", update_parse_type)
+        .patch_async("/tables/parse-types/:id", update_parse_type).put_async("/tables/parse-types/:id", update_parse_type)
         //.delete_async("/tables/parse-types/:id", delete_parse_type)
         .get_async("/tables", get_tables) // tables just need to be done manually on my end, because we don't have many tables *and* it's less effort than just populating.
         .get_async("/tables/items", get_items)
@@ -729,6 +729,54 @@ pub async fn get_parse_type(_: Request, ctx: RouteContext<()>) -> worker::Result
             Err(e) => return err_specific(e.to_string()).await,
         },
         None => return err_specific("Internal Server Error, route parameter mismatch!".to_string()).await,
+    }
+}
+
+
+pub async fn update_parse_type(mut req: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
+    match ctx.env.d1(DB_NAME) {
+        Ok(db) => {
+            let session_result = header_session_is_valid(&req, &db).await;
+            if !session_result.0 {
+                return err_not_logged_in().await
+            }
+
+            let username = session_result.1;
+
+            match db_fso::db_get_user_role(&username, &db).await {                 
+                Ok(authorizer_role) => {
+                    match authorizer_role {
+                        db_fso::UserRole::VIEWER => return err_insufficent_permissions().await,
+                        _=> (),
+                    }         
+
+                    match req.json::<db_fso::ParseBehavior>().await {
+                        Ok(parse_behavior) => {
+                            if parse_behavior.behavior_id < 0 {
+                                return err_specific("Invalid behavior id, cannot update.".to_string()).await;
+                            }
+
+                            match db_fso::db_generic_update_query(&db_fso::Table::ParseBehaviors, 0, &parse_behavior.behavior_id.to_string(), &parse_behavior.description, &ctx).await {
+                                Ok(_) => (),
+                                Err(e) => return err_specific(e.to_string()).await,
+                            }
+
+                            match db_fso::db_generic_update_query(&db_fso::Table::ParseBehaviors, 1, &parse_behavior.description, &parse_behavior.description, &ctx).await {
+                                Ok(_) => (),
+                                Err(e) => return err_specific(e.to_string()).await,
+                            }
+
+                            return Response::ok("Success!")
+
+                        },
+                        Err(e) => return err_specific(e.to_string() + "\nMake sure that the request json has a behavior_id, behavior, and description, even if not updating.  If not updating (id cannot be updated) mark a string type with \"!!NO UPDATE!!\".").await,
+                    }
+                },
+                Err(e) => return err_specific(e.to_string()).await,
+            }
+
+        },
+        Err(e) => return err_specific(e.to_string()).await,
     }
 }
 
