@@ -115,8 +115,8 @@ const RESTRICTIONS_PATCH_ILLEGAL_VALUE_FLOAT_QUERY: &str = "UPDATE restrictions 
 
 const SESSIONS_PATCH_EXPIRATION_QUERY: &str =  "UPDATE sessions SET expiration = ?";  
 
-const TABLE_ALIASES_QUERY: &str = "UPDATE table_aliases SET table_id = ?";
-const TABLE_ALIASES_QUERY: &str = "UPDATE table_aliases SET filename = ?";
+const TABLE_ALIASES_PATCH_TABLE_ID_QUERY: &str = "UPDATE table_aliases SET table_id = ?";
+const TABLE_ALIASES_PATCH_FILENAME_QUERY: &str = "UPDATE table_aliases SET filename = ?";
 
 
 const ACTIONS_FILTER_ID: &str = "WHERE action_id = ?;";
@@ -666,7 +666,7 @@ pub async fn db_generic_update_query(table: &Table, mode: i8 , key1: &String, ke
 
             match table {
                 Table::Actions => {
-                    query += ACTIONS_PATCH_APPROVED_QUERY + ACTIONS_FILTER_ID_BINDABLE; 
+                    query = ACTIONS_PATCH_APPROVED_QUERY.to_owned() + ACTIONS_FILTER_ID_BINDABLE; 
                 },
                 Table::BugReports => {
 
@@ -774,7 +774,7 @@ pub async fn db_generic_update_query(table: &Table, mode: i8 , key1: &String, ke
 
             match db.prepare(query).bind(&[JsValue::from(key1), JsValue::from(key2)]){
                 Ok(prepped_query)=> {
-                    match prepped_query.run() {
+                    match prepped_query.run().await {
                         Ok(_) => return Ok(()),
                         Err(e) => return Err(e),
                     }
