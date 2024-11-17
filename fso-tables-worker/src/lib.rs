@@ -79,7 +79,7 @@ async fn fetch(req: Request, env: Env, _ctx: Context,) -> worker::Result<Respons
         .get_async("/tables/parse-types", get_parse_types)
         .get_async("/tables/parse-types/:id", get_parse_type)
         //.post_async("/tables/parse-types", post_parse_behavior)
-        .patch_async("/tables/parse-types/:id", update_parse_type).put_async("/tables/parse-types/:id", update_parse_type)
+        .patch_async("/tables/parse-types", update_parse_type).put_async("/tables/parse-types", update_parse_type)
         //.delete_async("/tables/parse-types/:id", delete_parse_type)
         .get_async("/tables", get_tables) // tables just need to be done manually on my end, because we don't have many tables *and* it's less effort than just populating.
         .get_async("/tables/items", get_items)
@@ -756,14 +756,18 @@ pub async fn update_parse_type(mut req: Request, ctx: RouteContext<()>) -> worke
                                 return err_specific("Invalid behavior id, cannot update.".to_string()).await;
                             }
 
-                            match db_fso::db_generic_update_query(&db_fso::Table::ParseBehaviors, 0, &parse_behavior.behavior_id.to_string(), &parse_behavior.description, &ctx).await {
-                                Ok(_) => (),
-                                Err(e) => return err_specific(e.to_string()).await,
+                            if parse_behavior.behavior != "!!NO UPDATE!!"{
+                                match db_fso::db_generic_update_query(&db_fso::Table::ParseBehaviors, 0, &parse_behavior.behavior, &parse_behavior.behavior_id.to_string(),  &ctx).await {
+                                    Ok(_) => (),
+                                    Err(e) => return err_specific(e.to_string()).await,
+                                }    
                             }
 
-                            match db_fso::db_generic_update_query(&db_fso::Table::ParseBehaviors, 1, &parse_behavior.description, &parse_behavior.description, &ctx).await {
-                                Ok(_) => (),
-                                Err(e) => return err_specific(e.to_string()).await,
+                            if parse_behavior.description != "!!NO UPDATE!!"{
+                                match db_fso::db_generic_update_query(&db_fso::Table::ParseBehaviors, 1, &parse_behavior.description, &parse_behavior.behavior_id.to_string(),  &ctx).await {
+                                    Ok(_) => (),
+                                    Err(e) => return err_specific(e.to_string()).await,
+                                }
                             }
 
                             return Response::ok("Success!")

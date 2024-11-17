@@ -757,11 +757,11 @@ pub async fn db_generic_update_query(table: &Table, mode: i8 , key1: &String, ke
                     query += TABLE_ALIASES_FILTER_BINDABLE;
                 },
                 Table::Users => {
-                    return Err("Internal Server Error: Users cannot be updated via the generic update function.  This error message *should* be unreachable.  Please report!".into()),
+                    return Err("Internal Server Error: Users cannot be updated via the generic update function.  This error message *should* be unreachable.  Please report!".into())
                 },
             }
 
-            match db.prepare(query).bind(&[JsValue::from(key1), JsValue::from(key2)]){
+            match db.prepare(query.clone()).bind(&[JsValue::from(key1), JsValue::from(key2)]){
                 Ok(prepped_query)=> {
                     match prepped_query.run().await {
                         Ok(_) => return Ok(()),
