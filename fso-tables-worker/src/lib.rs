@@ -90,7 +90,7 @@ async fn fetch(req: Request, env: Env, _ctx: Context,) -> worker::Result<Respons
         .get_async("/tables/aliases", get_aliases)
         .get_async("/tables/aliases/:id", get_alias) 
         //.post_async("/tables/:id/alias", post_alias) // Requires login
-        //.patch_async("/tables/aliases/:id", update_alias).put_async("/tables/aliases/:id", update_alias) // Requires login
+        .patch_async("/tables/aliases/:id", update_alias).put_async("/tables/aliases/:id", update_alias) // Requires login
         //.delete_alias("/tables/aliases/:id", delete_alias)
         .get_async("/tables/:id", get_table)
         //.get_async("/tables/:id/items", get_tables_items)
@@ -944,6 +944,57 @@ pub async fn get_alias(_: Request, ctx: RouteContext<()>) -> worker::Result<Resp
             Err(e) => return err_specific(e.to_string()).await,
         },
         None => return err_specific("Internal Server Error, route parameter mismatch!".to_string()).await,
+    }
+}
+
+pub async fn update_alias(mut req: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
+    match ctx.env.d1(DB_NAME) {
+        Ok(db) => {
+            let session_result = header_session_is_valid(&req, &db).await;
+            if !session_result.0 {
+                return err_not_logged_in().await
+            }
+
+            let username = session_result.1;
+
+            match db_fso::db_get_user_role(&username, &db).await {                 
+                Ok(authorizer_role) => {
+                    match authorizer_role {
+                        db_fso::UserRole::VIEWER => return err_insufficent_permissions().await,
+                        _=> (),
+                    }         
+
+                    match req.json::<db_fso::TableAlias>().await {
+                        Ok(table_alias) => {
+                            if table_alias.alias_id < 0 {
+                                return err_specific("Invalid table alias id, cannot update.".to_string()).await;
+                            }
+
+                            if table_alias.filename != "!!NO UPDATE!!"{
+                                match db_fso::db_generic_update_query(&db_fso::Table::TableAliases, 0, &table_alias.filename, &table_alias.alias_id.to_string(),  &ctx).await {
+                                    Ok(_) => (),
+                                    Err(e) => return err_specific(e.to_string()).await,
+                                }    
+                            }
+
+                            if table_alias.table_id > -2{
+                                match db_fso::db_generic_update_query(&db_fso::Table::TableAliases, 1, &table_alias.table_id.to_string(), &table_alias.alias_id.to_string(),  &ctx).await {
+                                    Ok(_) => (),
+                                    Err(e) => return err_specific(e.to_string()).await,
+                                }
+                            }
+
+                            return Response::ok("Success!")
+
+                        },
+                        Err(e) => return err_specific(e.to_string() + "\nMake sure that the request json has an alias_id, filename, and table_id, even if not updating.  If not updating (parse_id cannot be updated) mark a string type with \"!!NO UPDATE!!\". Use -2 or a more negative number for ids. Echo back other values.").await,
+                    }
+                },
+                Err(e) => return err_specific(e.to_string()).await,
+            }
+
+        },
+        Err(e) => return err_specific(e.to_string()).await,
     }
 }
 
