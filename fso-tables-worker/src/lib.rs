@@ -85,7 +85,7 @@ async fn fetch(req: Request, env: Env, _ctx: Context,) -> worker::Result<Respons
         .get_async("/tables/items", get_items)
         .get_async("/tables/items/:id", get_item)
         //.post_async("/tables/items", post_item) // Requires login
-        //.patch_async("/tables/items/:id", update_item).put_async("/tables/items/:id", update_item) //Requires login 
+        .patch_async("/tables/items", update_item).put_async("/tables/items", update_item) //Requires login 
         //.delete_async("/tables/items/:id", delete_item)
         .get_async("/tables/aliases", get_aliases)
         .get_async("/tables/aliases/:id", get_alias) 
@@ -773,7 +773,7 @@ pub async fn update_parse_type(mut req: Request, ctx: RouteContext<()>) -> worke
                             return Response::ok("Success!")
 
                         },
-                        Err(e) => return err_specific(e.to_string() + "\nMake sure that the request json has a behavior_id, behavior, and description, even if not updating.  If not updating (id cannot be updated) mark a string type with \"!!NO UPDATE!!\".").await,
+                        Err(e) => return err_specific(e.to_string() + "\nMake sure that the request json has a behavior_id, behavior, and description, even if not updating.  If not updating (parse_id cannot be updated) mark a string type with \"!!NO UPDATE!!\". Use -2 or a more negative number for ids. Echo back other values.").await,
                     }
                 },
                 Err(e) => return err_specific(e.to_string()).await,
@@ -802,6 +802,106 @@ pub async fn get_item(_: Request, ctx: RouteContext<()>) -> worker::Result<Respo
             Err(e) => return err_specific(e.to_string()).await,
         },
         None => return err_specific("Internal Server Error, route parameter mismatch!".to_string()).await,
+    }
+}
+
+pub async fn update_item(mut req: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
+    match ctx.env.d1(DB_NAME) {
+        Ok(db) => {
+            let session_result = header_session_is_valid(&req, &db).await;
+            if !session_result.0 {
+                return err_not_logged_in().await
+            }
+
+            let username = session_result.1;
+
+            match db_fso::db_get_user_role(&username, &db).await {                 
+                Ok(authorizer_role) => {
+                    match authorizer_role {
+                        db_fso::UserRole::VIEWER => return err_insufficent_permissions().await,
+                        _=> (),
+                    }         
+
+                    match req.json::<db_fso::FsoItems>().await {
+                        Ok(item) => {
+                            if item.item_id < 0 {
+                                return err_specific("Invalid item id, cannot update.".to_string()).await;
+                            }
+
+                            if item.default_value != "!!NO UPDATE!!"{
+                                match db_fso::db_generic_update_query(&db_fso::Table::FsoItems, 0, &item.default_value, &item.item_id.to_string(),  &ctx).await {
+                                    Ok(_) => (),
+                                    Err(e) => return err_specific(e.to_string()).await,
+                                }    
+                            }
+
+                            if item.deprecation_id > -2 {
+                                match db_fso::db_generic_update_query(&db_fso::Table::FsoItems, 1, &item.deprecation_id.to_string(), &item.item_id.to_string(),  &ctx).await {
+                                    Ok(_) => (),
+                                    Err(e) => return err_specific(e.to_string()).await,
+                                }
+                            }
+
+                            if item.documentation != "!!NO UPDATE!!"{
+                                match db_fso::db_generic_update_query(&db_fso::Table::FsoItems, 2, &item.documentation, &item.item_id.to_string(),  &ctx).await {
+                                    Ok(_) => (),
+                                    Err(e) => return err_specific(e.to_string()).await,
+                                }
+                            }
+
+                            if item.info_type != "!!NO UPDATE!!"{
+                                match db_fso::db_generic_update_query(&db_fso::Table::FsoItems, 3, &item.info_type, &item.item_id.to_string(),  &ctx).await {
+                                    Ok(_) => (),
+                                    Err(e) => return err_specific(e.to_string()).await,
+                                }
+                            }
+
+                            if item.item_text != "!!NO UPDATE!!"{
+                                match db_fso::db_generic_update_query(&db_fso::Table::FsoItems, 4, &item.item_text, &item.item_id.to_string(),  &ctx).await {
+                                    Ok(_) => (),
+                                    Err(e) => return err_specific(e.to_string()).await,
+                                }
+                            }
+
+                            if item.major_version != "!!NO UPDATE!!"{
+                                match db_fso::db_generic_update_query(&db_fso::Table::FsoItems, 5, &item.major_version, &item.item_id.to_string(),  &ctx).await {
+                                    Ok(_) => (),
+                                    Err(e) => return err_specific(e.to_string()).await,
+                                }
+                            }
+                            
+                            if item.parent_id > -2 {
+                                match db_fso::db_generic_update_query(&db_fso::Table::FsoItems, 6, &item.parent_id.to_string(), &item.item_id.to_string(),  &ctx).await {
+                                    Ok(_) => (),
+                                    Err(e) => return err_specific(e.to_string()).await,
+                                }
+                            }
+
+                            if item.restriction_id > -2 {
+                                match db_fso::db_generic_update_query(&db_fso::Table::FsoItems, 7, &item.restriction_id.to_string(), &item.item_id.to_string(),  &ctx).await {
+                                    Ok(_) => (),
+                                    Err(e) => return err_specific(e.to_string()).await,
+                                }
+                            }
+
+                            if item.table_id > -2 {
+                                match db_fso::db_generic_update_query(&db_fso::Table::FsoItems, 8, &item.table_id.to_string(), &item.item_id.to_string(),  &ctx).await {
+                                    Ok(_) => (),
+                                    Err(e) => return err_specific(e.to_string()).await,
+                                }
+                            }
+
+                            return Response::ok("Success!")
+
+                        },
+                        Err(e) => return err_specific(e.to_string() + "\nMake sure that the request json has an item_id, behavior, and description, even if not updating.  If not updating (id cannot be updated) mark a string type with \"!!NO UPDATE!!\". Use -2 or more negative number for ids for no update.  Echo back other values for no update.").await,
+                    }
+                },
+                Err(e) => return err_specific(e.to_string()).await,
+            }
+
+        },
+        Err(e) => return err_specific(e.to_string()).await,
     }
 }
 
