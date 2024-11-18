@@ -113,8 +113,9 @@ async fn fetch(req: Request, env: Env, _ctx: Context,) -> worker::Result<Respons
         //.post_async("/tables/actions/:id:/approve", approve_request) // Requires login and admin
         //.post_async("/tables/actions/:id:/reject", reject_request) // Requries login and admin
         .post_async("/bugreport", add_bug_report)
-        //.patch_async("/bugreport/:id", resolve_bug_report)
-        //.delete_async("/bugreport/:id", delete_bug_report)
+        .patch_async("/bugreport/:id/resolve", resolve_bug_report)
+        .patch_async("/bugreport/:id/unresolve", unresolve_bug_report)
+        .patch_async("/bugreport/:id/edit", update_bug_report)
         .get_async("/test", test_all) // This might eventually be a "CI" test, but for now it just displays a message.
         .or_else_any_method_async("/", err_api_fallback) // TODO, this does not work.
         .run(req, env)
@@ -1196,9 +1197,8 @@ pub async fn add_bug_report(mut req: Request, ctx: RouteContext<()>) -> worker::
     }
 }
 
-/*  I don't think I actualyl need this ...
-pub async fn user_add_email(mut req: Request, ctx: RouteContext<()>) -> worker::Result<Response> {  
-    match ctx.env.d1(DB_NAME){
+pub async fn resolve_bug_report(mut req: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
+    match ctx.env.d1(DB_NAME) {
         Ok(db) => {
             let session_result = header_session_is_valid(&req, &db).await;
             if !session_result.0 {
@@ -1207,22 +1207,78 @@ pub async fn user_add_email(mut req: Request, ctx: RouteContext<()>) -> worker::
 
             let username = session_result.1;
 
-            match req.json::<EmailSubmission>().await {                                                        
-                Ok (email) => {
-                    // db_replace_email
-                    // send_email for confirmation
+            match db_fso::db_get_user_role(&username, &db).await {                 
+                Ok(authorizer_role) => {
+                    match authorizer_role {
+                        db_fso::UserRole::VIEWER => return err_insufficent_permissions().await,
+                        db_fso::UserRole::MAINTAINER => return err_insufficent_permissions().await,
+                        _=> (),
+                    }         
+                        match ctx.param("id"){
+                            Ok(id) => { 
+                                if id < 0 {
+                                    return err_specific("Invalid bug report id, cannot update.".to_string()).await;
+                                }
+
+                                match db_fso::db_generic_update_query(&db_fso::Table::BugReports, 0, &"1".to_string(), &id.to_string(),  &ctx).await {
+                                    Ok(_) => (),
+                                    Err(e) => return err_specific(e.to_string()).await,
+                                }
+
+                                return Response::ok("Success!")
+                            },
+
+                            Err(e) => return err_specific(e.to_string()).await,
+                        }
                 },
-                Err(_) => return err_bad_request().await,
-                }
-
-            
-
-            return err_api_under_construction().await
-        },
+                Err(e) => return err_specific(e.to_string()).await,
+            }
+        }
         Err(e) => return err_specific(e.to_string()).await,
     }
 }
- */
+
+
+pub async fn unresolve_bug_report(mut req: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
+    match ctx.env.d1(DB_NAME) {
+        Ok(db) => {
+            let session_result = header_session_is_valid(&req, &db).await;
+            if !session_result.0 {
+                return err_not_logged_in().await
+            }
+
+            let username = session_result.1;
+
+            match db_fso::db_get_user_role(&username, &db).await {                 
+                Ok(authorizer_role) => {
+                    match authorizer_role {
+                        db_fso::UserRole::VIEWER => return err_insufficent_permissions().await,
+                        db_fso::UserRole::MAINTAINER => return err_insufficent_permissions().await,
+                        _=> (),
+                    }         
+                        match ctx.param("id"){
+                            Ok(id) => { 
+                                if id < 0 {
+                                    return err_specific("Invalid bug report id, cannot update.".to_string()).await;
+                                }
+
+                                match db_fso::db_generic_update_query(&db_fso::Table::BugReports, 0, &"0".to_string(), &id.to_string(),  &ctx).await {
+                                    Ok(_) => (),
+                                    Err(e) => return err_specific(e.to_string()).await,
+                                }
+
+                                return Response::ok("Success!")
+                            },
+
+                            Err(e) => return err_specific(e.to_string()).await,
+                        }
+                },
+                Err(e) => return err_specific(e.to_string()).await,
+            }
+        }
+        Err(e) => return err_specific(e.to_string()).await,
+    }
+}
 
 
 
