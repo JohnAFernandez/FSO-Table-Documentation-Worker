@@ -97,7 +97,7 @@ async fn fetch(req: Request, env: Env, _ctx: Context,) -> worker::Result<Respons
         .get_async("/tables/restrictions", get_restrictions)
         .get_async("/tables/restrictions/:id", get_restriction)
         //.post_async("/tables/items/:id/restriction", post_restriction) // Requires login
-        //.patch_async("/tables/restriction/:id", update_restriction).put_async("/tables/restriction/:id", update_restriction) // Requires login
+        .patch_async("/tables/restriction/:id", update_restriction).put_async("/tables/restriction/:id", update_restriction) // Requires login
         //.delete_async("/tables/restrictions/:id", delete_restriction) // Requires login
         .get_async("/tables/deprecations", get_deprecations) 
         .get_async("/tables/deprecations/:id", get_deprecation)
@@ -1016,6 +1016,70 @@ pub async fn get_restriction(_: Request, ctx: RouteContext<()>) -> worker::Resul
             Err(e) => return err_specific(e.to_string()).await,
         },
         None => return err_specific("Internal Server Error, route parameter mismatch!".to_string()).await,
+    }
+}
+
+pub async fn update_restriction(mut req: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
+    match ctx.env.d1(DB_NAME) {
+        Ok(db) => {
+            let session_result = header_session_is_valid(&req, &db).await;
+            if !session_result.0 {
+                return err_not_logged_in().await
+            }
+
+            let username = session_result.1;
+
+            match db_fso::db_get_user_role(&username, &db).await {                 
+                Ok(authorizer_role) => {
+                    match authorizer_role {
+                        db_fso::UserRole::VIEWER => return err_insufficent_permissions().await,
+                        _=> (),
+                    }         
+
+                    match req.json::<db_fso::Restrictions>().await {
+                        Ok(restriction) => {
+                            if restriction.restriction_id < 0 {
+                                return err_specific("Invalid restriction id, cannot update.".to_string()).await;
+                            }
+
+                            match db_fso::db_generic_update_query(&db_fso::Table::Restrictions, 0, &restriction.illegal_value_float.to_string(), &restriction.restriction_id.to_string(),  &ctx).await {
+                                Ok(_) => (),
+                                Err(e) => return err_specific(e.to_string()).await,
+                            }    
+
+                            match db_fso::db_generic_update_query(&db_fso::Table::Restrictions, 1, &restriction.illegal_value_int.to_string(), &restriction.restriction_id.to_string(),  &ctx).await {
+                                Ok(_) => (),
+                                Err(e) => return err_specific(e.to_string()).await,
+                            }
+                            
+                            if restriction.max_string_length > -2 {
+                                match db_fso::db_generic_update_query(&db_fso::Table::Restrictions, 2, &restriction.max_string_length.to_string(), &restriction.restriction_id.to_string(),  &ctx).await {
+                                    Ok(_) => (),
+                                    Err(e) => return err_specific(e.to_string()).await,
+                                }    
+                            }
+
+                            match db_fso::db_generic_update_query(&db_fso::Table::Restrictions, 3, &restriction.max_value.to_string(), &restriction.restriction_id.to_string(),  &ctx).await {
+                                Ok(_) => (),
+                                Err(e) => return err_specific(e.to_string()).await,
+                            }    
+
+                            match db_fso::db_generic_update_query(&db_fso::Table::Restrictions, 4, &restriction.min_value.to_string(), &restriction.restriction_id.to_string(),  &ctx).await {
+                                Ok(_) => (),
+                                Err(e) => return err_specific(e.to_string()).await,
+                            }    
+
+                            return Response::ok("Success!")
+
+                        },
+                        Err(e) => return err_specific(e.to_string() + "\nMake sure that the request json has a restriction_id, , and description, even if not updating.  If not updating (parse_id cannot be updated) mark a string type with \"!!NO UPDATE!!\". Use -2 or a more negative number for ids. Echo back other values.").await,
+                    }
+                },
+                Err(e) => return err_specific(e.to_string()).await,
+            }
+
+        },
+        Err(e) => return err_specific(e.to_string()).await,
     }
 }
 
