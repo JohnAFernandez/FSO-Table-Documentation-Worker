@@ -114,6 +114,7 @@ async fn fetch(req: Request, env: Env, _ctx: Context,) -> worker::Result<Respons
         //.post_async("/tables/actions/:id:/reject", reject_request) // Requries login and admin
         .post_async("/bugreport", add_bug_report)
         .patch_async("/bugreport/:id/resolve", resolve_bug_report)
+        .patch_async("/bugreport/:id/acknowledge", acknowledge_bug_report)
         .patch_async("/bugreport/:id/unresolve", unresolve_bug_report)
         .patch_async("/bugreport/:id/edit", update_bug_report)
         .get_async("/test", test_all) // This might eventually be a "CI" test, but for now it just displays a message.
@@ -757,14 +758,14 @@ pub async fn update_parse_type(mut req: Request, ctx: RouteContext<()>) -> worke
                                 return err_specific("Invalid behavior id, cannot update.".to_string()).await;
                             }
 
-                            if parse_behavior.behavior != "!!NO UPDATE!!"{
+                            if parse_behavior.behavior != "~!!NO UPDATE!!~"{
                                 match db_fso::db_generic_update_query(&db_fso::Table::ParseBehaviors, 0, &parse_behavior.behavior, &parse_behavior.behavior_id.to_string(),  &ctx).await {
                                     Ok(_) => (),
                                     Err(e) => return err_specific(e.to_string()).await,
                                 }    
                             }
 
-                            if parse_behavior.description != "!!NO UPDATE!!"{
+                            if parse_behavior.description != "~!!NO UPDATE!!~"{
                                 match db_fso::db_generic_update_query(&db_fso::Table::ParseBehaviors, 1, &parse_behavior.description, &parse_behavior.behavior_id.to_string(),  &ctx).await {
                                     Ok(_) => (),
                                     Err(e) => return err_specific(e.to_string()).await,
@@ -774,7 +775,7 @@ pub async fn update_parse_type(mut req: Request, ctx: RouteContext<()>) -> worke
                             return Response::ok("Success!")
 
                         },
-                        Err(e) => return err_specific(e.to_string() + "\nMake sure that the request json has a behavior_id, behavior, and description, even if not updating.  If not updating (parse_id cannot be updated) mark a string type with \"!!NO UPDATE!!\". Use -2 or a more negative number for ids. Echo back other values.").await,
+                        Err(e) => return err_specific(e.to_string() + "\nMake sure that the request json has a behavior_id, behavior, and description, even if not updating.  If not updating a field (parse_id cannot be updated) mark a string type with \"~!!NO UPDATE!!~\". Use -2 or a more negative number for ids. Echo back other values.").await,
                     }
                 },
                 Err(e) => return err_specific(e.to_string()).await,
@@ -829,7 +830,7 @@ pub async fn update_item(mut req: Request, ctx: RouteContext<()>) -> worker::Res
                                 return err_specific("Invalid item id, cannot update.".to_string()).await;
                             }
 
-                            if item.default_value != "!!NO UPDATE!!"{
+                            if item.default_value != "~!!NO UPDATE!!~"{
                                 match db_fso::db_generic_update_query(&db_fso::Table::FsoItems, 0, &item.default_value, &item.item_id.to_string(),  &ctx).await {
                                     Ok(_) => (),
                                     Err(e) => return err_specific(e.to_string()).await,
@@ -843,28 +844,28 @@ pub async fn update_item(mut req: Request, ctx: RouteContext<()>) -> worker::Res
                                 }
                             }
 
-                            if item.documentation != "!!NO UPDATE!!"{
+                            if item.documentation != "~!!NO UPDATE!!~"{
                                 match db_fso::db_generic_update_query(&db_fso::Table::FsoItems, 2, &item.documentation, &item.item_id.to_string(),  &ctx).await {
                                     Ok(_) => (),
                                     Err(e) => return err_specific(e.to_string()).await,
                                 }
                             }
 
-                            if item.info_type != "!!NO UPDATE!!"{
+                            if item.info_type != "~!!NO UPDATE!!~"{
                                 match db_fso::db_generic_update_query(&db_fso::Table::FsoItems, 3, &item.info_type, &item.item_id.to_string(),  &ctx).await {
                                     Ok(_) => (),
                                     Err(e) => return err_specific(e.to_string()).await,
                                 }
                             }
 
-                            if item.item_text != "!!NO UPDATE!!"{
+                            if item.item_text != "~!!NO UPDATE!!~"{
                                 match db_fso::db_generic_update_query(&db_fso::Table::FsoItems, 4, &item.item_text, &item.item_id.to_string(),  &ctx).await {
                                     Ok(_) => (),
                                     Err(e) => return err_specific(e.to_string()).await,
                                 }
                             }
 
-                            if item.major_version != "!!NO UPDATE!!"{
+                            if item.major_version != "~!!NO UPDATE!!~"{
                                 match db_fso::db_generic_update_query(&db_fso::Table::FsoItems, 5, &item.major_version, &item.item_id.to_string(),  &ctx).await {
                                     Ok(_) => (),
                                     Err(e) => return err_specific(e.to_string()).await,
@@ -895,7 +896,7 @@ pub async fn update_item(mut req: Request, ctx: RouteContext<()>) -> worker::Res
                             return Response::ok("Success!")
 
                         },
-                        Err(e) => return err_specific(e.to_string() + "\nMake sure that the request json has an item_id, behavior, and description, even if not updating.  If not updating (id cannot be updated) mark a string type with \"!!NO UPDATE!!\". Use -2 or more negative number for ids for no update.  Echo back other values for no update.").await,
+                        Err(e) => return err_specific(e.to_string() + "\nMake sure that the request json has an item_id, behavior, and description, even if not updating.  If not updating a field (id cannot be updated) mark a string type with \"~!!NO UPDATE!!~\". Use -2 or more negative number for ids for no update.  Echo back other values for no update.").await,
                     }
                 },
                 Err(e) => return err_specific(e.to_string()).await,
@@ -971,7 +972,7 @@ pub async fn update_alias(mut req: Request, ctx: RouteContext<()>) -> worker::Re
                                 return err_specific("Invalid table alias id, cannot update.".to_string()).await;
                             }
 
-                            if table_alias.filename != "!!NO UPDATE!!"{
+                            if table_alias.filename != "~!!NO UPDATE!!~"{
                                 match db_fso::db_generic_update_query(&db_fso::Table::TableAliases, 0, &table_alias.filename, &table_alias.alias_id.to_string(),  &ctx).await {
                                     Ok(_) => (),
                                     Err(e) => return err_specific(e.to_string()).await,
@@ -988,7 +989,7 @@ pub async fn update_alias(mut req: Request, ctx: RouteContext<()>) -> worker::Re
                             return Response::ok("Success!")
 
                         },
-                        Err(e) => return err_specific(e.to_string() + "\nMake sure that the request json has an alias_id, filename, and table_id, even if not updating.  If not updating (parse_id cannot be updated) mark a string type with \"!!NO UPDATE!!\". Use -2 or a more negative number for ids. Echo back other values.").await,
+                        Err(e) => return err_specific(e.to_string() + "\nMake sure that the request json has an alias_id, filename, and table_id, even if not updating.  If not updating a field (parse_id cannot be updated) mark a string type with \"~!!NO UPDATE!!~\". Use -2 or a more negative number for ids. Echo back other values.").await,
                     }
                 },
                 Err(e) => return err_specific(e.to_string()).await,
@@ -1073,7 +1074,7 @@ pub async fn update_restriction(mut req: Request, ctx: RouteContext<()>) -> work
                             return Response::ok("Success!")
 
                         },
-                        Err(e) => return err_specific(e.to_string() + "\nMake sure that the request json has a restriction_id, illegal_value_float, illegal_value_int, max_string_length, max_value, min_value, and description, even if not updating.  If not updating (parse_id cannot be updated) mark a string type with \"!!NO UPDATE!!\". Use -2 or a more negative number for ids. Echo back other values.").await,
+                        Err(e) => return err_specific(e.to_string() + "\nMake sure that the request json has a restriction_id, illegal_value_float, illegal_value_int, max_string_length, max_value, min_value, and description, even if not updating.  If not updating a field (parse_id cannot be updated) mark a string type with \"~!!NO UPDATE!!~\". Use -2 or a more negative number for ids. Echo back other values.").await,
                     }
                 },
                 Err(e) => return err_specific(e.to_string()).await,
@@ -1128,14 +1129,14 @@ pub async fn update_deprecation(mut req: Request, ctx: RouteContext<()>) -> work
                                 return err_specific("Invalid deprecation id, cannot update.".to_string()).await;
                             }
 
-                            if deprecation.date != "!!NO UPDATE!!"{
+                            if deprecation.date != "~!!NO UPDATE!!~"{
                                 match db_fso::db_generic_update_query(&db_fso::Table::Deprecations, 0, &deprecation.date, &deprecation.deprecation_id.to_string(),  &ctx).await {
                                     Ok(_) => (),
                                     Err(e) => return err_specific(e.to_string()).await,
                                 }    
                             }
 
-                            if deprecation.version != "!!NO UPDATE!!"{
+                            if deprecation.version != "~!!NO UPDATE!!~"{
                                 match db_fso::db_generic_update_query(&db_fso::Table::Deprecations, 1, &deprecation.version, &deprecation.deprecation_id.to_string(),  &ctx).await {
                                     Ok(_) => (),
                                     Err(e) => return err_specific(e.to_string()).await,
@@ -1145,7 +1146,7 @@ pub async fn update_deprecation(mut req: Request, ctx: RouteContext<()>) -> work
                             return Response::ok("Success!")
 
                         },
-                        Err(e) => return err_specific(e.to_string() + "\nMake sure that the request json has a deprecation_id, date, and version, even if not updating.  If not updating (deprecation_id cannot be updated) mark a string type with \"!!NO UPDATE!!\". Use -2 or a more negative number for ids. Echo back other values.").await,
+                        Err(e) => return err_specific(e.to_string() + "\nMake sure that the request json has a deprecation_id, date, and version, even if not updating.  If not updating a field (deprecation_id cannot be updated) mark a string type with \"~!!NO UPDATE!!~\". Use -2 or a more negative number for ids. Echo back other values.").await,
                     }
                 },
                 Err(e) => return err_specific(e.to_string()).await,
@@ -1220,7 +1221,7 @@ pub async fn resolve_bug_report(mut req: Request, ctx: RouteContext<()>) -> work
                                     return err_specific("Invalid bug report id, cannot update.".to_string()).await;
                                 }
 
-                                match db_fso::db_generic_update_query(&db_fso::Table::BugReports, 0, &"1".to_string(), &id.to_string(),  &ctx).await {
+                                match db_fso::db_generic_update_query(&db_fso::Table::BugReports, 0, &"3".to_string(), &id.to_string(),  &ctx).await {
                                     Ok(_) => (),
                                     Err(e) => return err_specific(e.to_string()).await,
                                 }
@@ -1281,6 +1282,151 @@ pub async fn unresolve_bug_report(mut req: Request, ctx: RouteContext<()>) -> wo
 }
 
 
+pub async fn acknowledge_bug_report(mut req: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
+    match ctx.env.d1(DB_NAME) {
+        Ok(db) => {
+            let session_result = header_session_is_valid(&req, &db).await;
+            if !session_result.0 {
+                return err_not_logged_in().await
+            }
+
+            let username = session_result.1;
+
+            match db_fso::db_get_user_role(&username, &db).await {                 
+                Ok(authorizer_role) => {
+                    match authorizer_role {
+                        db_fso::UserRole::OWNER => administrator = true,
+                        db_fso::UserRole::ADMIN => administrator = true,
+                        _=> return err_specific("Only administrators can acknowledge bug reports".to_string()).await,
+                    }         
+                },
+                Err(e) => return err_specific(e.to_string()).await,
+            }
+
+            match ctx.param("id"){
+                Ok(id) => { 
+                    if id < 0 {
+                        return err_specific("Invalid bug report id, cannot update.".to_string()).await;
+                    }
+
+                    match db_fso::db_generic_search_query(&db_fso::Table::BugReports, 0, &id, &"".to_string(), &ctx).await {
+                        Ok(bug_report_result) => {
+                            if bug_report_result.bug_reports.is_empty() {
+                                return err_specifc("Could not find a matching bug report.".to_string());
+                            }
+
+                        },
+                        Err(e) => return err_specific(e.to_string()).await,
+                    }
+
+                    match db_fso::db_generic_update_query(&db_fso::Table::BugReports, 0, &"1".to_string(), &id.to_string(),  &ctx).await {
+                        Ok(_) => (),
+                        Err(e) => return err_specific(e.to_string()).await,
+                    }
+
+                    return Response::ok("Success!")
+                },
+
+                Err(e) => return err_specific(e.to_string()).await,
+            }
+
+        }
+        Err(e) => return err_specific(e.to_string()).await,
+    }
+}
+
+
+
+#[derive(Serialize, Deserialize)]
+pub struct BugReportInfo{
+    bug_type : String,
+    description: String,
+}
+
+pub async fn update_bug_report(mut req: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
+    match ctx.env.d1(DB_NAME) {
+        Ok(db) => {
+            let session_result = header_session_is_valid(&req, &db).await;
+            if !session_result.0 {
+                return err_not_logged_in().await
+            }
+
+            let username = session_result.1;
+            let mut administrator = false;
+
+            match db_fso::db_get_user_role(&username, &db).await {                 
+                Ok(authorizer_role) => {
+                    match db_fso::db_get_user_role(&username, &db).await {                 
+                        Ok(authorizer_role) => {
+                            match authorizer_role {
+                                db_fso::UserRole::OWNER => administrator = true,
+                                db_fso::UserRole::ADMIN => administrator = true,
+                                _=> (),
+                            }         
+                        },
+                        Err(e) => return err_specific(e.to_string()).await,
+                    }
+                },
+                Err(e) => return err_specific(e.to_string()).await,
+            }
+
+            let bug_id = -1; 
+
+            // MAJOR TODO!!! getting the id from the URL, we have not been checking that the id is numeric, so we need to go back and verify those are correct.
+            // Here is an example of it done correctly, below.
+            match ctx.param("id"){
+                Some(id) => { 
+                    match id.parse::<i32>() {
+                        Ok(parsed) => bug_id = parsed,
+                        Err(e) => return err_specific("Invalid bug report id, cannot update.".to_string()).await,
+                    }
+                },
+                None() => return err_specific("Invalid bug report id, cannot update.".to_string()).await,
+            }
+
+            if !administrator {
+                match db_fso::db_generic_search_query(&db_fso::Table::Users, 2, &username, &"".to_string(), &ctx) {
+                    Ok(user_result) => {
+                        if (bug_report_result.users.is_empty()){
+                            return err_specific("Could not find a matching user for the username logged in somehow.".to_string()).await
+                        }
+
+                        if (bug_report_result.users[0].id != bug_report_result.bug_reports[0].user_id) {
+                            return err_specific("Only the reporter of a bug or an administrator can edit the contents of a bug report.".to_string()).await
+                        }
+                    },
+                    Err(e) => return err_specific(e.to_string()).await,
+                }
+            }
+
+
+
+            match req.json::<BugReportInfo>().await {
+                Ok(bug_info) => {
+                    if bug_info.bug_type != "~!!NO UPDATE!!~"{
+                        match db_fso::db_generic_update_query(&db_fso::Table::BugReports, 1, &bug_info.bug_type, &bug_id.to_string(),  &ctx).await {
+                            Ok(_) => (),
+                            Err(e) => return err_specific(e.to_string()).await,
+                        }    
+                    }
+
+                    if bug_info.description != "~!!NO UPDATE!!~"{
+                        match db_fso::db_generic_update_query(&db_fso::Table::BugReports, 2, &bug_info.description, &bug_id.to_string(),  &ctx).await {
+                            Ok(_) => (),
+                            Err(e) => return err_specific(e.to_string()).await,
+                        }
+                    }
+
+                    return Response::ok("Success!")
+
+                },
+                Err(e) => return err_specific(e.to_string() + "\nMake sure that the request json has an bug_type, and description, even if not updating.  If not updating a field (parse_id cannot be updated) mark a string type with \"~!!NO UPDATE!!~\". Use -2 or a more negative number for ids. Echo back other values.").await,
+            }
+
+        },
+        Err(e) => return err_specific(e.to_string()).await,
+    }
+}
 
 // SECTION!! generic server tasks
 pub async fn  header_has_token(req: &Request) -> Option<worker::Result<Response>> {
