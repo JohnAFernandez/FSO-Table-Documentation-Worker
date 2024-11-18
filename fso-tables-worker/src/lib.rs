@@ -102,7 +102,7 @@ async fn fetch(req: Request, env: Env, _ctx: Context,) -> worker::Result<Respons
         .get_async("/tables/deprecations", get_deprecations) 
         .get_async("/tables/deprecations/:id", get_deprecation)
         //.post_async("/tables/deprecations", post_deprecation) // Requires login
-        //.patch_async("/tables/deprecations/:id", update_deprecation).put_async("/tables/deprecations/:id", update_deprecation) // Requires login
+        .patch_async("/tables/deprecations", update_deprecation).put_async("/tables/deprecations", update_deprecation) // Requires login
         //.delete_async("/tables/deprecations/:id", delete_deprecation) // Requires login
         //.get_async("/tables/actions/history", get_completed_history) // Requires login
         //.get_async("/tables/actions/history/:id", get_completed_user_history) // Requires login
@@ -1072,7 +1072,7 @@ pub async fn update_restriction(mut req: Request, ctx: RouteContext<()>) -> work
                             return Response::ok("Success!")
 
                         },
-                        Err(e) => return err_specific(e.to_string() + "\nMake sure that the request json has a restriction_id, , and description, even if not updating.  If not updating (parse_id cannot be updated) mark a string type with \"!!NO UPDATE!!\". Use -2 or a more negative number for ids. Echo back other values.").await,
+                        Err(e) => return err_specific(e.to_string() + "\nMake sure that the request json has a restriction_id, illegal_value_float, illegal_value_int, max_string_length, max_value, min_value, and description, even if not updating.  If not updating (parse_id cannot be updated) mark a string type with \"!!NO UPDATE!!\". Use -2 or a more negative number for ids. Echo back other values.").await,
                     }
                 },
                 Err(e) => return err_specific(e.to_string()).await,
@@ -1101,6 +1101,57 @@ pub async fn get_deprecation(_: Request, ctx: RouteContext<()>) -> worker::Resul
             Err(e) => return err_specific(e.to_string()).await,
         },
         None => return err_specific("Internal Server Error, route parameter mismatch!".to_string()).await,
+    }
+}
+
+pub async fn update_deprecation(mut req: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
+    match ctx.env.d1(DB_NAME) {
+        Ok(db) => {
+            let session_result = header_session_is_valid(&req, &db).await;
+            if !session_result.0 {
+                return err_not_logged_in().await
+            }
+
+            let username = session_result.1;
+
+            match db_fso::db_get_user_role(&username, &db).await {                 
+                Ok(authorizer_role) => {
+                    match authorizer_role {
+                        db_fso::UserRole::VIEWER => return err_insufficent_permissions().await,
+                        _=> (),
+                    }         
+
+                    match req.json::<db_fso::Deprecations>().await {
+                        Ok(deprecation) => {
+                            if deprecation.deprecation_id < 0 {
+                                return err_specific("Invalid deprecation id, cannot update.".to_string()).await;
+                            }
+
+                            if deprecation.date != "!!NO UPDATE!!"{
+                                match db_fso::db_generic_update_query(&db_fso::Table::Deprecations, 0, &deprecation.date, &deprecation.deprecation_id.to_string(),  &ctx).await {
+                                    Ok(_) => (),
+                                    Err(e) => return err_specific(e.to_string()).await,
+                                }    
+                            }
+
+                            if deprecation.version != "!!NO UPDATE!!"{
+                                match db_fso::db_generic_update_query(&db_fso::Table::Deprecations, 1, &deprecation.version, &deprecation.deprecation_id.to_string(),  &ctx).await {
+                                    Ok(_) => (),
+                                    Err(e) => return err_specific(e.to_string()).await,
+                                }
+                            }
+
+                            return Response::ok("Success!")
+
+                        },
+                        Err(e) => return err_specific(e.to_string() + "\nMake sure that the request json has a deprecation_id, date, and version, even if not updating.  If not updating (deprecation_id cannot be updated) mark a string type with \"!!NO UPDATE!!\". Use -2 or a more negative number for ids. Echo back other values.").await,
+                    }
+                },
+                Err(e) => return err_specific(e.to_string()).await,
+            }
+
+        },
+        Err(e) => return err_specific(e.to_string()).await,
     }
 }
 
