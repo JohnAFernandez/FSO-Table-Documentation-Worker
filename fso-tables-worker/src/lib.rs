@@ -1,6 +1,6 @@
 use std::io::Read;
 
-use db_fso::db_generic_search_query;
+use db_fso::{db_generic_delete, db_generic_search_query};
 use serde::{Deserialize, Serialize};
 use worker::*;
 use email_address::*;
@@ -80,7 +80,7 @@ async fn fetch(req: Request, env: Env, _ctx: Context,) -> worker::Result<Respons
         .get_async("/tables/parse-types/:id", get_parse_type)
         //.post_async("/tables/parse-types", post_parse_behavior)
         .patch_async("/tables/parse-types", update_parse_type).put_async("/tables/parse-types", update_parse_type)
-        //.delete_async("/tables/parse-types/:id", delete_parse_type) // Admin only
+        .delete_async("/tables/parse-types/:id", delete_parse_type) // Admin only
         .get_async("/tables", get_tables) // tables just need to be done manually on my end, because we don't have many tables *and* it's less effort than just populating.
         .get_async("/tables/items", get_items)
         .get_async("/tables/items/:id", get_item)
@@ -782,6 +782,48 @@ pub async fn update_parse_type(mut req: Request, ctx: RouteContext<()>) -> worke
             }
 
         },
+        Err(e) => return err_specific(e.to_string()).await,
+    }
+}
+
+pub async fn delete_parse_type(req: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
+    match ctx.env.d1(DB_NAME) {
+        Ok(db) => {
+            let session_result = header_session_is_valid(&req, &db).await;
+            if !session_result.0 {
+                return err_not_logged_in().await
+            }
+
+            let username = session_result.1;
+
+            match db_fso::db_get_user_role(&username, &db).await {                 
+                Ok(authorizer_role) => {
+                    match authorizer_role {
+                        db_fso::UserRole::VIEWER => return err_insufficent_permissions().await,
+                        db_fso::UserRole::MAINTAINER => return err_insufficent_permissions().await,
+                        _=> {},
+                    }         
+                },
+                Err(e) => return err_specific(e.to_string()).await,
+            }
+
+            match ctx.param("id"){
+                Some(id) => {
+                    match id.parse::<i32>(){
+                        Ok(_) =>{
+                            match db_fso::db_generic_delete(db_fso::Table::ParseBehaviors, id, &ctx).await {
+                                Ok(_) => return Response::ok("Success!"),
+                                Err(e) => return err_specific(e.to_string()).await,
+                            }
+                            
+                        },
+                        Err(_) => return err_specific("Could not parse the parse behavior id as an integer, please resubmit!".to_string()).await,
+                    }
+                },
+                None => return err_specific("Please provide a parse behavior id to delete, and then resubmit.".to_string()).await,
+            }
+        },
+
         Err(e) => return err_specific(e.to_string()).await,
     }
 }
