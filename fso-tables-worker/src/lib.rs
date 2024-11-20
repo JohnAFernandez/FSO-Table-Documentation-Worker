@@ -80,30 +80,30 @@ async fn fetch(req: Request, env: Env, _ctx: Context,) -> worker::Result<Respons
         .get_async("/tables/parse-types/:id", get_parse_type)
         //.post_async("/tables/parse-types", post_parse_behavior)
         .patch_async("/tables/parse-types", update_parse_type).put_async("/tables/parse-types", update_parse_type)
-        //.delete_async("/tables/parse-types/:id", delete_parse_type)
+        //.delete_async("/tables/parse-types/:id", delete_parse_type) // Admin only
         .get_async("/tables", get_tables) // tables just need to be done manually on my end, because we don't have many tables *and* it's less effort than just populating.
         .get_async("/tables/items", get_items)
         .get_async("/tables/items/:id", get_item)
         //.post_async("/tables/items", post_item) // Requires login
         .patch_async("/tables/items", update_item).put_async("/tables/items", update_item) //Requires login 
-        //.delete_async("/tables/items/:id", delete_item)
+        //.delete_async("/tables/items/:id", delete_item) // Admin only
         .get_async("/tables/aliases", get_aliases)
         .get_async("/tables/aliases/:id", get_alias) 
         //.post_async("/tables/:id/alias", post_alias) // Requires login
         .patch_async("/tables/aliases/:id", update_alias).put_async("/tables/aliases/:id", update_alias) // Requires login
-        //.delete_alias("/tables/aliases/:id", delete_alias)
+        //.delete_alias("/tables/aliases/:id", delete_alias) // Admin only
         .get_async("/tables/:id", get_table)
         //.get_async("/tables/:id/items", get_tables_items)
         .get_async("/tables/restrictions", get_restrictions)
         .get_async("/tables/restrictions/:id", get_restriction)
         //.post_async("/tables/items/:id/restriction", post_restriction) // Requires login
         .patch_async("/tables/restriction/:id", update_restriction).put_async("/tables/restriction/:id", update_restriction) // Requires login
-        //.delete_async("/tables/restrictions/:id", delete_restriction) // Requires login
+        //.delete_async("/tables/restrictions/:id", delete_restriction) // Admin only
         .get_async("/tables/deprecations", get_deprecations) 
         .get_async("/tables/deprecations/:id", get_deprecation)
         //.post_async("/tables/deprecations", post_deprecation) // Requires login
         .patch_async("/tables/deprecations", update_deprecation).put_async("/tables/deprecations", update_deprecation) // Requires login
-        //.delete_async("/tables/deprecations/:id", delete_deprecation) // Requires login
+        //.delete_async("/tables/deprecations/:id", delete_deprecation) // Admin only
         //.get_async("/tables/actions/history", get_completed_history) // Requires login
         //.get_async("/tables/actions/history/:id", get_completed_user_history) // Requires login
         //.get_async("/tables/actions/approvals", get_approval_requests) // Requires login
