@@ -1198,7 +1198,7 @@ pub async fn add_bug_report(mut req: Request, ctx: RouteContext<()>) -> worker::
     }
 }
 
-pub async fn resolve_bug_report(mut req: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
+pub async fn resolve_bug_report(req: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
     match ctx.env.d1(DB_NAME) {
         Ok(db) => {
             let session_result = header_session_is_valid(&req, &db).await;
@@ -1215,22 +1215,26 @@ pub async fn resolve_bug_report(mut req: Request, ctx: RouteContext<()>) -> work
                         db_fso::UserRole::MAINTAINER => return err_insufficent_permissions().await,
                         _=> (),
                     }         
-                        match ctx.param("id"){
-                            Ok(id) => { 
-                                if id < 0 {
-                                    return err_specific("Invalid bug report id, cannot update.".to_string()).await;
+                    match ctx.param("id"){
+                        Some(id) => {
+                            match id.parse::<i32>(){
+                                Ok(parsed_id) =>{
+                                    if parsed_id < 0 {
+                                        return err_specific("Invalid bug report id, cannot update.".to_string()).await;
+                                    }
+
+                                    match db_fso::db_generic_update_query(&db_fso::Table::BugReports, 0, &"3".to_string(), &id,  &ctx).await {
+                                        Ok(_) => (),
+                                        Err(e) => return err_specific(e.to_string()).await,
+                                    }
+                                
+                                    return Response::ok("Success!")
                                 }
-
-                                match db_fso::db_generic_update_query(&db_fso::Table::BugReports, 0, &"3".to_string(), &id.to_string(),  &ctx).await {
-                                    Ok(_) => (),
-                                    Err(e) => return err_specific(e.to_string()).await,
-                                }
-
-                                return Response::ok("Success!")
-                            },
-
-                            Err(e) => return err_specific(e.to_string()).await,
-                        }
+                                Err(_) => return err_specific("Bug report id cannot be parsed as an integer, please resubmit your request.".to_string()).await,
+                            }
+                        },
+                        None => return err_specific("Please submit an id in the url as part of the request to acknowledge a bug report.".to_string()).await,
+                    }
                 },
                 Err(e) => return err_specific(e.to_string()).await,
             }
@@ -1240,7 +1244,7 @@ pub async fn resolve_bug_report(mut req: Request, ctx: RouteContext<()>) -> work
 }
 
 
-pub async fn unresolve_bug_report(mut req: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
+pub async fn unresolve_bug_report(req: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
     match ctx.env.d1(DB_NAME) {
         Ok(db) => {
             let session_result = header_session_is_valid(&req, &db).await;
@@ -1257,22 +1261,28 @@ pub async fn unresolve_bug_report(mut req: Request, ctx: RouteContext<()>) -> wo
                         db_fso::UserRole::MAINTAINER => return err_insufficent_permissions().await,
                         _=> (),
                     }         
-                        match ctx.param("id"){
-                            Ok(id) => { 
-                                if id < 0 {
-                                    return err_specific("Invalid bug report id, cannot update.".to_string()).await;
-                                }
 
-                                match db_fso::db_generic_update_query(&db_fso::Table::BugReports, 0, &"0".to_string(), &id.to_string(),  &ctx).await {
-                                    Ok(_) => (),
-                                    Err(e) => return err_specific(e.to_string()).await,
-                                }
+                    match ctx.param("id"){
+                        Some(id) => {
+                            match id.parse::<i32>(){
+                                Ok(parsed_id) =>{
+                                    if parsed_id < 0 {
+                                            return err_specific("Invalid bug report id, cannot update.".to_string()).await;
+                                    }
 
-                                return Response::ok("Success!")
-                            },
+                                    match db_fso::db_generic_update_query(&db_fso::Table::BugReports, 0, &"0".to_string(), &id.to_string(),  &ctx).await {
+                                        Ok(_) => (),
+                                        Err(e) => return err_specific(e.to_string()).await,
+                                    }
 
-                            Err(e) => return err_specific(e.to_string()).await,
+                                    return Response::ok("Success!")
+                                },
+
+                                Err(_) => return err_specific("Bug report id cannot be parsed as an integer, please resubmit your request.".to_string()).await,
+                            }
                         }
+                        None => return err_specific("Please submit an id in the url as part of the request to acknowledge a bug report.".to_string()).await,
+                    }
                 },
                 Err(e) => return err_specific(e.to_string()).await,
             }
@@ -1282,7 +1292,7 @@ pub async fn unresolve_bug_report(mut req: Request, ctx: RouteContext<()>) -> wo
 }
 
 
-pub async fn acknowledge_bug_report(mut req: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
+pub async fn acknowledge_bug_report(req: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
     match ctx.env.d1(DB_NAME) {
         Ok(db) => {
             let session_result = header_session_is_valid(&req, &db).await;
@@ -1295,8 +1305,8 @@ pub async fn acknowledge_bug_report(mut req: Request, ctx: RouteContext<()>) -> 
             match db_fso::db_get_user_role(&username, &db).await {                 
                 Ok(authorizer_role) => {
                     match authorizer_role {
-                        db_fso::UserRole::OWNER => administrator = true,
-                        db_fso::UserRole::ADMIN => administrator = true,
+                        db_fso::UserRole::OWNER => (),
+                        db_fso::UserRole::ADMIN => (),
                         _=> return err_specific("Only administrators can acknowledge bug reports".to_string()).await,
                     }         
                 },
@@ -1304,30 +1314,36 @@ pub async fn acknowledge_bug_report(mut req: Request, ctx: RouteContext<()>) -> 
             }
 
             match ctx.param("id"){
-                Ok(id) => { 
-                    if id < 0 {
-                        return err_specific("Invalid bug report id, cannot update.".to_string()).await;
-                    }
-
-                    match db_fso::db_generic_search_query(&db_fso::Table::BugReports, 0, &id, &"".to_string(), &ctx).await {
-                        Ok(bug_report_result) => {
-                            if bug_report_result.bug_reports.is_empty() {
-                                return err_specifc("Could not find a matching bug report.".to_string());
+                Some(id) => {
+                    match id.parse::<i32>(){
+                        Ok(parsed_id) =>{
+                            if parsed_id < 0 {
+                                return err_specific("Invalid bug report id, cannot update.".to_string()).await;
                             }
-
+        
+                            match db_fso::db_generic_search_query(&db_fso::Table::BugReports, 0, &id, &"".to_string(), &ctx).await {
+                                Ok(bug_report_result) => {
+                                    if bug_report_result.bug_reports.is_empty() {
+                                        return err_specific("Could not find a matching bug report.".to_string()).await;
+                                    }
+        
+                                },
+                                Err(e) => return err_specific(e.to_string()).await,
+                            }
+        
+                            match db_fso::db_generic_update_query(&db_fso::Table::BugReports, 0, &"1".to_string(), &id.to_string(),  &ctx).await {
+                                Ok(_) => (),
+                                Err(e) => return err_specific(e.to_string()).await,
+                            }
+        
+                            return Response::ok("Success!")
                         },
-                        Err(e) => return err_specific(e.to_string()).await,
+                        Err(_) => return err_specific("Bug report id cannot be parsed as an integer, please resubmit your request.".to_string()).await,
                     }
-
-                    match db_fso::db_generic_update_query(&db_fso::Table::BugReports, 0, &"1".to_string(), &id.to_string(),  &ctx).await {
-                        Ok(_) => (),
-                        Err(e) => return err_specific(e.to_string()).await,
-                    }
-
-                    return Response::ok("Success!")
+                    
                 },
 
-                Err(e) => return err_specific(e.to_string()).await,
+                None => return err_specific("Please submit an id in the url as part of the request to acknowledge a bug report.".to_string()).await,
             }
 
         }
@@ -1356,21 +1372,16 @@ pub async fn update_bug_report(mut req: Request, ctx: RouteContext<()>) -> worke
 
             match db_fso::db_get_user_role(&username, &db).await {                 
                 Ok(authorizer_role) => {
-                    match db_fso::db_get_user_role(&username, &db).await {                 
-                        Ok(authorizer_role) => {
-                            match authorizer_role {
-                                db_fso::UserRole::OWNER => administrator = true,
-                                db_fso::UserRole::ADMIN => administrator = true,
-                                _=> (),
-                            }         
-                        },
-                        Err(e) => return err_specific(e.to_string()).await,
-                    }
-                },
+                    match authorizer_role {
+                        db_fso::UserRole::OWNER => administrator = true,
+                        db_fso::UserRole::ADMIN => administrator = true,
+                        _=> (),
+                    }         
+                },                
                 Err(e) => return err_specific(e.to_string()).await,
             }
 
-            let bug_id = -1; 
+            let bug_id: i32; 
 
             // MAJOR TODO!!! getting the id from the URL, we have not been checking that the id is numeric, so we need to go back and verify those are correct.
             // Here is an example of it done correctly, below.
@@ -1378,21 +1389,26 @@ pub async fn update_bug_report(mut req: Request, ctx: RouteContext<()>) -> worke
                 Some(id) => { 
                     match id.parse::<i32>() {
                         Ok(parsed) => bug_id = parsed,
-                        Err(e) => return err_specific("Invalid bug report id, cannot update.".to_string()).await,
+                        Err(_) => return err_specific("Cannot parse the supplied bug report id.".to_string()).await,
                     }
                 },
-                None() => return err_specific("Invalid bug report id, cannot update.".to_string()).await,
+                None => return err_specific("Invalid bug report id, cannot update.".to_string()).await,
             }
 
             if !administrator {
-                match db_fso::db_generic_search_query(&db_fso::Table::Users, 2, &username, &"".to_string(), &ctx) {
+                match db_fso::db_generic_search_query(&db_fso::Table::Users, 2, &username, &"".to_string(), &ctx).await {
                     Ok(user_result) => {
-                        if (bug_report_result.users.is_empty()){
-                            return err_specific("Could not find a matching user for the username logged in somehow.".to_string()).await
+                        if user_result.users.is_empty(){
+                            return err_specific("Could not find a matching user for the username logged in somehow. You should probably submit a new bug report.".to_string()).await
                         }
 
-                        if (bug_report_result.users[0].id != bug_report_result.bug_reports[0].user_id) {
-                            return err_specific("Only the reporter of a bug or an administrator can edit the contents of a bug report.".to_string()).await
+                        match db_fso::db_generic_search_query(&db_fso::Table::BugReports, 1, &bug_id.to_string(), &"".to_string(), &ctx).await {
+                            Ok(bug_report_result) => {
+                                if user_result.users[0].id != bug_report_result.bug_reports[0].user_id {
+                                    return err_specific("Only the reporter of a bug or an administrator can edit the contents of a bug report.".to_string()).await
+                                }
+                            }
+                            Err(e) => return err_specific(e.to_string()).await,
                         }
                     },
                     Err(e) => return err_specific(e.to_string()).await,
