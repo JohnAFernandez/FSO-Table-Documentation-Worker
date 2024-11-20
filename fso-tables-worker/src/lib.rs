@@ -86,24 +86,24 @@ async fn fetch(req: Request, env: Env, _ctx: Context,) -> worker::Result<Respons
         .get_async("/tables/items/:id", get_item)
         //.post_async("/tables/items", post_item) // Requires login
         .patch_async("/tables/items", update_item).put_async("/tables/items", update_item) //Requires login 
-        //.delete_async("/tables/items/:id", delete_item) // Admin only
+        .delete_async("/tables/items/:id", delete_item) // Admin only
         .get_async("/tables/aliases", get_aliases)
         .get_async("/tables/aliases/:id", get_alias) 
         //.post_async("/tables/:id/alias", post_alias) // Requires login
         .patch_async("/tables/aliases/:id", update_alias).put_async("/tables/aliases/:id", update_alias) // Requires login
-        //.delete_alias("/tables/aliases/:id", delete_alias) // Admin only
+        .delete_async("/tables/aliases/:id", delete_alias) // Admin only
         .get_async("/tables/:id", get_table)
         //.get_async("/tables/:id/items", get_tables_items)
         .get_async("/tables/restrictions", get_restrictions)
         .get_async("/tables/restrictions/:id", get_restriction)
         //.post_async("/tables/items/:id/restriction", post_restriction) // Requires login
         .patch_async("/tables/restriction/:id", update_restriction).put_async("/tables/restriction/:id", update_restriction) // Requires login
-        //.delete_async("/tables/restrictions/:id", delete_restriction) // Admin only
+        .delete_async("/tables/restrictions/:id", delete_restriction) // Admin only
         .get_async("/tables/deprecations", get_deprecations) 
         .get_async("/tables/deprecations/:id", get_deprecation)
         //.post_async("/tables/deprecations", post_deprecation) // Requires login
         .patch_async("/tables/deprecations", update_deprecation).put_async("/tables/deprecations", update_deprecation) // Requires login
-        //.delete_async("/tables/deprecations/:id", delete_deprecation) // Admin only
+        .delete_async("/tables/deprecations/:id", delete_deprecation) // Admin only
         //.get_async("/tables/actions/history", get_completed_history) // Requires login
         //.get_async("/tables/actions/history/:id", get_completed_user_history) // Requires login
         //.get_async("/tables/actions/approvals", get_approval_requests) // Requires login
@@ -949,6 +949,48 @@ pub async fn update_item(mut req: Request, ctx: RouteContext<()>) -> worker::Res
     }
 }
 
+pub async fn delete_item(req: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
+    match ctx.env.d1(DB_NAME) {
+        Ok(db) => {
+            let session_result = header_session_is_valid(&req, &db).await;
+            if !session_result.0 {
+                return err_not_logged_in().await
+            }
+
+            let username = session_result.1;
+
+            match db_fso::db_get_user_role(&username, &db).await {                 
+                Ok(authorizer_role) => {
+                    match authorizer_role {
+                        db_fso::UserRole::VIEWER => return err_insufficent_permissions().await,
+                        db_fso::UserRole::MAINTAINER => return err_insufficent_permissions().await,
+                        _=> {},
+                    }         
+                },
+                Err(e) => return err_specific(e.to_string()).await,
+            }
+
+            match ctx.param("id"){
+                Some(id) => {
+                    match id.parse::<i32>(){
+                        Ok(_) =>{
+                            match db_fso::db_generic_delete(db_fso::Table::FsoItems, id, &ctx).await {
+                                Ok(_) => return Response::ok("Success!"),
+                                Err(e) => return err_specific(e.to_string()).await,
+                            }
+                            
+                        },
+                        Err(_) => return err_specific("Could not parse the item id as an integer, please resubmit!".to_string()).await,
+                    }
+                },
+                None => return err_specific("Please provide a item id to delete, and then resubmit.".to_string()).await,
+            }
+        },
+
+        Err(e) => return err_specific(e.to_string()).await,
+    }
+}
+
 pub async fn get_tables(_: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
     match db_fso::db_generic_search_query(&db_fso::Table::FsoTables, 0, &"".to_string(), &"".to_string(), &ctx).await {
         Ok(result) => {
@@ -1042,6 +1084,48 @@ pub async fn update_alias(mut req: Request, ctx: RouteContext<()>) -> worker::Re
     }
 }
 
+pub async fn delete_alias(req: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
+    match ctx.env.d1(DB_NAME) {
+        Ok(db) => {
+            let session_result = header_session_is_valid(&req, &db).await;
+            if !session_result.0 {
+                return err_not_logged_in().await
+            }
+
+            let username = session_result.1;
+
+            match db_fso::db_get_user_role(&username, &db).await {                 
+                Ok(authorizer_role) => {
+                    match authorizer_role {
+                        db_fso::UserRole::VIEWER => return err_insufficent_permissions().await,
+                        db_fso::UserRole::MAINTAINER => return err_insufficent_permissions().await,
+                        _=> {},
+                    }         
+                },
+                Err(e) => return err_specific(e.to_string()).await,
+            }
+
+            match ctx.param("id"){
+                Some(id) => {
+                    match id.parse::<i32>(){
+                        Ok(_) =>{
+                            match db_fso::db_generic_delete(db_fso::Table::TableAliases, id, &ctx).await {
+                                Ok(_) => return Response::ok("Success!"),
+                                Err(e) => return err_specific(e.to_string()).await,
+                            }
+                            
+                        },
+                        Err(_) => return err_specific("Could not parse the alias id as an integer, please resubmit!".to_string()).await,
+                    }
+                },
+                None => return err_specific("Please provide a alias id to delete, and then resubmit.".to_string()).await,
+            }
+        },
+
+        Err(e) => return err_specific(e.to_string()).await,
+    }
+}
+
 pub async fn get_restrictions(_: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
     match db_fso::db_generic_search_query(&db_fso::Table::Restrictions, 0, &"".to_string(), &"".to_string(), &ctx).await {
         Ok(result) => {
@@ -1127,6 +1211,48 @@ pub async fn update_restriction(mut req: Request, ctx: RouteContext<()>) -> work
     }
 }
 
+pub async fn delete_restriction(req: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
+    match ctx.env.d1(DB_NAME) {
+        Ok(db) => {
+            let session_result = header_session_is_valid(&req, &db).await;
+            if !session_result.0 {
+                return err_not_logged_in().await
+            }
+
+            let username = session_result.1;
+
+            match db_fso::db_get_user_role(&username, &db).await {                 
+                Ok(authorizer_role) => {
+                    match authorizer_role {
+                        db_fso::UserRole::VIEWER => return err_insufficent_permissions().await,
+                        db_fso::UserRole::MAINTAINER => return err_insufficent_permissions().await,
+                        _=> {},
+                    }         
+                },
+                Err(e) => return err_specific(e.to_string()).await,
+            }
+
+            match ctx.param("id"){
+                Some(id) => {
+                    match id.parse::<i32>(){
+                        Ok(_) =>{
+                            match db_fso::db_generic_delete(db_fso::Table::Restrictions, id, &ctx).await {
+                                Ok(_) => return Response::ok("Success!"),
+                                Err(e) => return err_specific(e.to_string()).await,
+                            }
+                            
+                        },
+                        Err(_) => return err_specific("Could not parse the restriction id as an integer, please resubmit!".to_string()).await,
+                    }
+                },
+                None => return err_specific("Please provide a restriction id to delete, and then resubmit.".to_string()).await,
+            }
+        },
+
+        Err(e) => return err_specific(e.to_string()).await,
+    }
+}
+
 pub async fn get_deprecations(_: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
     match db_fso::db_generic_search_query(&db_fso::Table::Deprecations, 0, &"".to_string(), &"".to_string(), &ctx).await {
         Ok(result) => {
@@ -1195,6 +1321,48 @@ pub async fn update_deprecation(mut req: Request, ctx: RouteContext<()>) -> work
             }
 
         },
+        Err(e) => return err_specific(e.to_string()).await,
+    }
+}
+
+pub async fn delete_deprecation(req: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
+    match ctx.env.d1(DB_NAME) {
+        Ok(db) => {
+            let session_result = header_session_is_valid(&req, &db).await;
+            if !session_result.0 {
+                return err_not_logged_in().await
+            }
+
+            let username = session_result.1;
+
+            match db_fso::db_get_user_role(&username, &db).await {                 
+                Ok(authorizer_role) => {
+                    match authorizer_role {
+                        db_fso::UserRole::VIEWER => return err_insufficent_permissions().await,
+                        db_fso::UserRole::MAINTAINER => return err_insufficent_permissions().await,
+                        _=> {},
+                    }         
+                },
+                Err(e) => return err_specific(e.to_string()).await,
+            }
+
+            match ctx.param("id"){
+                Some(id) => {
+                    match id.parse::<i32>(){
+                        Ok(_) =>{
+                            match db_fso::db_generic_delete(db_fso::Table::ParseBehaviors, id, &ctx).await {
+                                Ok(_) => return Response::ok("Success!"),
+                                Err(e) => return err_specific(e.to_string()).await,
+                            }
+                            
+                        },
+                        Err(_) => return err_specific("Could not parse the deprecation id as an integer, please resubmit!".to_string()).await,
+                    }
+                },
+                None => return err_specific("Please provide a deprecation id to delete, and then resubmit.".to_string()).await,
+            }
+        },
+
         Err(e) => return err_specific(e.to_string()).await,
     }
 }
