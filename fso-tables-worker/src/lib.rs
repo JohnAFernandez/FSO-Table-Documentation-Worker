@@ -22,7 +22,7 @@ mod db_fso;
 const DB_NAME: &str = "fso_table_database";    
 const DB_ALLOWED_PASSWORD_CHARACTERS: &str = "[^0-9A-Za-z~!@#$%^&*()_\\-+={\\[}\\]|\\\\:;<,>.?\\/]";// 
 const DB_MINIMUM_PASSWORD_LENGTH: usize = 8;
-
+const DB_SEMVER_CHARACTERS: &str = "[^0-9.]";
 
 #[derive(Serialize)]
 struct FullEmailAddress {
@@ -846,6 +846,75 @@ pub async fn get_item(_: Request, ctx: RouteContext<()>) -> worker::Result<Respo
             Err(e) => return err_specific(e.to_string()).await,
         },
         None => return err_specific("Internal Server Error, route parameter mismatch!".to_string()).await,
+    }
+}
+
+// const FSO_ITEMS_INSERT_QUERY: &str = "INSERT INTO fso_items (item_text, documentation, major_version, parent_id, table_id, deprecation_id, restriction_id, info_type, table_index, default_value) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)";
+
+
+#[derive(Serialize, Deserialize)]
+pub struct NewItem{
+    item_text: String,
+    documentation: String,
+    major_version: String, 
+    parent_id: i32,
+    table_id: i32,
+    deprecation_id: i32,
+    restriction_id: i32,
+    info_type: String,
+    table_index: i32,
+    default_value: String,
+}
+
+pub async fn insert_item(req: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
+    match ctx.env.d1(DB_NAME) {
+        Ok(db) => {
+            let session_result = header_session_is_valid(&req, &db).await;
+            if !session_result.0 {
+                return err_not_logged_in().await
+            }
+
+            let username = session_result.1;
+
+            match db_fso::db_get_user_role(&username, &db).await {                 
+                Ok(authorizer_role) => {
+                    match authorizer_role {
+                        db_fso::UserRole::VIEWER => return err_insufficent_permissions().await,
+                        _=> (),
+                    }  
+                },
+                Err(e) => return err_specific(e.to_string()).await,
+            }
+
+            match req.json::<NewItem>().await{
+                Ok(new_item) => {
+                    if new_item.item_text.trim().is_empty()  {
+                        return err_specific("Item text cannot be empty.  Please resubmit your item.".to_string()).await;
+                    }
+
+                    if new_item.major_version.is_empty() {
+                        return err_specific("Item major version must be specified.".to_string()).await;
+                    }
+
+                    match Regex::new(DB_SEMVER_CHARACTERS) {
+                        Ok(search_set) => {
+                            match search_set.find(&new_item.major_version) {
+                                Some(_) => return err_specific("Disallowed semver characters found, please submit with a corrected majorversion.".to_string()).await,
+                                None => {},
+                            }    
+                        },
+                        Err(e) => return Err(e.to_string().into())
+                    }
+                
+                    
+
+                },
+                Err(e) => return err_specific(e.to_string()).await,
+            }
+
+
+        }, 
+        Err(e) => return err_specific(e.to_string()).await;
     }
 }
 
