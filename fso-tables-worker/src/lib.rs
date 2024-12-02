@@ -64,7 +64,7 @@ async fn fetch(req: Request, env: Env, _ctx: Context,) -> worker::Result<Respons
     // Email validations do not need get requests, this is only for the activate user
     // table_aliases, users
     Router::new()
-//        .get_async("/", root_get)
+        .get_async("/", root_get)
         .get_async("/users", db_fso::db_user_stats_get)       // No Post, put, patch, or delete for overarching category
         .post_async("/users/register", user_register_new)
         .get_async("/validation/:email/:id", user_confirm_email)
