@@ -64,14 +64,14 @@ async fn fetch(req: Request, env: Env, _ctx: Context,) -> worker::Result<Respons
     // Email validations do not need get requests, this is only for the activate user
     // table_aliases, users
     Router::new()
-        .get_async("/", root_get)
+//        .get_async("/", root_get)
         .get_async("/users", db_fso::db_user_stats_get)       // No Post, put, patch, or delete for overarching category
         .post_async("/users/register", user_register_new)
         .get_async("/validation/:email/:id", user_confirm_email)
         .get_async("/validation/:email/:id/password", user_confirm_email)
         .get_async("/users/myaccount", user_get_details)
         .post_async("/users/myaccount/password", user_change_password)
-        .get_async("/users/login", user_login)
+        .post_async("/users/login", user_login)
         .post_async("/users/activate", activate_user).put_async("/users/activate", activate_user).patch_async("/users/activate", activate_user)
         .post_async("/users/:username/upgrade", user_upgrade_user_permissions).patch_async("/users/:username/upgrade", user_upgrade_user_permissions)
         .post_async("/users/:username/downgrade", user_downgrade_user_permissions).patch_async("/users/:username/downgrade", user_downgrade_user_permissions)
@@ -128,15 +128,15 @@ async fn fetch(req: Request, env: Env, _ctx: Context,) -> worker::Result<Respons
         */
 }
 
-pub async fn test_all(_: Request, _ctx: RouteContext<()>) -> worker::Result<Response> {
+pub async fn test_all(req: Request, _ctx: RouteContext<()>) -> worker::Result<Response> {
     
     let mut _return_object = db_fso::FsoTablesQueryResults::new_results().await;
 
-    return Response::ok("Test API is deactivated as tests were successful.");
+    return send_success(&req,&"Test API is deactivated as tests were successful.".to_string()).await;
 }
 
-pub async fn root_get(_: Request, _ctx: RouteContext<()>) -> worker::Result<Response> {   
-    Response::ok("You have accessed the Freespace Open Table Option Databse API.\n\nRoutes are users, tables, items, deprecations, and behaviors.\n\nThis API is currently under construction!".to_string())
+pub async fn root_get(req: Request, _ctx: RouteContext<()>) -> worker::Result<Response> {   
+    send_success(&req, &"You have accessed the Freespace Open Table Option Databse API.\n\nRoutes are users, tables, items, deprecations, and behaviors.\n\nThis API is currently under construction!".to_string()).await
 }
 
 #[derive(Serialize, Deserialize)]
@@ -153,7 +153,7 @@ pub async fn user_register_new(mut req: Request, ctx: RouteContext<()>) -> worke
     let email = submission.unwrap();
 
     if !EmailAddress::is_valid(&email.email){
-        return Response::ok("Email address is not in the right format".to_string());
+        return send_success(&req,&"Email address is not in the right format".to_string()).await;
     }
 
     let db = ctx.env.d1(DB_NAME);
@@ -866,7 +866,7 @@ pub struct NewItem{
     default_value: String,
 }
 
-pub async fn insert_item(req: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
+pub async fn insert_item(mut req: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
     match ctx.env.d1(DB_NAME) {
         Ok(db) => {
             let session_result = header_session_is_valid(&req, &db).await;
@@ -900,7 +900,7 @@ pub async fn insert_item(req: Request, ctx: RouteContext<()>) -> worker::Result<
                         Ok(search_set) => {
                             match search_set.find(&new_item.major_version) {
                                 Some(_) => return err_specific("Disallowed semver characters found, please submit with a corrected majorversion.".to_string()).await,
-                                None => {},
+                                None => err_specific("I'm not done yet come back later.".to_string()).await,
                             }    
                         },
                         Err(e) => return Err(e.to_string().into())
@@ -914,7 +914,7 @@ pub async fn insert_item(req: Request, ctx: RouteContext<()>) -> worker::Result<
 
 
         }, 
-        Err(e) => return err_specific(e.to_string()).await;
+        Err(e) => return err_specific(e.to_string()).await
     }
 }
 
@@ -1947,6 +1947,36 @@ pub async fn send_confirmation_link(address : &String, activation_key : &String)
 
 }
 
+// Regular response when successful, allows cross origin requests (necessary for API)
+pub async fn send_success(req: &Request, body: &String) -> worker::Result<Response> {
+
+    // Get Requester URL -- This is a public API, so it should have public acccess.
+    let url = req.url();
+
+    let mut headers = Headers::new();
+
+    // Set Headers
+/*    match url {
+        Ok(url2)=> { 
+            match headers.set("Access-Control-Allow-Origin", &format!("{}", url2)) {
+                Ok(_) => {},
+                Err(_) => headers.set("Access-Control-Allow-Origin", "*")?, 
+            }
+    },
+         Err(_) => headers.set("Access-Control-Allow-Origin", "*")?,    
+    }*/
+    
+    headers.set("Access-Control-Allow-Origin", "file:///C:/FreespaceOpen2/Cyborg/fso-tables-dot-com/index.html")?;
+
+    headers.set("Access-Control-Allow-Methods", "GET,PATCH,POST,PUT,DELETE")?;
+    headers.set("Access-Control-Max-Age", "100000")?;
+
+    return Ok(Response::from_html(body)?.with_headers(headers));
+}
+
+//        (),
+//        (,
+//        (),
 
 // SECTION!! Body/Server Failure Responses
 pub async fn err_insufficent_permissions() -> worker::Result<Response> {
