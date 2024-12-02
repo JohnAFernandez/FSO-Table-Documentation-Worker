@@ -1966,7 +1966,7 @@ pub async fn send_success(req: &Request, body: &String) -> worker::Result<Respon
          Err(_) => headers.set("Access-Control-Allow-Origin", "*")?,    
     }*/
     
-    headers.set("Access-Control-Allow-Origin", "file:///C:/FreespaceOpen2/Cyborg/fso-tables-dot-com/index.html")?;
+    headers.set("Access-Control-Allow-Origin", "https://www.fsotables.com")?;
 
     headers.set("Access-Control-Allow-Methods", "GET,PATCH,POST,PUT,DELETE")?;
     headers.set("Access-Control-Max-Age", "100000")?;
