@@ -1948,63 +1948,53 @@ pub async fn send_confirmation_link(address : &String, activation_key : &String)
 }
 
 // Regular response when successful, allows cross origin requests (necessary for API)
-pub async fn send_success(req: &Request, body: &String) -> worker::Result<Response> {
-
-    // Get Requester URL -- This is a public API, so it should have public acccess.
-    let url = req.url();
-
-    let mut headers = Headers::new();
-
-    // Set Headers
-/*    match url {
-        Ok(url2)=> { 
-            match headers.set("Access-Control-Allow-Origin", &format!("{}", url2)) {
-                Ok(_) => {},
-                Err(_) => headers.set("Access-Control-Allow-Origin", "*")?, 
-            }
-    },
-         Err(_) => headers.set("Access-Control-Allow-Origin", "*")?,    
-    }*/
-    
-    headers.set("Access-Control-Allow-Origin", "https://www.fsotables.com")?;
-
-    headers.set("Access-Control-Allow-Methods", "GET,PATCH,POST,PUT,DELETE")?;
-    headers.set("Access-Control-Max-Age", "100000")?;
-
-    return Ok(Response::from_html(body)?.with_headers(headers));
+pub async fn send_success(body: &String) -> worker::Result<Response> {
+    return Ok(Response::from_html(body)?.with_headers(add_cors_headers().await));
 }
 
-//        (),
-//        (,
-//        (),
+
+// Regular response when successful, allows cross origin requests (necessary for API)
+pub async fn send_failure(body: &String, code: u16) -> worker::Result<Response> {
+    return Ok(Response::from_html(body)?.with_headers(add_cors_headers().await).with_status(code));
+}
+
+pub async fn add_cors_headers() -> worker::Headers {
+    let mut headers = Headers::new();
+
+    headers.set("Access-Control-Allow-Origin", "https://ganymede.fsotables.com")?;
+    headers.set("Access-Control-Allow-Methods", "GET,PATCH,POST,PUT,DELETE")?;
+    headers.set("Acceujk-yk;iju0yutjgym7/ss-Control-Max-Age", "100000")?;
+
+    return headers
+}
 
 // SECTION!! Body/Server Failure Responses
 pub async fn err_insufficent_permissions() -> worker::Result<Response> {
-    Response::error("This operation is not authorizable via our API at your access level.", 403)    
+    send_failure("{\"Error\": \"This operation is not authorizable via our API at your access level.\"}", 403)    
 }
 
 pub async fn err_not_logged_in() -> worker::Result<Response> {
-    Response::error("You must be logged and provide an access token to access this endpoint.", 403)
+    send_failure("{\"Error\": \"You must be logged and provide an access token to access this endpoint.\"}", 403)
 }
 
 pub async fn err_user_not_active() -> worker::Result<Response> {
-    Response::error("The user must be active before it can authorize this type of action", 403)
+    send_failure("{\"Error\": \"The user must be active before it can authorize this type of action\"}", 403)
 }
 
 pub async fn err_api_fallback(_: Request, _: RouteContext<()>) -> worker::Result<Response> {
-    Response::error("A method for this API route does not exist.", 404)    
+    send_failure("{\"Error\": \"A method for this API route does not exist.\"}", 404)    
 }
 
 pub async fn err_api_under_construction() -> worker::Result<Response> {
-    Response::error("This endpoint is under construction.", 403)    
+    send_failure("{\"Error\": \"This endpoint is under construction.\"}", 403)    
 }
 
 pub async fn err_bad_request() -> worker::Result<Response> {
-    Response::error("Bad request, check your json input.", 400)    
+    send_failure("{\"Error\": \"Bad request, check your json input.\"}", 400)    
 }
 
 pub async fn err_specific(e: String) -> worker::Result<Response> {
-    Response::error(&e, 500)    
+    send_failure(&e, 500)    
 }
 
 /*
