@@ -1380,7 +1380,7 @@ pub async fn update_deprecation(mut req: Request, ctx: RouteContext<()>) -> work
                                 }
                             }
 
-                            return Response::ok("Success!")
+                            return send_success("{\"Response\": \"Success!\"}")
 
                         },
                         Err(e) => return err_specific(e.to_string() + "\nMake sure that the request json has a deprecation_id, date, and version, even if not updating.  If not updating a field (deprecation_id cannot be updated) mark a string type with \"~!!NO UPDATE!!~\". Use -2 or a more negative number for ids. Echo back other values.").await,
@@ -1420,7 +1420,7 @@ pub async fn delete_deprecation(req: Request, ctx: RouteContext<()>) -> worker::
                     match id.parse::<i32>(){
                         Ok(_) =>{
                             match db_fso::db_generic_delete(db_fso::Table::ParseBehaviors, id, &ctx).await {
-                                Ok(_) => return Response::ok("Success!"),
+                                Ok(_) => return send_success("{\"Response\": \"Success!\"}"),
                                 Err(e) => return err_specific(e.to_string()).await,
                             }
                             
@@ -1461,7 +1461,7 @@ pub async fn add_bug_report(mut req: Request, ctx: RouteContext<()>) -> worker::
                     }
 
                     match db_fso::db_insert_bug_report(&username, &report.bug_type, &report.description, &ctx).await {
-                        Ok(_) => Response::ok("Success!"),
+                        Ok(_) => send_success("{\"Response\": \"Success!\"}"),
                         Err(e) => err_specific(e.to_string()).await,
                     }
         
@@ -1507,7 +1507,7 @@ pub async fn resolve_bug_report(req: Request, ctx: RouteContext<()>) -> worker::
                                         Err(e) => return err_specific(e.to_string()).await,
                                     }
                                 
-                                    return Response::ok("Success!")
+                                    return send_success("{\"Response\": \"Success!\"}")
                                 }
                                 Err(_) => return err_specific("Bug report id cannot be parsed as an integer, please resubmit your request.".to_string()).await,
                             }
@@ -1554,7 +1554,7 @@ pub async fn unresolve_bug_report(req: Request, ctx: RouteContext<()>) -> worker
                                         Err(e) => return err_specific(e.to_string()).await,
                                     }
 
-                                    return Response::ok("Success!")
+                                    return send_success("{\"Response\": \"Success!\"}")
                                 },
 
                                 Err(_) => return err_specific("Bug report id cannot be parsed as an integer, please resubmit your request.".to_string()).await,
@@ -1615,7 +1615,7 @@ pub async fn acknowledge_bug_report(req: Request, ctx: RouteContext<()>) -> work
                                 Err(e) => return err_specific(e.to_string()).await,
                             }
         
-                            return Response::ok("Success!")
+                            return Response::ok("{\"Response\": \"Bug Report Successfully Updated!\"}")
                         },
                         Err(_) => return err_specific("Bug report id cannot be parsed as an integer, please resubmit your request.".to_string()).await,
                     }
@@ -1712,7 +1712,7 @@ pub async fn update_bug_report(mut req: Request, ctx: RouteContext<()>) -> worke
                         }
                     }
 
-                    return Response::ok("Success!")
+                    return send_success("{\"Response\":\"Bug report successfully updated!\"}")
 
                 },
                 Err(e) => return err_specific(e.to_string() + "\nMake sure that the request json has an bug_type, and description, even if not updating.  If not updating a field (parse_id cannot be updated) mark a string type with \"~!!NO UPDATE!!~\". Use -2 or a more negative number for ids. Echo back other values.").await,
@@ -1785,7 +1785,7 @@ pub async fn create_session_and_send(email: &String, ctx: &RouteContext<()>) -> 
 
     // We give the user two hours to do what they need to do.
     match db_fso::db_session_add(&hashed_string, &email, &(Utc::now() + TimeDelta::hours(2)).to_string(), ctx).await {
-        Ok(_) => return worker::Response::ok(format!("{{\"token\":\"{}\"}}", login_token)),
+        Ok(_) => return send_success(&format!("{{\"token\":\"{}\"}", login_token)),
         Err(e) => return err_specific(e.to_string() + " at create_session, 2").await,
     }
 }
