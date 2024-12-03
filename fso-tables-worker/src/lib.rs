@@ -21,7 +21,7 @@ mod db_fso;
 
 const DB_NAME: &str = "fso_table_database";    
 const DB_ALLOWED_PASSWORD_CHARACTERS: &str = "[^0-9A-Za-z~!@#$%^&*()_\\-+={\\[}\\]|\\\\:;<,>.?\\/]";// 
-const DB_MINIMUM_PASSWORD_LENGTH: usize = 8;
+const DB_MINIMUM_PASSWORD_LENGTH: usize = 10;
 const DB_SEMVER_CHARACTERS: &str = "[^0-9.]";
 
 #[derive(Serialize)]
