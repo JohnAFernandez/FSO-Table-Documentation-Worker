@@ -367,7 +367,7 @@ pub async fn deactivate_user(mut req: Request, ctx: RouteContext<()>) -> worker:
                             if target_user.email == username && authorizer_role != db_fso::UserRole::OWNER {
                                 
                                 match db_fso::db_deactivate_user(&username, &db).await {
-                                    Ok(_) => return send_success("{\"Response\": \"User Deactivated\"}"),
+                                    Ok(_) => return send_success(&"{\"Response\": \"User Deactivated\"}".to_string()).await,
                                     Err(e) => return err_specific(e.to_string()).await,
                                 }
 
@@ -384,7 +384,7 @@ pub async fn deactivate_user(mut req: Request, ctx: RouteContext<()>) -> worker:
                                 Ok(target_user_role) => {
                                     if authorizer_role < target_user_role{
                                         match db_fso::db_deactivate_user(&target_user.email, &db).await {
-                                            Ok(_) => return send_success("{\"Response\": \"User Deactivated\"}"),
+                                            Ok(_) => return send_success(&"{\"Response\": \"User Deactivated\"}".to_string()).await,
                                             Err(e) => return err_specific(e.to_string()).await,
                                         }
                                     } else {
@@ -426,7 +426,7 @@ pub async fn activate_user(mut req: Request, ctx: RouteContext<()>) -> worker::R
 
                     // make no changes if this user already exists
                     if db_fso::db_user_is_active(&target_user.email, &db).await {
-                        return send_success("{\"Response\": \"User is already Active\"}")
+                        return send_success(&"{\"Response\": \"User is already Active\"}".to_string()).await
                     }
 
                     // We need to see if the activating user is active, otherwise we should ignore
@@ -476,11 +476,11 @@ pub async fn activate_user(mut req: Request, ctx: RouteContext<()>) -> worker::R
                                 // try to act via a deactivated Admin
                                 if role < db_fso::UserRole::MAINTAINER{
                                     match db_fso::db_force_role(&target_user.email, &db, db_fso::UserRole::MAINTAINER).await {
-                                        Ok(_) => return send_success("{\"Response\": \"User Activated\"}"),
+                                        Ok(_) => return send_success(&"{\"Response\": \"User Activated\"}".to_string()).await,
                                         Err(e) => return err_specific(e.to_string()).await,
                                     }
                                 } else {
-                                    return send_success("{\"Response\": \"User Activated\"}")
+                                    return send_success(&"{\"Response\": \"User Activated\"}".to_string()).await
                                 }
                             },
                             Err(e) => {
@@ -523,7 +523,7 @@ pub async fn user_login(mut req: Request, ctx: RouteContext<()>) -> worker::Resu
                             if db_fso::db_check_password(&login.email, &hash, &db).await {
                                 return create_session_and_send(&login.email, &ctx).await;
                             } else {
-                                return send_error("Login unsuccessful! Part 4", 403);
+                                return send_failure(&"Login unsuccessful! Part 4".to_string(), 403).await;
                             }
                         },
                         Err(_) => return err_specific("Hashing function failed.".to_string()  + "Part 5").await,
@@ -562,7 +562,7 @@ pub async fn user_change_password(mut req: Request, ctx: RouteContext<()>) -> wo
                     match hash_string(&username, &password.password).await {                             
                         Ok(hash) => { 
                             match db_fso::db_set_new_pass(&username, &hash, &ctx).await {
-                                Ok(_) => return send_success("{\"Response\": \"Password Changed!\"}"),
+                                Ok(_) => return send_success(&"{\"Response\": \"Password Changed!\"}".to_string()).await,
                                 Err(e) => return err_specific(e.to_string()).await,
                             }
                         },
@@ -636,7 +636,7 @@ pub async fn user_upgrade_user_permissions(mut req: Request, ctx: RouteContext<(
                                     // We cannot upgrade Admins here.  Only when directly accessing the database.
                                     if authorizer_role < target_user_role && target_user_role > db_fso::UserRole::ADMIN {
                                         //db_upgrade_user(&target_user.email, &db).await;
-                                        return send_success("{\"Response\": \"User Upgraded\"]");
+                                        return send_success(&"{\"Response\": \"User Upgraded\"]".to_string()).await;
                                     } else {
                                         return err_insufficent_permissions().await;
                                     }
@@ -772,7 +772,7 @@ pub async fn update_parse_type(mut req: Request, ctx: RouteContext<()>) -> worke
                                 }
                             }
 
-                            return send_success("{\"Response\": \"Success!\"}")
+                            return send_success(&"{\"Response\": \"Success!\"}".to_string()).await
 
                         },
                         Err(e) => return err_specific(e.to_string() + "\nMake sure that the request json has a behavior_id, behavior, and description, even if not updating.  If not updating a field (parse_id cannot be updated) mark a string type with \"~!!NO UPDATE!!~\". Use -2 or a more negative number for ids. Echo back other values.").await,
@@ -812,7 +812,7 @@ pub async fn delete_parse_type(req: Request, ctx: RouteContext<()>) -> worker::R
                     match id.parse::<i32>(){
                         Ok(_) =>{
                             match db_fso::db_generic_delete(db_fso::Table::ParseBehaviors, id, &ctx).await {
-                                Ok(_) => return send_success("{\"Response\": \"Success!\"}"),
+                                Ok(_) => return send_success(&"{\"Response\": \"Success!\"}".to_string()).await,
                                 Err(e) => return err_specific(e.to_string()).await,
                             }
                             
@@ -1004,7 +1004,7 @@ pub async fn update_item(mut req: Request, ctx: RouteContext<()>) -> worker::Res
                                 }
                             }
 
-                            return send_success("{\"Response\": \"Success!\"}")
+                            return send_success(&"{\"Response\": \"Success!\"}".to_string()).await
 
                         },
                         Err(e) => return err_specific(e.to_string() + "\nMake sure that the request json has an item_id, behavior, and description, even if not updating.  If not updating a field (id cannot be updated) mark a string type with \"~!!NO UPDATE!!~\". Use -2 or more negative number for ids for no update.  Echo back other values for no update.").await,
@@ -1044,7 +1044,7 @@ pub async fn delete_item(req: Request, ctx: RouteContext<()>) -> worker::Result<
                     match id.parse::<i32>(){
                         Ok(_) =>{
                             match db_fso::db_generic_delete(db_fso::Table::FsoItems, id, &ctx).await {
-                                Ok(_) => return send_success("{\"Response\": \"Success!\"}"),
+                                Ok(_) => return send_success(&"{\"Response\": \"Success!\"}".to_string()).await,
                                 Err(e) => return err_specific(e.to_string()).await,
                             }
                             
@@ -1179,7 +1179,7 @@ pub async fn delete_alias(req: Request, ctx: RouteContext<()>) -> worker::Result
                     match id.parse::<i32>(){
                         Ok(_) =>{
                             match db_fso::db_generic_delete(db_fso::Table::TableAliases, id, &ctx).await {
-                                Ok(_) => return send_success("{\"Response\": \"Success!\"}"),
+                                Ok(_) => return send_success(&"{\"Response\": \"Success!\"}".to_string()).await,
                                 Err(e) => return err_specific(e.to_string()).await,
                             }
                             
@@ -1266,7 +1266,7 @@ pub async fn update_restriction(mut req: Request, ctx: RouteContext<()>) -> work
                                 Err(e) => return err_specific(e.to_string()).await,
                             }    
 
-                            return send_success("{\"Response\": \"Success!\"}")
+                            return send_success(&"{\"Response\": \"Success!\"}".to_string()).await
 
                         },
                         Err(e) => return err_specific(e.to_string() + "\nMake sure that the request json has a restriction_id, illegal_value_float, illegal_value_int, max_string_length, max_value, min_value, and description, even if not updating.  If not updating a field (parse_id cannot be updated) mark a string type with \"~!!NO UPDATE!!~\". Use -2 or a more negative number for ids. Echo back other values.").await,
@@ -1306,7 +1306,7 @@ pub async fn delete_restriction(req: Request, ctx: RouteContext<()>) -> worker::
                     match id.parse::<i32>(){
                         Ok(_) =>{
                             match db_fso::db_generic_delete(db_fso::Table::Restrictions, id, &ctx).await {
-                                Ok(_) => return send_success("{\"Response\": \"Success!\"}"),
+                                Ok(_) => return send_success(&"{\"Response\": \"Success!\"}".to_string()).await,
                                 Err(e) => return err_specific(e.to_string()).await,
                             }
                             
@@ -1380,7 +1380,7 @@ pub async fn update_deprecation(mut req: Request, ctx: RouteContext<()>) -> work
                                 }
                             }
 
-                            return send_success("{\"Response\": \"Success!\"}")
+                            return send_success(&"{\"Response\": \"Success!\"}".to_string()).await
 
                         },
                         Err(e) => return err_specific(e.to_string() + "\nMake sure that the request json has a deprecation_id, date, and version, even if not updating.  If not updating a field (deprecation_id cannot be updated) mark a string type with \"~!!NO UPDATE!!~\". Use -2 or a more negative number for ids. Echo back other values.").await,
@@ -1420,7 +1420,7 @@ pub async fn delete_deprecation(req: Request, ctx: RouteContext<()>) -> worker::
                     match id.parse::<i32>(){
                         Ok(_) =>{
                             match db_fso::db_generic_delete(db_fso::Table::ParseBehaviors, id, &ctx).await {
-                                Ok(_) => return send_success("{\"Response\": \"Success!\"}"),
+                                Ok(_) => return send_success(&"{\"Response\": \"Success!\"}".to_string()).await,
                                 Err(e) => return err_specific(e.to_string()).await,
                             }
                             
@@ -1461,7 +1461,7 @@ pub async fn add_bug_report(mut req: Request, ctx: RouteContext<()>) -> worker::
                     }
 
                     match db_fso::db_insert_bug_report(&username, &report.bug_type, &report.description, &ctx).await {
-                        Ok(_) => send_success("{\"Response\": \"Success!\"}"),
+                        Ok(_) => send_success(&"{\"Response\": \"Success!\"}".to_string()).await,
                         Err(e) => err_specific(e.to_string()).await,
                     }
         
@@ -1507,7 +1507,7 @@ pub async fn resolve_bug_report(req: Request, ctx: RouteContext<()>) -> worker::
                                         Err(e) => return err_specific(e.to_string()).await,
                                     }
                                 
-                                    return send_success("{\"Response\": \"Success!\"}")
+                                    return send_success(&"{\"Response\": \"Success!\"}".to_string()).await
                                 }
                                 Err(_) => return err_specific("Bug report id cannot be parsed as an integer, please resubmit your request.".to_string()).await,
                             }
@@ -1554,7 +1554,7 @@ pub async fn unresolve_bug_report(req: Request, ctx: RouteContext<()>) -> worker
                                         Err(e) => return err_specific(e.to_string()).await,
                                     }
 
-                                    return send_success("{\"Response\": \"Success!\"}")
+                                    return send_success(&"{\"Response\": \"Success!\"}".to_string()).await
                                 },
 
                                 Err(_) => return err_specific("Bug report id cannot be parsed as an integer, please resubmit your request.".to_string()).await,
@@ -1712,7 +1712,7 @@ pub async fn update_bug_report(mut req: Request, ctx: RouteContext<()>) -> worke
                         }
                     }
 
-                    return send_success("{\"Response\":\"Bug report successfully updated!\"}")
+                    return send_success(&"{\"Response\":\"Bug report successfully updated!\"}".to_string()).await
 
                 },
                 Err(e) => return err_specific(e.to_string() + "\nMake sure that the request json has an bug_type, and description, even if not updating.  If not updating a field (parse_id cannot be updated) mark a string type with \"~!!NO UPDATE!!~\". Use -2 or a more negative number for ids. Echo back other values.").await,
@@ -1785,7 +1785,8 @@ pub async fn create_session_and_send(email: &String, ctx: &RouteContext<()>) -> 
 
     // We give the user two hours to do what they need to do.
     match db_fso::db_session_add(&hashed_string, &email, &(Utc::now() + TimeDelta::hours(2)).to_string(), ctx).await {
-        Ok(_) => return send_success(&format!("{{\"token\":\"{}\"}", login_token)),
+        // remember! double {{ }} needed to escape here, even on the right side.
+        Ok(_) => return send_success(&format!("{{\"token\":\"{}\"}}", login_token).to_string()).await,
         Err(e) => return err_specific(e.to_string() + " at create_session, 2").await,
     }
 }
@@ -1961,40 +1962,40 @@ pub async fn send_failure(body: &String, code: u16) -> worker::Result<Response> 
 pub async fn add_cors_headers() -> worker::Headers {
     let mut headers = Headers::new();
 
-    headers.set("Access-Control-Allow-Origin", "https://ganymede.fsotables.com")?;
-    headers.set("Access-Control-Allow-Methods", "GET,PATCH,POST,PUT,DELETE")?;
-    headers.set("Acceujk-yk;iju0yutjgym7/ss-Control-Max-Age", "100000")?;
+    headers.set("Access-Control-Allow-Origin", "https://ganymede.fsotables.com").unwrap();
+    headers.set("Access-Control-Allow-Methods", "GET,PATCH,POST,PUT,DELETE").unwrap();
+    headers.set("Acceujk-yk;iju0yutjgym7/ss-Control-Max-Age", "100000").unwrap();
 
     return headers
 }
 
 // SECTION!! Body/Server Failure Responses
 pub async fn err_insufficent_permissions() -> worker::Result<Response> {
-    send_failure("{\"Error\": \"This operation is not authorizable via our API at your access level.\"}", 403)    
+    send_failure(&"{\"Error\": \"This operation is not authorizable via our API at your access level.\"}".to_string(), 403).await    
 }
 
 pub async fn err_not_logged_in() -> worker::Result<Response> {
-    send_failure("{\"Error\": \"You must be logged and provide an access token to access this endpoint.\"}", 403)
+    send_failure(&"{\"Error\": \"You must be logged and provide an access token to access this endpoint.\"}".to_string(), 403).await
 }
 
 pub async fn err_user_not_active() -> worker::Result<Response> {
-    send_failure("{\"Error\": \"The user must be active before it can authorize this type of action\"}", 403)
+    send_failure(&"{\"Error\": \"The user must be active before it can authorize this type of action\"}".to_string(), 403).await
 }
 
 pub async fn err_api_fallback(_: Request, _: RouteContext<()>) -> worker::Result<Response> {
-    send_failure("{\"Error\": \"A method for this API route does not exist.\"}", 404)    
+    send_failure(&"{\"Error\": \"A method for this API route does not exist.\"}".to_string(), 404).await
 }
 
 pub async fn err_api_under_construction() -> worker::Result<Response> {
-    send_failure("{\"Error\": \"This endpoint is under construction.\"}", 403)    
+    send_failure(&"{\"Error\": \"This endpoint is under construction.\"}".to_string(), 403).await
 }
 
 pub async fn err_bad_request() -> worker::Result<Response> {
-    send_failure("{\"Error\": \"Bad request, check your json input.\"}", 400)    
+    send_failure(&"{\"Error\": \"Bad request, check your json input.\"}".to_string(), 400).await
 }
 
 pub async fn err_specific(e: String) -> worker::Result<Response> {
-    send_failure(&e, 500)    
+    send_failure(&e, 500).await    
 }
 
 /*
