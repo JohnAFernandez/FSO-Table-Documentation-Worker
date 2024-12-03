@@ -132,11 +132,11 @@ pub async fn test_all(req: Request, _ctx: RouteContext<()>) -> worker::Result<Re
     
     let mut _return_object = db_fso::FsoTablesQueryResults::new_results().await;
 
-    return send_success(&req,&"Test API is deactivated as tests were successful.".to_string()).await;
+    return send_success(&"Test API is deactivated as tests were successful.".to_string()).await;
 }
 
 pub async fn root_get(req: Request, _ctx: RouteContext<()>) -> worker::Result<Response> {   
-    send_success(&req, &"You have accessed the Freespace Open Table Option Databse API.\n\nRoutes are users, tables, items, deprecations, and behaviors.\n\nThis API is currently under construction!".to_string()).await
+    send_success(&"You have accessed the Freespace Open Table Option Databse API.\n\nRoutes are users, tables, items, deprecations, and behaviors.\n\nThis API is currently under construction!".to_string()).await
 }
 
 #[derive(Serialize, Deserialize)]
@@ -153,7 +153,7 @@ pub async fn user_register_new(mut req: Request, ctx: RouteContext<()>) -> worke
     let email = submission.unwrap();
 
     if !EmailAddress::is_valid(&email.email){
-        return send_success(&req,&"Email address is not in the right format".to_string()).await;
+        return send_success(&"Email address is not in the right format".to_string()).await;
     }
 
     let db = ctx.env.d1(DB_NAME);
