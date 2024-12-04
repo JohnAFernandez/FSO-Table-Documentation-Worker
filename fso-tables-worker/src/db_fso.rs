@@ -68,6 +68,7 @@ const ACTIONS_INSERT_QUERY: &str = "INSERT INTO actions (user_id, action, approv
 const BUG_REPORT_INSERT_QUERY: &str = "INSERT INTO bug_reports ( user_id, bug_type, description, status, timestamp) VALUES (?1, ?2, ?3, ?4, ?5)";    
 const DEPRECATIONS_INSERT_QUERY: &str = "INSERT INTO deprecations (date, version) VALUES (?1, ?2)"; 
 const EMAIL_VALIDATIONS_INSERT_QUERY: &str = "INSERT INTO email_validations (username) VALUES (?1)";
+const ERROR_REPORT_INSERT_QUERY: &str = "INSERT INTO error_reports (error, timestamp) VALUES (?1, ?2);";
 const FSO_ITEMS_INSERT_QUERY: &str = "INSERT INTO fso_items (item_text, documentation, major_version, parent_id, table_id, deprecation_id, restriction_id, info_type, table_index, default_value) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)";
 //const FSO_TABLES_INSERT_QUERY: &str = "INSERT INTO fso_tables VALUES (?1, ?2)";    
 const PARSE_BEHAVIORS_INSERT_QUERY: &str = "INSERT INTO parse_behaviors (behavior, description) VALUES (?1, ?2)";    
@@ -1127,6 +1128,25 @@ pub async fn db_insert_bug_report(username: &String, bug_type: &String, descript
     }
 
 
+}
+
+pub async fn db_insert_error_record(error: &String,  ctx: &RouteContext<()>) -> Result<()> {
+    match  ctx.env.d1(DB_NAME) {
+        Ok(db) => {
+            let query = ERROR_REPORT_INSERT_QUERY;
+
+            match db.prepare(query).bind(&[JsValue::from(error), JsValue::from(Utc::now())]) {
+                Ok(statement) => {
+                    match statement.run().await {
+                        Ok(_) => return Ok(()),
+                        Err(e) => return Err(e),
+                    }
+                },
+                Err(e)=> return Err(e),
+            }
+        },
+        Err(e) => return Err(e),
+    }
 }
 
 pub async fn db_check_token(username: &String, token: &String, time: String, db: &D1Database) -> Result<bool> {

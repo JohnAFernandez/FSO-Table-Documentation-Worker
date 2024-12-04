@@ -118,7 +118,7 @@ async fn fetch(req: Request, env: Env, _ctx: Context,) -> worker::Result<Respons
         .patch_async("/bugreport/:id/unresolve", unresolve_bug_report)
         .patch_async("/bugreport/:id/edit", update_bug_report)
         .get_async("/test", test_all) // This might eventually be a "CI" test, but for now it just displays a message.
-        .or_else_any_method_async("/", err_api_fallback) // TODO, this does not work.
+//        .or_else_any_method_async("/", err_api_fallback) // TODO, this does not work.
         .run(req, env)
         .await
 
@@ -147,7 +147,7 @@ struct EmailSubmission{
 pub async fn user_register_new(mut req: Request, ctx: RouteContext<()>) -> worker::Result<Response> {  
     let submission = req.json::<EmailSubmission>().await;
     if submission.is_err() {
-        return err_bad_request().await;
+        return send_failure(ERROR_BAD_REQUEST, 403).await;
     }
     
     let email = submission.unwrap();
@@ -320,7 +320,7 @@ pub async fn user_get_details(req: Request, ctx: RouteContext<()>) -> worker::Re
         Ok(db) => {
             let session_result = header_session_is_valid(&req, &db).await;
             if !session_result.0 {
-                return err_not_logged_in().await
+                return send_failure(ERROR_NOT_LOGGED_IN, 403).await
             }
 
             let username = session_result.1;
@@ -347,7 +347,7 @@ pub async fn deactivate_user(mut req: Request, ctx: RouteContext<()>) -> worker:
             let username = session_result.1;
             
             if !db_fso::db_user_is_active(&username, &db).await {
-                return err_user_not_active().await
+                return send_failure(ERROR_USER_NOT_ACTIVE).await
             }
 
             match db_fso::db_get_user_role(&username, &db).await {                 
@@ -375,8 +375,8 @@ pub async fn deactivate_user(mut req: Request, ctx: RouteContext<()>) -> worker:
 
                             // these two types are not allowed to deactivate other users
                             match authorizer_role {
-                                db_fso::UserRole::MAINTAINER => return err_insufficent_permissions().await,
-                                db_fso::UserRole::VIEWER => return err_insufficent_permissions().await,
+                                db_fso::UserRole::MAINTAINER => return send_failure(ERROR_INSUFFICIENT_PERMISSISONS, 403).await,
+                                db_fso::UserRole::VIEWER => return send_failure(ERROR_INSUFFICIENT_PERMISSISONS, 403).await,
                                 _=> (),
                             }         
                                                                                     
@@ -388,13 +388,13 @@ pub async fn deactivate_user(mut req: Request, ctx: RouteContext<()>) -> worker:
                                             Err(e) => return err_specific(e.to_string()).await,
                                         }
                                     } else {
-                                        return err_insufficent_permissions().await;
+                                        return send_failure(ERROR_INSUFFICIENT_PERMISSISONS, 403).await;
                                     }
                                 },
                                 Err(e) => return err_specific(e.to_string()).await,                                
                             }               
                         },
-                        Err(_) => return err_bad_request().await,
+                        Err(_) => return send_failure(ERROR_BAD_REQUEST, 403).await,
                     }
                 },
                 Err(e) => return err_specific(e.to_string()).await, 
@@ -410,7 +410,7 @@ pub async fn activate_user(mut req: Request, ctx: RouteContext<()>) -> worker::R
         Ok(db) => {
             let session_result = header_session_is_valid(&req, &db).await;
             if !session_result.0 {
-                return err_not_logged_in().await
+                return send_failure(ERROR_INSUFFICIENT_PERMISSISONS, 403).await
             }
 
             let username = session_result.1;
@@ -439,7 +439,7 @@ pub async fn activate_user(mut req: Request, ctx: RouteContext<()>) -> worker::R
                                 Err(e) => return err_specific(e.to_string()).await,
                             }
                         } else {
-                            return err_user_not_active().await
+                            return ERROR_USER_NOT_ACTIVE().await
                         }                                
                     }
                     // NOTE! IF WE GET HERE THE USER IS ACTIVE! AND WE NEED TO DEACTIVATE ON EVERY FAILURE!
@@ -452,18 +452,18 @@ pub async fn activate_user(mut req: Request, ctx: RouteContext<()>) -> worker::R
                         match authorizer_role {
                             db_fso::UserRole::OWNER => {
                                 let _ = db_fso::db_deactivate_user(&target_user.email, &db).await;
-                                return err_insufficent_permissions().await
+                                return send_failure(ERROR_INSUFFICIENT_PERMISSISONS, 403).await
                             }
                             db_fso::UserRole::MAINTAINER => {
                                 if target_user.email != username{
                                     let _ = db_fso::db_deactivate_user(&target_user.email, &db).await;
-                                    return err_insufficent_permissions().await    
+                                    return send_failure(ERROR_INSUFFICIENT_PERMISSISONS, 403).await    
                                 }
                             },
                             db_fso::UserRole::VIEWER => { 
                                 if target_user.email != username{
                                     let _ = db_fso::db_deactivate_user(&target_user.email, &db).await;
-                                    return err_insufficent_permissions().await
+                                    return send_failure(ERROR_INSUFFICIENT_PERMISSISONS, 403).await
                                 }
                             },
                             _=> (),
@@ -495,7 +495,7 @@ pub async fn activate_user(mut req: Request, ctx: RouteContext<()>) -> worker::R
                         }
                     }    
                 },
-                Err(_) => return err_bad_request().await,
+                Err(_) => return send_failure(ERROR_BAD_REQUEST, 403).await,
             }        
         },
         Err(e) => return err_specific(e.to_string()).await,
@@ -515,7 +515,7 @@ pub async fn user_login(mut req: Request, ctx: RouteContext<()>) -> worker::Resu
             match req.json::<LoginRequest>().await{
                 Ok(login) => {
                     match db_fso::db_email_taken(&login.email, &db).await {
-                        Ok(b) => if !b { return err_specific("User does not exist.".to_string()).await },
+                        Ok(b) => if !b { return send_failure(&"Incorrect credentials! Please resubmit.".to_string(), 403).await },
                         Err(e) => return err_specific(e.to_string()  + "Part 3").await,
                     }
                     match hash_string(&login.email, &login.password).await {
@@ -523,10 +523,10 @@ pub async fn user_login(mut req: Request, ctx: RouteContext<()>) -> worker::Resu
                             if db_fso::db_check_password(&login.email, &hash, &db).await {
                                 return create_session_and_send(&login.email, &ctx).await;
                             } else {
-                                return send_failure(&"Login unsuccessful! Part 4".to_string(), 403).await;
+                                return send_failure(&"Incorrect credentials! Please resubmit.".to_string(), 403).await;
                             }
                         },
-                        Err(_) => return err_specific("Hashing function failed.".to_string()  + "Part 5").await,
+                        Err(_) => return err_specific("Hashing function failed: ".to_string()).await,
                     }                    
                 },
                 Err(e) => return err_specific(e.to_string()  + "Part 6").await,
@@ -548,7 +548,7 @@ pub async fn user_change_password(mut req: Request, ctx: RouteContext<()>) -> wo
 
             let session_result = header_session_is_valid(&req, &db).await;
             if !session_result.0 {
-                return err_not_logged_in().await
+                return send_failure(ERROR_NOT_LOGGED_IN, 403).await
             }
 
             let username = session_result.1;
@@ -569,7 +569,7 @@ pub async fn user_change_password(mut req: Request, ctx: RouteContext<()>) -> wo
                         Err(e) => return err_specific(e.to_string() + &" Hashing function failed.".to_string()).await,
                     }                            
                 },
-                Err(_) => return err_bad_request().await,
+                Err(_) => return send_failure(ERROR_BAD_REQUEST, 403).await,
             }
         },
         Err(e)=> err_specific(e.to_string()).await,
@@ -597,13 +597,13 @@ pub async fn user_upgrade_user_permissions(mut req: Request, ctx: RouteContext<(
         Ok(db) => {
             let session_result = header_session_is_valid(&req, &db).await;
             if !session_result.0 {
-                return err_not_logged_in().await
+                return send_failure(ERROR_NOT_LOGGED_IN, 403).await
             }
 
             let username = session_result.1;
 
             if !db_fso::db_user_is_active(&username, &db).await {
-                return err_user_not_active().await
+                return ERROR_USER_NOT_ACTIVE().await
             }
 
             match db_fso::db_get_user_role(&username, &db).await {                 
@@ -625,8 +625,8 @@ pub async fn user_upgrade_user_permissions(mut req: Request, ctx: RouteContext<(
 
                             // these two types are not allowed to deactivate other users
                             match authorizer_role {
-                                db_fso::UserRole::MAINTAINER => return err_insufficent_permissions().await,
-                                db_fso::UserRole::VIEWER => return err_insufficent_permissions().await,
+                                db_fso::UserRole::MAINTAINER => return send_failure(ERROR_INSUFFICIENT_PERMISSISONS, 403).await,
+                                db_fso::UserRole::VIEWER => return send_failure(ERROR_INSUFFICIENT_PERMISSISONS, 403).await,
                                 _=> (),
                             }         
 
@@ -638,13 +638,13 @@ pub async fn user_upgrade_user_permissions(mut req: Request, ctx: RouteContext<(
                                         //db_upgrade_user(&target_user.email, &db).await;
                                         return send_success(&"{\"Response\": \"User Upgraded\"]".to_string()).await;
                                     } else {
-                                        return err_insufficent_permissions().await;
+                                        return send_failure(ERROR_INSUFFICIENT_PERMISSISONS, 403).await;
                                     }
                                 },
                                 Err(e) => return err_specific(e.to_string()).await,                                
                             }               
                         },
-                        Err(_) => return err_bad_request().await,
+                        Err(_) => return send_failure(ERROR_BAD_REQUEST, 403).await,
                     }
                 },
                 Err(e) => return err_specific(e.to_string()).await, 
@@ -660,13 +660,13 @@ pub async fn user_downgrade_user_permissions(mut req: Request, ctx: RouteContext
         Ok(db) => {
             let session_result = header_session_is_valid(&req, &db).await;
             if !session_result.0 {
-                return err_not_logged_in().await
+                return send_failure(ERROR_NOT_LOGGED_IN, 403).await
             }
 
             let username = session_result.1;
 
             if !db_fso::db_user_is_active(&username, &db).await {
-                return err_user_not_active().await
+                return ERROR_USER_NOT_ACTIVE().await
             }
 
             match db_fso::db_get_user_role(&username, &db).await {                 
@@ -688,8 +688,8 @@ pub async fn user_downgrade_user_permissions(mut req: Request, ctx: RouteContext
 
                             // these two types are not allowed to deactivate other users
                             match authorizer_role {
-                                db_fso::UserRole::MAINTAINER => return err_insufficent_permissions().await,
-                                db_fso::UserRole::VIEWER => return err_insufficent_permissions().await,
+                                db_fso::UserRole::MAINTAINER => return send_failure(ERROR_INSUFFICIENT_PERMISSISONS, 403).await,
+                                db_fso::UserRole::VIEWER => return send_failure(ERROR_INSUFFICIENT_PERMISSISONS, 403).await,
                                 _=> (),
                             }         
 
@@ -701,13 +701,13 @@ pub async fn user_downgrade_user_permissions(mut req: Request, ctx: RouteContext
                                         //db_downgrade_user(&target_user.email, &db).await;
                                         return worker::Response::ok("User Upgraded");
                                     } else {
-                                        return err_insufficent_permissions().await;
+                                        return send_failure(ERROR_INSUFFICIENT_PERMISSISONS, 403).await;
                                     }
                                 },
                                 Err(e) => return err_specific(e.to_string()).await,                                
                             }               
                         },
-                        Err(_) => return err_bad_request().await,
+                        Err(_) => return send_failure(ERROR_BAD_REQUEST, 403).await,
                     }
                 },
                 Err(e) => return err_specific(e.to_string()).await, 
@@ -740,7 +740,7 @@ pub async fn update_parse_type(mut req: Request, ctx: RouteContext<()>) -> worke
         Ok(db) => {
             let session_result = header_session_is_valid(&req, &db).await;
             if !session_result.0 {
-                return err_not_logged_in().await
+                return send_failure(ERROR_NOT_LOGGED_IN, 403).await
             }
 
             let username = session_result.1;
@@ -748,7 +748,7 @@ pub async fn update_parse_type(mut req: Request, ctx: RouteContext<()>) -> worke
             match db_fso::db_get_user_role(&username, &db).await {                 
                 Ok(authorizer_role) => {
                     match authorizer_role {
-                        db_fso::UserRole::VIEWER => return err_insufficent_permissions().await,
+                        db_fso::UserRole::VIEWER => return send_failure(ERROR_INSUFFICIENT_PERMISSISONS, 403).await,
                         _=> (),
                     }         
 
@@ -791,7 +791,7 @@ pub async fn delete_parse_type(req: Request, ctx: RouteContext<()>) -> worker::R
         Ok(db) => {
             let session_result = header_session_is_valid(&req, &db).await;
             if !session_result.0 {
-                return err_not_logged_in().await
+                return send_failure(ERROR_NOT_LOGGED_IN, 403).await
             }
 
             let username = session_result.1;
@@ -799,8 +799,8 @@ pub async fn delete_parse_type(req: Request, ctx: RouteContext<()>) -> worker::R
             match db_fso::db_get_user_role(&username, &db).await {                 
                 Ok(authorizer_role) => {
                     match authorizer_role {
-                        db_fso::UserRole::VIEWER => return err_insufficent_permissions().await,
-                        db_fso::UserRole::MAINTAINER => return err_insufficent_permissions().await,
+                        db_fso::UserRole::VIEWER => return send_failure(ERROR_INSUFFICIENT_PERMISSISONS, 403).await,
+                        db_fso::UserRole::MAINTAINER => return send_failure(ERROR_INSUFFICIENT_PERMISSISONS, 403).await,
                         _=> {},
                     }         
                 },
@@ -871,7 +871,7 @@ pub async fn insert_item(mut req: Request, ctx: RouteContext<()>) -> worker::Res
         Ok(db) => {
             let session_result = header_session_is_valid(&req, &db).await;
             if !session_result.0 {
-                return err_not_logged_in().await
+                return send_failure(ERROR_NOT_LOGGED_IN, 403).await
             }
 
             let username = session_result.1;
@@ -879,7 +879,7 @@ pub async fn insert_item(mut req: Request, ctx: RouteContext<()>) -> worker::Res
             match db_fso::db_get_user_role(&username, &db).await {                 
                 Ok(authorizer_role) => {
                     match authorizer_role {
-                        db_fso::UserRole::VIEWER => return err_insufficent_permissions().await,
+                        db_fso::UserRole::VIEWER => return send_failure(ERROR_INSUFFICIENT_PERMISSISONS, 403).await,
                         _=> (),
                     }  
                 },
@@ -923,7 +923,7 @@ pub async fn update_item(mut req: Request, ctx: RouteContext<()>) -> worker::Res
         Ok(db) => {
             let session_result = header_session_is_valid(&req, &db).await;
             if !session_result.0 {
-                return err_not_logged_in().await
+                return send_failure(ERROR_NOT_LOGGED_IN, 403).await
             }
 
             let username = session_result.1;
@@ -931,7 +931,7 @@ pub async fn update_item(mut req: Request, ctx: RouteContext<()>) -> worker::Res
             match db_fso::db_get_user_role(&username, &db).await {                 
                 Ok(authorizer_role) => {
                     match authorizer_role {
-                        db_fso::UserRole::VIEWER => return err_insufficent_permissions().await,
+                        db_fso::UserRole::VIEWER => return send_failure(ERROR_INSUFFICIENT_PERMISSISONS, 403).await,
                         _=> (),
                     }         
 
@@ -1023,7 +1023,7 @@ pub async fn delete_item(req: Request, ctx: RouteContext<()>) -> worker::Result<
         Ok(db) => {
             let session_result = header_session_is_valid(&req, &db).await;
             if !session_result.0 {
-                return err_not_logged_in().await
+                return send_failure(ERROR_NOT_LOGGED_IN, 403).await
             }
 
             let username = session_result.1;
@@ -1031,8 +1031,8 @@ pub async fn delete_item(req: Request, ctx: RouteContext<()>) -> worker::Result<
             match db_fso::db_get_user_role(&username, &db).await {                 
                 Ok(authorizer_role) => {
                     match authorizer_role {
-                        db_fso::UserRole::VIEWER => return err_insufficent_permissions().await,
-                        db_fso::UserRole::MAINTAINER => return err_insufficent_permissions().await,
+                        db_fso::UserRole::VIEWER => return send_failure(ERROR_INSUFFICIENT_PERMISSISONS, 403).await,
+                        db_fso::UserRole::MAINTAINER => return send_failure(ERROR_INSUFFICIENT_PERMISSISONS, 403).await,
                         _=> {},
                     }         
                 },
@@ -1107,7 +1107,7 @@ pub async fn update_alias(mut req: Request, ctx: RouteContext<()>) -> worker::Re
         Ok(db) => {
             let session_result = header_session_is_valid(&req, &db).await;
             if !session_result.0 {
-                return err_not_logged_in().await
+                return send_failure(ERROR_NOT_LOGGED_IN, 403).await
             }
 
             let username = session_result.1;
@@ -1115,7 +1115,7 @@ pub async fn update_alias(mut req: Request, ctx: RouteContext<()>) -> worker::Re
             match db_fso::db_get_user_role(&username, &db).await {                 
                 Ok(authorizer_role) => {
                     match authorizer_role {
-                        db_fso::UserRole::VIEWER => return err_insufficent_permissions().await,
+                        db_fso::UserRole::VIEWER => return send_failure(ERROR_INSUFFICIENT_PERMISSISONS, 403).await,
                         _=> (),
                     }         
 
@@ -1158,7 +1158,7 @@ pub async fn delete_alias(req: Request, ctx: RouteContext<()>) -> worker::Result
         Ok(db) => {
             let session_result = header_session_is_valid(&req, &db).await;
             if !session_result.0 {
-                return err_not_logged_in().await
+                return send_failure(ERROR_NOT_LOGGED_IN, 403).await
             }
 
             let username = session_result.1;
@@ -1166,8 +1166,8 @@ pub async fn delete_alias(req: Request, ctx: RouteContext<()>) -> worker::Result
             match db_fso::db_get_user_role(&username, &db).await {                 
                 Ok(authorizer_role) => {
                     match authorizer_role {
-                        db_fso::UserRole::VIEWER => return err_insufficent_permissions().await,
-                        db_fso::UserRole::MAINTAINER => return err_insufficent_permissions().await,
+                        db_fso::UserRole::VIEWER => return send_failure(ERROR_INSUFFICIENT_PERMISSISONS, 403).await,
+                        db_fso::UserRole::MAINTAINER => return send_failure(ERROR_INSUFFICIENT_PERMISSISONS, 403).await,
                         _=> {},
                     }         
                 },
@@ -1221,7 +1221,7 @@ pub async fn update_restriction(mut req: Request, ctx: RouteContext<()>) -> work
         Ok(db) => {
             let session_result = header_session_is_valid(&req, &db).await;
             if !session_result.0 {
-                return err_not_logged_in().await
+                return send_failure(ERROR_NOT_LOGGED_IN, 403).await
             }
 
             let username = session_result.1;
@@ -1229,7 +1229,7 @@ pub async fn update_restriction(mut req: Request, ctx: RouteContext<()>) -> work
             match db_fso::db_get_user_role(&username, &db).await {                 
                 Ok(authorizer_role) => {
                     match authorizer_role {
-                        db_fso::UserRole::VIEWER => return err_insufficent_permissions().await,
+                        db_fso::UserRole::VIEWER => return send_failure(ERROR_INSUFFICIENT_PERMISSISONS, 403).await,
                         _=> (),
                     }         
 
@@ -1285,7 +1285,7 @@ pub async fn delete_restriction(req: Request, ctx: RouteContext<()>) -> worker::
         Ok(db) => {
             let session_result = header_session_is_valid(&req, &db).await;
             if !session_result.0 {
-                return err_not_logged_in().await
+                return send_failure(ERROR_NOT_LOGGED_IN, 403).await
             }
 
             let username = session_result.1;
@@ -1293,8 +1293,8 @@ pub async fn delete_restriction(req: Request, ctx: RouteContext<()>) -> worker::
             match db_fso::db_get_user_role(&username, &db).await {                 
                 Ok(authorizer_role) => {
                     match authorizer_role {
-                        db_fso::UserRole::VIEWER => return err_insufficent_permissions().await,
-                        db_fso::UserRole::MAINTAINER => return err_insufficent_permissions().await,
+                        db_fso::UserRole::VIEWER => return send_failure(ERROR_INSUFFICIENT_PERMISSISONS, 403).await,
+                        db_fso::UserRole::MAINTAINER => return send_failure(ERROR_INSUFFICIENT_PERMISSISONS, 403).await,
                         _=> {},
                     }         
                 },
@@ -1348,7 +1348,7 @@ pub async fn update_deprecation(mut req: Request, ctx: RouteContext<()>) -> work
         Ok(db) => {
             let session_result = header_session_is_valid(&req, &db).await;
             if !session_result.0 {
-                return err_not_logged_in().await
+                return send_failure(ERROR_NOT_LOGGED_IN, 403).await
             }
 
             let username = session_result.1;
@@ -1356,7 +1356,7 @@ pub async fn update_deprecation(mut req: Request, ctx: RouteContext<()>) -> work
             match db_fso::db_get_user_role(&username, &db).await {                 
                 Ok(authorizer_role) => {
                     match authorizer_role {
-                        db_fso::UserRole::VIEWER => return err_insufficent_permissions().await,
+                        db_fso::UserRole::VIEWER => return send_failure(ERROR_INSUFFICIENT_PERMISSISONS, 403).await,
                         _=> (),
                     }         
 
@@ -1399,7 +1399,7 @@ pub async fn delete_deprecation(req: Request, ctx: RouteContext<()>) -> worker::
         Ok(db) => {
             let session_result = header_session_is_valid(&req, &db).await;
             if !session_result.0 {
-                return err_not_logged_in().await
+                return send_failure(ERROR_NOT_LOGGED_IN, 403).await
             }
 
             let username = session_result.1;
@@ -1407,8 +1407,8 @@ pub async fn delete_deprecation(req: Request, ctx: RouteContext<()>) -> worker::
             match db_fso::db_get_user_role(&username, &db).await {                 
                 Ok(authorizer_role) => {
                     match authorizer_role {
-                        db_fso::UserRole::VIEWER => return err_insufficent_permissions().await,
-                        db_fso::UserRole::MAINTAINER => return err_insufficent_permissions().await,
+                        db_fso::UserRole::VIEWER => return send_failure(ERROR_INSUFFICIENT_PERMISSISONS, 403).await,
+                        db_fso::UserRole::MAINTAINER => return send_failure(ERROR_INSUFFICIENT_PERMISSISONS, 403).await,
                         _=> {},
                     }         
                 },
@@ -1482,7 +1482,7 @@ pub async fn resolve_bug_report(req: Request, ctx: RouteContext<()>) -> worker::
         Ok(db) => {
             let session_result = header_session_is_valid(&req, &db).await;
             if !session_result.0 {
-                return err_not_logged_in().await
+                return send_failure(ERROR_NOT_LOGGED_IN, 403).await
             }
 
             let username = session_result.1;
@@ -1490,8 +1490,8 @@ pub async fn resolve_bug_report(req: Request, ctx: RouteContext<()>) -> worker::
             match db_fso::db_get_user_role(&username, &db).await {                 
                 Ok(authorizer_role) => {
                     match authorizer_role {
-                        db_fso::UserRole::VIEWER => return err_insufficent_permissions().await,
-                        db_fso::UserRole::MAINTAINER => return err_insufficent_permissions().await,
+                        db_fso::UserRole::VIEWER => return send_failure(ERROR_INSUFFICIENT_PERMISSISONS, 403).await,
+                        db_fso::UserRole::MAINTAINER => return send_failure(ERROR_INSUFFICIENT_PERMISSISONS, 403).await,
                         _=> (),
                     }         
                     match ctx.param("id"){
@@ -1528,7 +1528,7 @@ pub async fn unresolve_bug_report(req: Request, ctx: RouteContext<()>) -> worker
         Ok(db) => {
             let session_result = header_session_is_valid(&req, &db).await;
             if !session_result.0 {
-                return err_not_logged_in().await
+                return send_failure(ERROR_NOT_LOGGED_IN, 403).await
             }
 
             let username = session_result.1;
@@ -1536,8 +1536,8 @@ pub async fn unresolve_bug_report(req: Request, ctx: RouteContext<()>) -> worker
             match db_fso::db_get_user_role(&username, &db).await {                 
                 Ok(authorizer_role) => {
                     match authorizer_role {
-                        db_fso::UserRole::VIEWER => return err_insufficent_permissions().await,
-                        db_fso::UserRole::MAINTAINER => return err_insufficent_permissions().await,
+                        db_fso::UserRole::VIEWER => return send_failure(ERROR_INSUFFICIENT_PERMISSISONS, 403).await,
+                        db_fso::UserRole::MAINTAINER => return send_failure(ERROR_INSUFFICIENT_PERMISSISONS, 403).await,
                         _=> (),
                     }         
 
@@ -1576,7 +1576,7 @@ pub async fn acknowledge_bug_report(req: Request, ctx: RouteContext<()>) -> work
         Ok(db) => {
             let session_result = header_session_is_valid(&req, &db).await;
             if !session_result.0 {
-                return err_not_logged_in().await
+                return send_failure(ERROR_NOT_LOGGED_IN, 403).await
             }
 
             let username = session_result.1;
@@ -1643,7 +1643,7 @@ pub async fn update_bug_report(mut req: Request, ctx: RouteContext<()>) -> worke
         Ok(db) => {
             let session_result = header_session_is_valid(&req, &db).await;
             if !session_result.0 {
-                return err_not_logged_in().await
+                return send_failure(ERROR_NOT_LOGGED_IN, 403).await
             }
 
             let username = session_result.1;
@@ -1730,7 +1730,7 @@ pub async fn  header_has_token(req: &Request) -> Option<worker::Result<Response>
             if res { 
                 return None 
             } else {
-                return Some(err_not_logged_in().await)
+                return Some(send_failure(ERROR_NOT_LOGGED_IN, 403).await)
             }        
         },
         Err(e) => return Some(err_specific(e.to_string()).await),
@@ -1743,7 +1743,7 @@ pub async fn header_has_username(req: &Request) -> Option<worker::Result<Respons
             if res { 
                 return None 
             } else {
-                return Some(err_bad_request().await)
+                return Some(send_failure(ERROR_BAD_REQUEST, 403).await)
             }        
         },
         Err(e) => return Some(err_specific(e.to_string()).await),
@@ -1949,53 +1949,52 @@ pub async fn send_confirmation_link(address : &String, activation_key : &String)
 }
 
 // Regular response when successful, allows cross origin requests (necessary for API)
-pub async fn send_success(body: &String) -> worker::Result<Response> {
-    return Ok(Response::from_html(body)?.with_headers(add_cors_headers().await));
+pub async fn send_success(body: &String, token: &String) -> worker::Result<Response> {
+    return Ok(Response::from_html(body)?.with_headers(add_mandatory_headers(token).await));
 }
-
 
 // Regular response when successful, allows cross origin requests (necessary for API)
 pub async fn send_failure(body: &String, code: u16) -> worker::Result<Response> {
-    return Ok(Response::from_html(body)?.with_headers(add_cors_headers().await).with_status(code));
+    return Ok(Response::from_html(body)?.with_headers(add_mandatory_headers(&"".to_string()).await).with_status(code));
 }
 
-pub async fn add_cors_headers() -> worker::Headers {
-    let mut headers = Headers::new();
+pub async fn add_mandatory_headers(token: &String) -> worker::Headers {
+    let mut headers: Headers = Headers::new();
 
     headers.set("Access-Control-Allow-Origin", "https://ganymede.fsotables.com").unwrap();
     headers.set("Access-Control-Allow-Methods", "GET,PATCH,POST,PUT,DELETE").unwrap();
-    headers.set("Acceujk-yk;iju0yutjgym7/ss-Control-Max-Age", "100000").unwrap();
+    headers.set("Access-Control-Max-Age", "100000").unwrap();
+    if !token.is_empty() {
+        headers.set("Set-Cookie", &format!("ganymede-token={}; HttpOnly; Expires={}; Secure; SameSite=Lax", token, (Utc::now() + TimeDelta::days(7) - TimeDelta::seconds(5))))
+    }
 
     return headers
 }
 
-// SECTION!! Body/Server Failure Responses
-pub async fn err_insufficent_permissions() -> worker::Result<Response> {
-    send_failure(&"{\"Error\": \"This operation is not authorizable via our API at your access level.\"}".to_string(), 403).await    
-}
-
-pub async fn err_not_logged_in() -> worker::Result<Response> {
-    send_failure(&"{\"Error\": \"You must be logged and provide an access token to access this endpoint.\"}".to_string(), 403).await
-}
-
-pub async fn err_user_not_active() -> worker::Result<Response> {
-    send_failure(&"{\"Error\": \"The user must be active before it can authorize this type of action\"}".to_string(), 403).await
-}
-
-pub async fn err_api_fallback(_: Request, _: RouteContext<()>) -> worker::Result<Response> {
-    send_failure(&"{\"Error\": \"A method for this API route does not exist.\"}".to_string(), 404).await
-}
-
-pub async fn err_api_under_construction() -> worker::Result<Response> {
-    send_failure(&"{\"Error\": \"This endpoint is under construction.\"}".to_string(), 403).await
-}
-
-pub async fn err_bad_request() -> worker::Result<Response> {
-    send_failure(&"{\"Error\": \"Bad request, check your json input.\"}".to_string(), 400).await
-}
+/// CODE 403
+const ERROR_INSUFFICIENT_PERMISSISONS: &str = "{\"Error\": \"This operation is not authorizable via our API at your access level.\"}";
+/// CODE 403
+const ERROR_NOT_LOGGED_IN: &str = "{\"Error\": \"You must be logged and provide an access token to access this endpoint.\"}";
+/// CODE 403
+const ERROR_USER_NOT_ACTIVE: &str = "{\"Error\": \"The user must be active before it can authorize this type of action\"}";
+/// CODE 404
+//const ERR_API_FALLBACK: &str = "{\"Error\": \"A method for this API route does not exist.\"}";
+/// CODE 403
+const ERROR_BAD_REQUEST: &str = "{\"Error\": \"Bad request, check your json input.\"}";
 
 pub async fn err_specific(e: String) -> worker::Result<Response> {
     send_failure(&e, 500).await    
+}
+
+pub async fn err_specific_and_add_report(external: &String, internal: &String, code: u32, ctx: &RouteContext<()>) -> worker::Result<Response> {
+    let error_record_result: String; 
+    
+    match db_fso::db_insert_error_record(&internal, ctx).await {
+        Ok(_) => error_record_result = "".to_string(),
+        Err(e)=> error_record_result = format!(" Also, the internal error tracker could not save this error report because of \\\"{}\\\".  Please let Cyborg know.", e.to_string()),
+    }
+
+    send_failure(external, code).await
 }
 
 /*
