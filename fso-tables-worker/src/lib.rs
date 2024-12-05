@@ -161,7 +161,7 @@ pub async fn user_register_new(mut req: Request, ctx: RouteContext<()>) -> worke
         Ok(db1) => {
             match db_fso::db_email_taken(&email.email, &db1).await {
                 Ok(exists) => if exists {
-                    return err_specific("User already exists".to_string()).await;
+                    return err_specific("{\"Error\":\"User already exists\"}".to_string()).await;
                 },
                 Err(e) => return err_specific(e.to_string()).await,
             };
@@ -230,24 +230,24 @@ pub async fn user_confirm_email(req: Request, ctx: RouteContext<()>) -> worker::
                     
                     match hash_string(username, key).await {
                         Ok(string) => hashed = string,
-                        Err(e) => return err_specific(e.to_string() + " user confirm email new error").await,
+                        Err(e) => return err_specific(e.to_string()).await,
                     }
 
                     match db_generic_search_query(&db_fso::Table::EmailValidations, 2, &username, &hashed, &ctx).await{
                         Ok(result) => {
                             if result.email_validations.is_empty() {
-                                return err_specific("Bad credentials, please resubmit. User_confirm_email 1".to_string()).await
+                                return err_specific("{\"Error\":\"Bad credentials, please resubmit.\"}".to_string()).await
                             }                         
 
                             // double check that we haven't already validated this email.
                             match db_generic_search_query(&db_fso::Table::Users, 2, username, &"".to_string(), &ctx).await {
                                 Ok(results) => 
                                 if results.users.is_empty() {
-                                    return err_specific("No matching user found. User_confirm_email 2".to_string()).await
+                                    return err_specific("{\"Error\":\"No matching user found.\"}".to_string()).await
                                 } else if results.users[0].email_confirmed != 0 {
-                                    return err_specific("Email is either already confirmed or in error state. Please contact the admin if you cannot access your account. User_confirm_email 3".to_string()).await;
+                                    return err_specific("{\"Error\":\"Email is either already confirmed or in error state. Please contact the admin if you cannot access your account.\"}".to_string()).await;
                                 },
-                                Err(e) => return err_specific(e.to_string() + " User_confirm_email 4").await,
+                                Err(e) => return err_specific(e.to_string()).await,
                             }
 
                             match req.headers().has("password"){
@@ -261,47 +261,47 @@ pub async fn user_confirm_email(req: Request, ctx: RouteContext<()>) -> worker::
                                                             Ok(hashed_password) => {
                                                                 match db_fso::db_set_new_pass(&username, &hashed_password, &ctx).await {
                                                                     Ok(_) => (),
-                                                                    Err(e) => return err_specific(e.to_string() + " User_confirm_email 5").await,
+                                                                    Err(e) => return err_specific(e.to_string()).await,
                                                                 }
 
                                                                 match db_fso::db_generic_delete(db_fso::Table::EmailValidations, &username, &ctx).await {
                                                                     Ok(_) => (),
-                                                                    Err(e) => return err_specific(e.to_string() + " User_confirm_email 6").await,
+                                                                    Err(e) => return err_specific(e.to_string()).await,
                                                                 }
 
                                                                 return create_session_and_send(&username, &ctx).await;   
                                                             },
-                                                            Err(e) => err_specific(e.to_string() + "User_confirm_email 7").await,
+                                                            Err(e) => err_specific(e.to_string()).await,
                                                         }
                                                     },
-                                                    None => return err_specific("Password missing from headers".to_string() + "User_confirm_email 8").await,
+                                                    None => return err_specific("{\"Error\":\"Password missing from headers\"}".to_string()).await,
                                                 }
                                             },
-                                            Err(e) => return err_specific(e.to_string() + "User_confirm_email 9").await,
+                                            Err(e) => return err_specific(e.to_string()).await,
                                         }                                        
                                     } else {
                                         match db_fso::db_generic_delete(db_fso::Table::EmailValidations, &username, &ctx).await {
                                             Ok(_) => (),
-                                            Err(e) => return err_specific(e.to_string() + " User_confirm_email 15").await,
+                                            Err(e) => return err_specific(e.to_string()).await,
                                         }
 
                                         match db_fso::db_set_email_confirmed(&username, &ctx).await {
                                             Ok(_) => return create_session_and_send(&username, &ctx).await,
-                                            Err(e) => return err_specific(e.to_string() + "User_confirm_email 10").await,
+                                            Err(e) => return err_specific(e.to_string()).await,
                                         }
 
                                     }
                                 },
-                                Err(_) => return Response::ok("GO AHEAD AND SET THAT THERE PASSWORD SON. User_confirm_email 11"),
+                                Err(_) => return Response::ok("{\"Error\":\"Activation failed. No password header, which is required for this endpoint.\"}"),
                             }
                         },
                         Err(e) => return err_specific(e.to_string()).await,
                     }
                 },
-                None => return err_specific("Activation failed. Missing username.".to_string() + "User_confirm_email 13").await,
+                None => return err_specific("{\"Error\":\"Activation failed. The request is missing a username.".to_string()).await,
             }
         },
-        None => return err_specific("Activation failed.  Missing activation code.".to_string() + "User_confirm_email 14").await,
+        None => return err_specific("{\"Error\":\"Activation failed. The Request is missing the required activation code.".to_string()).await,
     }
 }
 
@@ -357,7 +357,7 @@ pub async fn deactivate_user(mut req: Request, ctx: RouteContext<()>) -> worker:
                         Ok(target_user) =>{
                             match db_fso::db_has_active_user(&target_user.email, &db).await {
                                 Ok(exists) => if !exists {
-                                    return err_specific("User does not exist or may already be deactivated.".to_string()).await;
+                                    return err_specific("{\"Error\":\"User does not exist or may already be deactivated.\"}".to_string()).await;
                                 },
                                 Err(e) => return err_specific(e.to_string()).await,
                             };
@@ -419,7 +419,7 @@ pub async fn activate_user(mut req: Request, ctx: RouteContext<()>) -> worker::R
                 Ok(target_user) =>{
                     match db_fso::db_email_taken(&target_user.email, &db).await {
                         Ok(exists) => if !exists {
-                            return err_specific("User to activate does not exist.".to_string()).await;
+                            return err_specific("{\"Error\":\"User to be activated does not exist.\"}".to_string()).await;
                         },
                         Err(e) => return err_specific(e.to_string()).await,
                     };
@@ -515,24 +515,24 @@ pub async fn user_login(mut req: Request, ctx: RouteContext<()>) -> worker::Resu
             match req.json::<LoginRequest>().await{
                 Ok(login) => {
                     match db_fso::db_email_taken(&login.email, &db).await {
-                        Ok(b) => if !b { return send_failure(&"Incorrect credentials! Please resubmit.".to_string(), 403).await },
-                        Err(e) => return err_specific(e.to_string()  + "Part 3").await,
+                        Ok(b) => if !b { return send_failure(&"{\"Error\":\"Incorrect credentials! Please resubmit.\"}".to_string(), 403).await },
+                        Err(e) => return err_specific(e.to_string()).await,
                     }
                     match hash_string(&login.email, &login.password).await {
                         Ok(hash) => {
                             if db_fso::db_check_password(&login.email, &hash, &db).await {
                                 return create_session_and_send(&login.email, &ctx).await;
                             } else {
-                                return send_failure(&"Incorrect credentials! Please resubmit.".to_string(), 403).await;
+                                return send_failure(&"{\"Error\":\"Incorrect credentials! Please resubmit.\"}".to_string(), 403).await;
                             }
                         },
-                        Err(_) => return err_specific("Hashing function failed: ".to_string()).await,
+                        Err(_) => return err_specific("{\"Error\":\"Hashing function failed.\"}".to_string()).await,
                     }                    
                 },
-                Err(e) => return err_specific(e.to_string()  + "Part 6").await,
+                Err(e) => return err_specific(e.to_string()).await,
             }
         },
-    Err(e) => err_specific(e.to_string()  + "Part 7").await,
+    Err(e) => err_specific(e.to_string()).await,
     }
 
 }
@@ -566,7 +566,7 @@ pub async fn user_change_password(mut req: Request, ctx: RouteContext<()>) -> wo
                                 Err(e) => return err_specific(e.to_string()).await,
                             }
                         },
-                        Err(e) => return err_specific(e.to_string() + &" Hashing function failed.".to_string()).await,
+                        Err(e) => return err_specific(e.to_string()).await,
                     }                            
                 },
                 Err(_) => return send_failure(&ERROR_BAD_REQUEST.to_string(), 403).await,
@@ -613,14 +613,14 @@ pub async fn user_upgrade_user_permissions(mut req: Request, ctx: RouteContext<(
                         Ok(target_user) =>{
                             match db_fso::db_has_active_user(&target_user.email, &db).await {
                                 Ok(exists) => if !exists {
-                                    return err_specific("User does not exist or may be deactivated.".to_string()).await;
+                                    return err_specific("{\"Error\":\"User does not exist or may be deactivated.\"}".to_string()).await;
                                 },
                                 Err(e) => return err_specific(e.to_string()).await,
                             };
                 
                             // You *cannot* upgrade yourself.
                             if target_user.email == username {
-                                return err_specific("You cannot upgrade your own account.".to_string()).await
+                                return err_specific("{\"Error\":\"You cannot upgrade your own account.\"}".to_string()).await
                             }
 
                             // these two types are not allowed to deactivate other users
@@ -676,14 +676,14 @@ pub async fn user_downgrade_user_permissions(mut req: Request, ctx: RouteContext
                         Ok(target_user) =>{
                             match db_fso::db_has_active_user(&target_user.email, &db).await {
                                 Ok(exists) => if !exists {
-                                    return err_specific("User does not exist or may be deactivated.".to_string()).await;
+                                    return err_specific("{\"Error\":\"User does not exist or may be deactivated.\"}".to_string()).await;
                                 },
                                 Err(e) => return err_specific(e.to_string()).await,
                             };
                 
                             // You *cannot* upgrade yourself.
                             if target_user.email == username {
-                                return err_specific("You cannot downgrade your own account.".to_string()).await
+                                return err_specific("{\"Error\":\"You cannot downgrade your own account.\"}".to_string()).await
                             }
 
                             // these two types are not allowed to deactivate other users
@@ -699,7 +699,7 @@ pub async fn user_downgrade_user_permissions(mut req: Request, ctx: RouteContext
                                     // We cannot downgrade viewers.  Deactivating them is a different code path
                                     if authorizer_role < target_user_role && target_user_role < db_fso::UserRole::VIEWER {
                                         //db_downgrade_user(&target_user.email, &db).await;
-                                        return worker::Response::ok("User Upgraded");
+                                        return worker::Response::ok("{\"Response\":\"User Upgraded\"}");
                                     } else {
                                         return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await;
                                     }
@@ -730,7 +730,7 @@ pub async fn get_parse_type(_: Request, ctx: RouteContext<()>) -> worker::Result
             Ok(results) => return Ok(Response::from_json(&results.parse_behaviors).unwrap().with_headers(add_mandatory_headers(&"".to_string()).await)),
             Err(e) => return err_specific(e.to_string()).await,
         },
-        None => return err_specific("Internal Server Error, route parameter mismatch!".to_string()).await,
+        None => return err_specific("{\"Error\":\"Internal Server Error, route parameter mismatch!\"}".to_string()).await,
     }
 }
 
@@ -754,8 +754,8 @@ pub async fn update_parse_type(mut req: Request, ctx: RouteContext<()>) -> worke
 
                     match req.json::<db_fso::ParseBehavior>().await {
                         Ok(parse_behavior) => {
-                            if parse_behavior.behavior_id < 0 {
-                                return err_specific("Invalid behavior id, cannot update.".to_string()).await;
+                            if parse_behavior.behavior_id < 1 {
+                                return err_specific("{\"Error\":\"Invalid behavior id, cannot update.\"}".to_string()).await;
                             }
 
                             if parse_behavior.behavior != "~!!NO UPDATE!!~"{
@@ -775,7 +775,7 @@ pub async fn update_parse_type(mut req: Request, ctx: RouteContext<()>) -> worke
                             return send_success(&"{\"Response\": \"Success!\"}".to_string(), &"".to_string()).await
 
                         },
-                        Err(e) => return err_specific(e.to_string() + "\nMake sure that the request json has a behavior_id, behavior, and description, even if not updating.  If not updating a field (parse_id cannot be updated) mark a string type with \"~!!NO UPDATE!!~\". Use -2 or a more negative number for ids. Echo back other values.").await,
+                        Err(e) => return err_specific("{\"Error\":\"".to_string() + &e.to_string() + "\n Make sure that the request json has a behavior_id, behavior, and description, even if not updating.  If not updating a field (parse_id cannot be updated) mark a string type with \"~!!NO UPDATE!!~\". Use -2 or a more negative number for ids. Echo back other values.\"}").await,
                     }
                 },
                 Err(e) => return err_specific(e.to_string()).await,
@@ -1007,7 +1007,7 @@ pub async fn update_item(mut req: Request, ctx: RouteContext<()>) -> worker::Res
                             return send_success(&"{\"Response\": \"Success!\"}".to_string(), &"".to_string()).await
 
                         },
-                        Err(e) => return err_specific(e.to_string() + "\nMake sure that the request json has an item_id, behavior, and description, even if not updating.  If not updating a field (id cannot be updated) mark a string type with \"~!!NO UPDATE!!~\". Use -2 or more negative number for ids for no update.  Echo back other values for no update.").await,
+                        Err(e) => return err_specific("{\"Error\":\"".to_string() + &e.to_string() + "\nMake sure that the request json has an item_id, behavior, and description, even if not updating.  If not updating a field (id cannot be updated) mark a string type with \"~!!NO UPDATE!!~\". Use -2 or more negative number for ids for no update.  Echo back other values for no update.\"}").await,
                     }
                 },
                 Err(e) => return err_specific(e.to_string()).await,
@@ -1142,7 +1142,7 @@ pub async fn update_alias(mut req: Request, ctx: RouteContext<()>) -> worker::Re
                             return Response::ok("Success!")
 
                         },
-                        Err(e) => return err_specific(e.to_string() + "\nMake sure that the request json has an alias_id, filename, and table_id, even if not updating.  If not updating a field (parse_id cannot be updated) mark a string type with \"~!!NO UPDATE!!~\". Use -2 or a more negative number for ids. Echo back other values.").await,
+                        Err(e) => return err_specific("{\"Error\":\"".to_string() + &e.to_string() + "\nMake sure that the request json has an alias_id, filename, and table_id, even if not updating.  If not updating a field (parse_id cannot be updated) mark a string type with \"~!!NO UPDATE!!~\". Use -2 or a more negative number for ids. Echo back other values.\"}").await,
                     }
                 },
                 Err(e) => return err_specific(e.to_string()).await,
@@ -1269,7 +1269,7 @@ pub async fn update_restriction(mut req: Request, ctx: RouteContext<()>) -> work
                             return send_success(&"{\"Response\": \"Success!\"}".to_string(), &"".to_string()).await
 
                         },
-                        Err(e) => return err_specific(e.to_string() + "\nMake sure that the request json has a restriction_id, illegal_value_float, illegal_value_int, max_string_length, max_value, min_value, and description, even if not updating.  If not updating a field (parse_id cannot be updated) mark a string type with \"~!!NO UPDATE!!~\". Use -2 or a more negative number for ids. Echo back other values.").await,
+                        Err(e) => return err_specific("{\"Error\":\"".to_string() + &e.to_string() + "\nMake sure that the request json has a restriction_id, illegal_value_float, illegal_value_int, max_string_length, max_value, min_value, and description, even if not updating.  If not updating a field (parse_id cannot be updated) mark a string type with \"~!!NO UPDATE!!~\". Use -2 or a more negative number for ids. Echo back other values.\"}").await,
                     }
                 },
                 Err(e) => return err_specific(e.to_string()).await,
@@ -1383,7 +1383,7 @@ pub async fn update_deprecation(mut req: Request, ctx: RouteContext<()>) -> work
                             return send_success(&"{\"Response\": \"Success!\"}".to_string(), &"".to_string()).await
 
                         },
-                        Err(e) => return err_specific(e.to_string() + "\nMake sure that the request json has a deprecation_id, date, and version, even if not updating.  If not updating a field (deprecation_id cannot be updated) mark a string type with \"~!!NO UPDATE!!~\". Use -2 or a more negative number for ids. Echo back other values.").await,
+                        Err(e) => return err_specific("{\"Error\":\"".to_string() + &e.to_string() + "\nMake sure that the request json has a deprecation_id, date, and version, even if not updating.  If not updating a field (deprecation_id cannot be updated) mark a string type with \"~!!NO UPDATE!!~\". Use -2 or a more negative number for ids. Echo back other values.\"}").await,
                     }
                 },
                 Err(e) => return err_specific(e.to_string()).await,
@@ -1715,7 +1715,7 @@ pub async fn update_bug_report(mut req: Request, ctx: RouteContext<()>) -> worke
                     return send_success(&"{\"Response\":\"Bug report successfully updated!\"}".to_string(), &"".to_string()).await
 
                 },
-                Err(e) => return err_specific(e.to_string() + "\nMake sure that the request json has an bug_type, and description, even if not updating.  If not updating a field (parse_id cannot be updated) mark a string type with \"~!!NO UPDATE!!~\". Use -2 or a more negative number for ids. Echo back other values.").await,
+                Err(e) => return err_specific("{\"Error\":\"".to_string() + &e.to_string() + "\nMake sure that the request json has an bug_type, and description, even if not updating.  If not updating a field (parse_id cannot be updated) mark a string type with \"~!!NO UPDATE!!~\". Use -2 or a more negative number for ids. Echo back other values.\"}").await,
             }
 
         },

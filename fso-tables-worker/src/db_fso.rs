@@ -1135,7 +1135,7 @@ pub async fn db_insert_error_record(error: &String,  ctx: &RouteContext<()>) -> 
         Ok(db) => {
             let query = ERROR_REPORT_INSERT_QUERY;
 
-            match db.prepare(query).bind(&[JsValue::from(error), JsValue::from(Utc::now())]) {
+            match db.prepare(query).bind(&[JsValue::from(error), JsValue::from(Utc::now().to_string())]) {
                 Ok(statement) => {
                     match statement.run().await {
                         Ok(_) => return Ok(()),
