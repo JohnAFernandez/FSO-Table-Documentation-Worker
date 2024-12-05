@@ -1979,6 +1979,7 @@ const ERROR_NOT_LOGGED_IN: &str = "{\"Error\": \"You must be logged and provide 
 const ERROR_USER_NOT_ACTIVE: &str = "{\"Error\": \"The user must be active before it can authorize this type of action\"}";
 /// CODE 404
 //const ERR_API_FALLBACK: &str = "{\"Error\": \"A method for this API route does not exist.\"}";
+
 /// CODE 403
 const ERROR_BAD_REQUEST: &str = "{\"Error\": \"Bad request, check your json input.\"}";
 
