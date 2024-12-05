@@ -719,7 +719,7 @@ pub async fn user_downgrade_user_permissions(mut req: Request, ctx: RouteContext
 
 pub async fn get_parse_types(_: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
     match db_fso::db_generic_search_query(&db_fso::Table::ParseBehaviors, 0, &"".to_string(), &"".to_string(), &ctx).await {
-        Ok(results) => return Response::from_json(&results.parse_behaviors),
+        Ok(results) => return Ok(Response::from_json(&results.parse_behaviors).unwrap().with_headers(add_mandatory_headers(&"".to_string()).await)),
         Err(e) => return err_specific(e.to_string()).await,
     }
 }
@@ -727,7 +727,7 @@ pub async fn get_parse_types(_: Request, ctx: RouteContext<()>) -> worker::Resul
 pub async fn get_parse_type(_: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
     match ctx.param("id"){
         Some(parameter) => match db_fso::db_generic_search_query(&db_fso::Table::ParseBehaviors, 1, parameter, &"".to_string(), &ctx).await {
-            Ok(results) => return Response::from_json(&results.parse_behaviors),
+            Ok(results) => return Ok(Response::from_json(&results.parse_behaviors).unwrap().with_headers(add_mandatory_headers(&"".to_string()).await)),
             Err(e) => return err_specific(e.to_string()).await,
         },
         None => return err_specific("Internal Server Error, route parameter mismatch!".to_string()).await,
@@ -831,7 +831,7 @@ pub async fn delete_parse_type(req: Request, ctx: RouteContext<()>) -> worker::R
 pub async fn get_items(_: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
     match db_fso::db_generic_search_query(&db_fso::Table::FsoItems, 0, &"".to_string(), &"".to_string(), &ctx).await {
         Ok(result) => {
-            return Response::from_json(&result.fso_items);
+            return Ok(Response::from_json(&result.fso_items).unwrap().with_headers(add_mandatory_headers(&"".to_string()).await));
         },
         Err(e) => {
             return err_specific(e.to_string()).await;
@@ -842,7 +842,7 @@ pub async fn get_items(_: Request, ctx: RouteContext<()>) -> worker::Result<Resp
 pub async fn get_item(_: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
     match ctx.param("id"){
         Some(parameter) => match db_fso::db_generic_search_query(&db_fso::Table::FsoItems, 1, parameter, &"".to_string(), &ctx).await {
-            Ok(results) => return Response::from_json(&results.fso_items),
+            Ok(results) => return Ok(Response::from_json(&results.fso_items).unwrap().with_headers(add_mandatory_headers(&"".to_string()).await)),
             Err(e) => return err_specific(e.to_string()).await,
         },
         None => return err_specific("Internal Server Error, route parameter mismatch!".to_string()).await,
@@ -1063,7 +1063,7 @@ pub async fn delete_item(req: Request, ctx: RouteContext<()>) -> worker::Result<
 pub async fn get_tables(_: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
     match db_fso::db_generic_search_query(&db_fso::Table::FsoTables, 0, &"".to_string(), &"".to_string(), &ctx).await {
         Ok(result) => {
-            return Response::from_json(&result.fso_tables);
+            return Ok(Response::from_json(&result.fso_tables).unwrap().with_headers(add_mandatory_headers(&"".to_string()).await));
         },
         Err(e) => {
             return err_specific(e.to_string()).await;
@@ -1074,7 +1074,7 @@ pub async fn get_tables(_: Request, ctx: RouteContext<()>) -> worker::Result<Res
 pub async fn get_table(_: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
     match ctx.param("id"){
         Some(parameter) => match db_fso::db_generic_search_query(&db_fso::Table::FsoTables, 1, parameter, &"".to_string(), &ctx).await {
-            Ok(results) => return Response::from_json(&results.fso_tables),
+            Ok(results) => return Ok(Response::from_json(&results.fso_tables).unwrap().with_headers(add_mandatory_headers(&"".to_string()).await)),
             Err(e) => return err_specific(e.to_string()).await,
         },
         None => return err_specific("Internal Server Error, route parameter mismatch!".to_string()).await,
@@ -1084,7 +1084,7 @@ pub async fn get_table(_: Request, ctx: RouteContext<()>) -> worker::Result<Resp
 pub async fn get_aliases(_: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
     match db_fso::db_generic_search_query(&db_fso::Table::TableAliases, 0, &"".to_string(), &"".to_string(), &ctx).await {
         Ok(result) => {
-            return Response::from_json(&result.table_aliases);
+            return Ok(Response::from_json(&result.table_aliases).unwrap().with_headers(add_mandatory_headers(&"".to_string()).await));
         },
         Err(e) => {
             return err_specific(e.to_string()).await;
@@ -1095,7 +1095,7 @@ pub async fn get_aliases(_: Request, ctx: RouteContext<()>) -> worker::Result<Re
 pub async fn get_alias(_: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
     match ctx.param("id"){
         Some(parameter) => match db_fso::db_generic_search_query(&db_fso::Table::TableAliases, 1, parameter, &"".to_string(), &ctx).await {
-            Ok(results) => return Response::from_json(&results.table_aliases),
+            Ok(results) => return Ok(Response::from_json(&results.table_aliases).unwrap().with_headers(add_mandatory_headers(&"".to_string()).await)),
             Err(e) => return err_specific(e.to_string()).await,
         },
         None => return err_specific("Internal Server Error, route parameter mismatch!".to_string()).await,
@@ -1198,7 +1198,7 @@ pub async fn delete_alias(req: Request, ctx: RouteContext<()>) -> worker::Result
 pub async fn get_restrictions(_: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
     match db_fso::db_generic_search_query(&db_fso::Table::Restrictions, 0, &"".to_string(), &"".to_string(), &ctx).await {
         Ok(result) => {
-            return Response::from_json(&result.restrictions);
+            return Ok(Response::from_json(&result.restrictions).unwrap().with_headers(add_mandatory_headers(&"".to_string()).await));
         },
         Err(e) => {
             return err_specific(e.to_string()).await;
@@ -1209,7 +1209,7 @@ pub async fn get_restrictions(_: Request, ctx: RouteContext<()>) -> worker::Resu
 pub async fn get_restriction(_: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
     match ctx.param("id"){
         Some(parameter) => match db_fso::db_generic_search_query(&db_fso::Table::Restrictions, 1, parameter, &"".to_string(), &ctx).await {
-            Ok(results) => return Response::from_json(&results.restrictions),
+            Ok(results) => return Ok(Response::from_json(&results.restrictions).unwrap().with_headers(add_mandatory_headers(&"".to_string()).await)),
             Err(e) => return err_specific(e.to_string()).await,
         },
         None => return err_specific("Internal Server Error, route parameter mismatch!".to_string()).await,
@@ -1325,7 +1325,7 @@ pub async fn delete_restriction(req: Request, ctx: RouteContext<()>) -> worker::
 pub async fn get_deprecations(_: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
     match db_fso::db_generic_search_query(&db_fso::Table::Deprecations, 0, &"".to_string(), &"".to_string(), &ctx).await {
         Ok(result) => {
-            return Response::from_json(&result.deprecations);
+            return Ok(Response::from_json(&result.deprecations).unwrap().with_headers(add_mandatory_headers(&"".to_string()).await));
         },
         Err(e) => {
             return err_specific(e.to_string()).await;
@@ -1336,7 +1336,7 @@ pub async fn get_deprecations(_: Request, ctx: RouteContext<()>) -> worker::Resu
 pub async fn get_deprecation(_: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
     match ctx.param("id"){
         Some(parameter) => match db_fso::db_generic_search_query(&db_fso::Table::Deprecations, 1, parameter, &"".to_string(), &ctx).await {
-            Ok(results) => return Response::from_json(&results.deprecations),
+            Ok(results) => return Ok(Response::from_json(&results.deprecations).unwrap().with_headers(add_mandatory_headers(&"".to_string()).await)),
             Err(e) => return err_specific(e.to_string()).await,
         },
         None => return err_specific("Internal Server Error, route parameter mismatch!".to_string()).await,
