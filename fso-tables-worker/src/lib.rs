@@ -163,18 +163,18 @@ pub async fn user_register_new(mut req: Request, ctx: RouteContext<()>) -> worke
                 Ok(exists) => if exists {
                     return err_specific("{\"Error\":\"User already exists\"}".to_string()).await;
                 },
-                Err(e) => return err_specific(e.to_string()).await,
+                Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00001\"}".to_string(),&(e.to_string() + " | IEC00001"), 500, &ctx).await,
             };
             
             let statement = db1.prepare("INSERT INTO users (username, role, active, contribution_count) VALUES (?, 3, 0, 0)").bind(&[email.email.clone().into()]);
             match &statement {
                 Ok(q) => {
                     if let Err(e) = q.run().await {
-                        return err_specific(e.to_string()).await;
+                        return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00002\"}".to_string(),&(e.to_string() + " | IEC00002"), 500, &ctx).await;
                     }
 
                 },
-                Err(e) => return err_specific(e.to_string()).await,
+                Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00003\"}".to_string(),&(e.to_string() + " | IEC00003"), 500, &ctx).await,
             }
 
             let mut success = false;
@@ -200,23 +200,23 @@ pub async fn user_register_new(mut req: Request, ctx: RouteContext<()>) -> worke
             }
             
             if success{
-                return send_confirmation_link(&email.email, &activation_string).await
+                return send_confirmation_link(&email.email, &activation_string, &ctx).await
             } else {
                 let statement = db1.prepare("DELETE FROM email_validations WHERE username = ?").bind(&[email.email.clone().into()]);
                 match &statement {
                     Ok(q) => {
                         if let Err(e) = q.run().await {
-                            return err_specific(e.to_string()).await;
+                            return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00004\"}".to_string(),&(e.to_string() + " | IEC00004"), 500, &ctx).await;
                         }
     
                     },
-                    Err(e) => return err_specific(e.to_string()).await,
+                    Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00005\"}".to_string(),&(e.to_string() + " | IEC00005"), 500, &ctx).await,
                 }    
-                return err_specific(error_message).await;
+                return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00006\"}".to_string(),&(error_message + " | IEC00006"), 500, &ctx).await;
             }
 
         },
-        Err(e) => return err_specific(e.to_string()).await,
+        Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00007\"}".to_string(),&(e.to_string() + " | IEC00007"), 500, &ctx).await,
     }
 
 }
@@ -230,7 +230,7 @@ pub async fn user_confirm_email(req: Request, ctx: RouteContext<()>) -> worker::
                     
                     match hash_string(username, key).await {
                         Ok(string) => hashed = string,
-                        Err(e) => return err_specific(e.to_string()).await,
+                        Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00008\"}".to_string(),&(e.to_string() + " | IEC00008"), 500, &ctx).await,
                     }
 
                     match db_generic_search_query(&db_fso::Table::EmailValidations, 2, &username, &hashed, &ctx).await{
@@ -247,7 +247,7 @@ pub async fn user_confirm_email(req: Request, ctx: RouteContext<()>) -> worker::
                                 } else if results.users[0].email_confirmed != 0 {
                                     return err_specific("{\"Error\":\"Email is either already confirmed or in error state. Please contact the admin if you cannot access your account.\"}".to_string()).await;
                                 },
-                                Err(e) => return err_specific(e.to_string()).await,
+                                Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00009\"}".to_string(),&(e.to_string() + " | IEC00009"), 500, &ctx).await,
                             }
 
                             match req.headers().has("password"){
@@ -261,33 +261,33 @@ pub async fn user_confirm_email(req: Request, ctx: RouteContext<()>) -> worker::
                                                             Ok(hashed_password) => {
                                                                 match db_fso::db_set_new_pass(&username, &hashed_password, &ctx).await {
                                                                     Ok(_) => (),
-                                                                    Err(e) => return err_specific(e.to_string()).await,
+                                                                    Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00010\"}".to_string(),&(e.to_string() + " | IEC00010"), 500, &ctx).await,
                                                                 }
 
                                                                 match db_fso::db_generic_delete(db_fso::Table::EmailValidations, &username, &ctx).await {
                                                                     Ok(_) => (),
-                                                                    Err(e) => return err_specific(e.to_string()).await,
+                                                                    Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00011\"}".to_string(),&(e.to_string() + " | IEC00011"), 500, &ctx).await,
                                                                 }
 
                                                                 return create_session_and_send(&username, &ctx).await;   
                                                             },
-                                                            Err(e) => err_specific(e.to_string()).await,
+                                                            Err(e) => err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00012\"}".to_string(),&(e.to_string() + " | IEC00012"), 500, &ctx).await,
                                                         }
                                                     },
                                                     None => return err_specific("{\"Error\":\"Password missing from headers\"}".to_string()).await,
                                                 }
                                             },
-                                            Err(e) => return err_specific(e.to_string()).await,
+                                            Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00013\"}".to_string(),&(e.to_string() + " | IEC00013"), 500, &ctx).await,
                                         }                                        
                                     } else {
                                         match db_fso::db_generic_delete(db_fso::Table::EmailValidations, &username, &ctx).await {
                                             Ok(_) => (),
-                                            Err(e) => return err_specific(e.to_string()).await,
+                                            Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00014\"}".to_string(),&(e.to_string() + " | IEC00014"), 500, &ctx).await,
                                         }
 
                                         match db_fso::db_set_email_confirmed(&username, &ctx).await {
                                             Ok(_) => return create_session_and_send(&username, &ctx).await,
-                                            Err(e) => return err_specific(e.to_string()).await,
+                                            Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00015\"}".to_string(),&(e.to_string() + " | IEC00015"), 500, &ctx).await,
                                         }
 
                                     }
@@ -295,7 +295,7 @@ pub async fn user_confirm_email(req: Request, ctx: RouteContext<()>) -> worker::
                                 Err(_) => return Response::ok("{\"Error\":\"Activation failed. No password header, which is required for this endpoint.\"}"),
                             }
                         },
-                        Err(e) => return err_specific(e.to_string()).await,
+                        Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00016\"}".to_string(),&(e.to_string() + " | IEC00016"), 500, &ctx).await,
                     }
                 },
                 None => return err_specific("{\"Error\":\"Activation failed. The request is missing a username.".to_string()).await,
@@ -327,11 +327,11 @@ pub async fn user_get_details(req: Request, ctx: RouteContext<()>) -> worker::Re
 
             match db_fso::db_get_user_details(&username, &db).await {
                 Ok(res) => return Ok(Response::from_json(&res).unwrap().with_headers(add_mandatory_headers(&"".to_string()).await)),
-                Err(e) => return err_specific(e.to_string()).await,
+                Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00017\"}".to_string(),&(e.to_string() + " | IEC00017"), 500, &ctx).await,
             }    
                   
         },
-        Err(e) => return err_specific(e.to_string()).await,
+        Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00018\"}".to_string(),&(e.to_string() + " | IEC00018"), 500, &ctx).await,
     }
 }
 
@@ -341,7 +341,7 @@ pub async fn deactivate_user(mut req: Request, ctx: RouteContext<()>) -> worker:
         Ok(db) => {
             let session_result = header_session_is_valid(&req, &db).await;
             if !session_result.0 {
-                return err_specific(session_result.1).await
+                return err_specific("{\"Error\":\"".to_string() + &session_result.1 + "\"}").await
             }
 
             let username = session_result.1;
@@ -359,7 +359,7 @@ pub async fn deactivate_user(mut req: Request, ctx: RouteContext<()>) -> worker:
                                 Ok(exists) => if !exists {
                                     return err_specific("{\"Error\":\"User does not exist or may already be deactivated.\"}".to_string()).await;
                                 },
-                                Err(e) => return err_specific(e.to_string()).await,
+                                Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00019\"}".to_string(),&(e.to_string() + " | IEC00019"), 500, &ctx).await,
                             };
                 
                             // Owners can only be deactivated by someone working directly with the database.
@@ -368,7 +368,7 @@ pub async fn deactivate_user(mut req: Request, ctx: RouteContext<()>) -> worker:
                                 
                                 match db_fso::db_deactivate_user(&username, &db).await {
                                     Ok(_) => return send_success(&"{\"Response\": \"User Deactivated\"}".to_string(), &"".to_string()).await,
-                                    Err(e) => return err_specific(e.to_string()).await,
+                                    Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00020\"}".to_string(),&(e.to_string() + " | IEC00020"), 500, &ctx).await,
                                 }
 
                             }
@@ -385,23 +385,23 @@ pub async fn deactivate_user(mut req: Request, ctx: RouteContext<()>) -> worker:
                                     if authorizer_role < target_user_role{
                                         match db_fso::db_deactivate_user(&target_user.email, &db).await {
                                             Ok(_) => return send_success(&"{\"Response\": \"User Deactivated\"}".to_string(), &"".to_string()).await,
-                                            Err(e) => return err_specific(e.to_string()).await,
+                                            Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00021\"}".to_string(),&(e.to_string() + " | IEC00021"), 500, &ctx).await,
                                         }
                                     } else {
                                         return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await;
                                     }
                                 },
-                                Err(e) => return err_specific(e.to_string()).await,                                
+                                Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00022\"}".to_string(),&(e.to_string() + " | IEC00022"), 500, &ctx).await,                                
                             }               
                         },
                         Err(_) => return send_failure(&ERROR_BAD_REQUEST.to_string(), 403).await,
                     }
                 },
-                Err(e) => return err_specific(e.to_string()).await, 
+                Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00023\"}".to_string(),&(e.to_string() + " | IEC00023"), 500, &ctx).await, 
             }
             
         },
-        Err(e) => return err_specific(e.to_string()).await,
+        Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00024\"}".to_string(),&(e.to_string() + " | IEC00024"), 500, &ctx).await,
     }
 }
 
@@ -421,7 +421,7 @@ pub async fn activate_user(mut req: Request, ctx: RouteContext<()>) -> worker::R
                         Ok(exists) => if !exists {
                             return err_specific("{\"Error\":\"User to be activated does not exist.\"}".to_string()).await;
                         },
-                        Err(e) => return err_specific(e.to_string()).await,
+                        Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00025\"}".to_string(),&(e.to_string() + " | IEC00025"), 500, &ctx).await,
                     };
 
                     // make no changes if this user already exists
@@ -436,7 +436,7 @@ pub async fn activate_user(mut req: Request, ctx: RouteContext<()>) -> worker::R
                         if target_user.email == username{
                             match db_fso::db_activate_user(&target_user.email, &db).await {
                                 Ok(_) => (),
-                                Err(e) => return err_specific(e.to_string()).await,
+                                Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00026\"}".to_string(),&(e.to_string() + " | IEC00026"), 500, &ctx).await,
                             }
                         } else {
                             return send_failure(&ERROR_USER_NOT_ACTIVE.to_string(), 403).await
@@ -477,7 +477,7 @@ pub async fn activate_user(mut req: Request, ctx: RouteContext<()>) -> worker::R
                                 if role < db_fso::UserRole::MAINTAINER{
                                     match db_fso::db_force_role(&target_user.email, &db, db_fso::UserRole::MAINTAINER).await {
                                         Ok(_) => return send_success(&"{\"Response\": \"User Activated\"}".to_string(), &"".to_string()).await,
-                                        Err(e) => return err_specific(e.to_string()).await,
+                                        Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00027\"}".to_string(),&(e.to_string() + " | IEC00027"), 500, &ctx).await,
                                     }
                                 } else {
                                     return send_success(&"{\"Response\": \"User Activated\"}".to_string(), &"".to_string()).await
@@ -485,20 +485,20 @@ pub async fn activate_user(mut req: Request, ctx: RouteContext<()>) -> worker::R
                             },
                             Err(e) => {
                                 let _ = db_fso::db_deactivate_user(&target_user.email, &db).await;
-                                return err_specific(e.to_string()).await
+                                return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00028\"}".to_string(),&(e.to_string() + " | IEC00028"), 500, &ctx).await
                             }
                         }
                         },
                         Err(e) => {
                             let _ = db_fso::db_deactivate_user(&target_user.email, &db).await;
-                            return err_specific(e.to_string()).await
+                            return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00029\"}".to_string(),&(e.to_string() + " | IEC00029"), 500, &ctx).await
                         }
                     }    
                 },
                 Err(_) => return send_failure(&ERROR_BAD_REQUEST.to_string(), 403).await,
             }        
         },
-        Err(e) => return err_specific(e.to_string()).await,
+        Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00030\"}".to_string(),&(e.to_string() + " | IEC00030"), 500, &ctx).await,
     }
 }
 
@@ -516,7 +516,7 @@ pub async fn user_login(mut req: Request, ctx: RouteContext<()>) -> worker::Resu
                 Ok(login) => {
                     match db_fso::db_email_taken(&login.email, &db).await {
                         Ok(b) => if !b { return send_failure(&"{\"Error\":\"Incorrect credentials! Please resubmit.\"}".to_string(), 403).await },
-                        Err(e) => return err_specific(e.to_string()).await,
+                        Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00031\"}".to_string(),&(e.to_string() + " | IEC00031"), 500, &ctx).await,
                     }
                     match hash_string(&login.email, &login.password).await {
                         Ok(hash) => {
@@ -529,10 +529,10 @@ pub async fn user_login(mut req: Request, ctx: RouteContext<()>) -> worker::Resu
                         Err(_) => return err_specific("{\"Error\":\"Hashing function failed.\"}".to_string()).await,
                     }                    
                 },
-                Err(e) => return err_specific(e.to_string()).await,
+                Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00032\"}".to_string(),&(e.to_string() + " | IEC00032"), 500, &ctx).await,
             }
         },
-    Err(e) => err_specific(e.to_string()).await,
+    Err(e) => err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00033\"}".to_string(),&(e.to_string() + " | IEC00033"), 500, &ctx).await,
     }
 
 }
@@ -556,23 +556,23 @@ pub async fn user_change_password(mut req: Request, ctx: RouteContext<()>) -> wo
                 Ok(password) => {
                     match check_password_requirements(&password.password).await{
                         Ok(_) => (),
-                        Err(e) => return err_specific(e.to_string()).await,
+                        Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00034\"}".to_string(),&(e.to_string() + " | IEC00034"), 500, &ctx).await,
                     }
                     
                     match hash_string(&username, &password.password).await {                             
                         Ok(hash) => { 
                             match db_fso::db_set_new_pass(&username, &hash, &ctx).await {
                                 Ok(_) => return send_success(&"{\"Response\": \"Password Changed!\"}".to_string(), &"".to_string()).await,
-                                Err(e) => return err_specific(e.to_string()).await,
+                                Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00035\"}".to_string(),&(e.to_string() + " | IEC00035"), 500, &ctx).await,
                             }
                         },
-                        Err(e) => return err_specific(e.to_string()).await,
+                        Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00036\"}".to_string(),&(e.to_string() + " | IEC00036"), 500, &ctx).await,
                     }                            
                 },
                 Err(_) => return send_failure(&ERROR_BAD_REQUEST.to_string(), 403).await,
             }
         },
-        Err(e)=> err_specific(e.to_string()).await,
+        Err(e)=> err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00037\"}".to_string(),&(e.to_string() + " | IEC00037"), 500, &ctx).await,
     }
 }
 
@@ -615,7 +615,7 @@ pub async fn user_upgrade_user_permissions(mut req: Request, ctx: RouteContext<(
                                 Ok(exists) => if !exists {
                                     return err_specific("{\"Error\":\"User does not exist or may be deactivated.\"}".to_string()).await;
                                 },
-                                Err(e) => return err_specific(e.to_string()).await,
+                                Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00038\"}".to_string(),&(e.to_string() + " | IEC00038"), 500, &ctx).await,
                             };
                 
                             // You *cannot* upgrade yourself.
@@ -641,16 +641,16 @@ pub async fn user_upgrade_user_permissions(mut req: Request, ctx: RouteContext<(
                                         return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await;
                                     }
                                 },
-                                Err(e) => return err_specific(e.to_string()).await,                                
+                                Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00039\"}".to_string(),&(e.to_string() + " | IEC00039"), 500, &ctx).await,                                
                             }               
                         },
                         Err(_) => return send_failure(&ERROR_BAD_REQUEST.to_string(), 403).await,
                     }
                 },
-                Err(e) => return err_specific(e.to_string()).await, 
+                Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00040\"}".to_string(),&(e.to_string() + " | IEC00040"), 500, &ctx).await, 
             }
         },
-        Err(e) => return err_specific(e.to_string()).await,
+        Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00041\"}".to_string(),&(e.to_string() + " | IEC00041"), 500, &ctx).await,
     }
 }
 
@@ -678,7 +678,7 @@ pub async fn user_downgrade_user_permissions(mut req: Request, ctx: RouteContext
                                 Ok(exists) => if !exists {
                                     return err_specific("{\"Error\":\"User does not exist or may be deactivated.\"}".to_string()).await;
                                 },
-                                Err(e) => return err_specific(e.to_string()).await,
+                                Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00042\"}".to_string(),&(e.to_string() + " | IEC00042"), 500, &ctx).await,
                             };
                 
                             // You *cannot* upgrade yourself.
@@ -704,23 +704,23 @@ pub async fn user_downgrade_user_permissions(mut req: Request, ctx: RouteContext
                                         return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await;
                                     }
                                 },
-                                Err(e) => return err_specific(e.to_string()).await,                                
+                                Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00043\"}".to_string(),&(e.to_string() + " | IEC00043"), 500, &ctx).await,                                
                             }               
                         },
                         Err(_) => return send_failure(&ERROR_BAD_REQUEST.to_string(), 403).await,
                     }
                 },
-                Err(e) => return err_specific(e.to_string()).await, 
+                Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00044\"}".to_string(),&(e.to_string() + " | IEC00044"), 500, &ctx).await, 
             }
         },
-        Err(e) => return err_specific(e.to_string()).await,
+        Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00045\"}".to_string(),&(e.to_string() + " | IEC00045"), 500, &ctx).await,
     }
 }
 
 pub async fn get_parse_types(_: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
     match db_fso::db_generic_search_query(&db_fso::Table::ParseBehaviors, 0, &"".to_string(), &"".to_string(), &ctx).await {
         Ok(results) => return Ok(Response::from_json(&results.parse_behaviors).unwrap().with_headers(add_mandatory_headers(&"".to_string()).await)),
-        Err(e) => return err_specific(e.to_string()).await,
+        Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00046\"}".to_string(),&(e.to_string() + " | IEC00046"), 500, &ctx).await,
     }
 }
 
@@ -728,7 +728,7 @@ pub async fn get_parse_type(_: Request, ctx: RouteContext<()>) -> worker::Result
     match ctx.param("id"){
         Some(parameter) => match db_fso::db_generic_search_query(&db_fso::Table::ParseBehaviors, 1, parameter, &"".to_string(), &ctx).await {
             Ok(results) => return Ok(Response::from_json(&results.parse_behaviors).unwrap().with_headers(add_mandatory_headers(&"".to_string()).await)),
-            Err(e) => return err_specific(e.to_string()).await,
+            Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00047\"}".to_string(),&(e.to_string() + " | IEC00047"), 500, &ctx).await,
         },
         None => return err_specific("{\"Error\":\"Internal Server Error, route parameter mismatch!\"}".to_string()).await,
     }
@@ -761,14 +761,14 @@ pub async fn update_parse_type(mut req: Request, ctx: RouteContext<()>) -> worke
                             if parse_behavior.behavior != "~!!NO UPDATE!!~"{
                                 match db_fso::db_generic_update_query(&db_fso::Table::ParseBehaviors, 0, &parse_behavior.behavior, &parse_behavior.behavior_id.to_string(),  &ctx).await {
                                     Ok(_) => (),
-                                    Err(e) => return err_specific(e.to_string()).await,
+                                    Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00048\"}".to_string(),&(e.to_string() + " | IEC00048"), 500, &ctx).await,
                                 }    
                             }
 
                             if parse_behavior.description != "~!!NO UPDATE!!~"{
                                 match db_fso::db_generic_update_query(&db_fso::Table::ParseBehaviors, 1, &parse_behavior.description, &parse_behavior.behavior_id.to_string(),  &ctx).await {
                                     Ok(_) => (),
-                                    Err(e) => return err_specific(e.to_string()).await,
+                                    Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00049\"}".to_string(),&(e.to_string() + " | IEC00049"), 500, &ctx).await,
                                 }
                             }
 
@@ -778,11 +778,11 @@ pub async fn update_parse_type(mut req: Request, ctx: RouteContext<()>) -> worke
                         Err(e) => return err_specific("{\"Error\":\"".to_string() + &e.to_string() + "\n Make sure that the request json has a behavior_id, behavior, and description, even if not updating.  If not updating a field (parse_id cannot be updated) mark a string type with \"~!!NO UPDATE!!~\". Use -2 or a more negative number for ids. Echo back other values.\"}").await,
                     }
                 },
-                Err(e) => return err_specific(e.to_string()).await,
+                Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00050\"}".to_string(),&(e.to_string() + " | IEC00050"), 500, &ctx).await,
             }
 
         },
-        Err(e) => return err_specific(e.to_string()).await,
+        Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00051\"}".to_string(),&(e.to_string() + " | IEC00051"), 500, &ctx).await,
     }
 }
 
@@ -804,7 +804,7 @@ pub async fn delete_parse_type(req: Request, ctx: RouteContext<()>) -> worker::R
                         _=> {},
                     }         
                 },
-                Err(e) => return err_specific(e.to_string()).await,
+                Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00052\"}".to_string(),&(e.to_string() + " | IEC00052"), 500, &ctx).await,
             }
 
             match ctx.param("id"){
@@ -813,18 +813,18 @@ pub async fn delete_parse_type(req: Request, ctx: RouteContext<()>) -> worker::R
                         Ok(_) =>{
                             match db_fso::db_generic_delete(db_fso::Table::ParseBehaviors, id, &ctx).await {
                                 Ok(_) => return send_success(&"{\"Response\": \"Success!\"}".to_string(), &"".to_string()).await,
-                                Err(e) => return err_specific(e.to_string()).await,
+                                Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00053\"}".to_string(),&(e.to_string() + " | IEC00053"), 500, &ctx).await,
                             }
                             
                         },
-                        Err(_) => return err_specific("Could not parse the parse behavior id as an integer, please resubmit!".to_string()).await,
+                        Err(_) => return err_specific("{\"Error\":\"Could not parse the parse behavior id as an integer, please resubmit!\"}".to_string()).await,
                     }
                 },
-                None => return err_specific("Please provide a parse behavior id to delete, and then resubmit.".to_string()).await,
+                None => return err_specific("{\"Error\":\"Please provide a parse behavior id to delete, and then resubmit.\"}".to_string()).await,
             }
         },
 
-        Err(e) => return err_specific(e.to_string()).await,
+        Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00054\"}".to_string(),&(e.to_string() + " | IEC00054"), 500, &ctx).await,
     }
 }
 
@@ -834,7 +834,7 @@ pub async fn get_items(_: Request, ctx: RouteContext<()>) -> worker::Result<Resp
             return Ok(Response::from_json(&result.fso_items).unwrap().with_headers(add_mandatory_headers(&"".to_string()).await));
         },
         Err(e) => {
-            return err_specific(e.to_string()).await;
+            return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00055\"}".to_string(),&(e.to_string() + " | IEC00055"), 500, &ctx).await;
         }
     }
 }
@@ -843,9 +843,9 @@ pub async fn get_item(_: Request, ctx: RouteContext<()>) -> worker::Result<Respo
     match ctx.param("id"){
         Some(parameter) => match db_fso::db_generic_search_query(&db_fso::Table::FsoItems, 1, parameter, &"".to_string(), &ctx).await {
             Ok(results) => return Ok(Response::from_json(&results.fso_items).unwrap().with_headers(add_mandatory_headers(&"".to_string()).await)),
-            Err(e) => return err_specific(e.to_string()).await,
+            Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00056\"}".to_string(),&(e.to_string() + " | IEC00056"), 500, &ctx).await,
         },
-        None => return err_specific("Internal Server Error, route parameter mismatch!".to_string()).await,
+        None => return err_specific("{\"Error\":\"Internal Server Error, route parameter mismatch!\"}".to_string()).await,
     }
 }
 
@@ -883,24 +883,24 @@ pub async fn insert_item(mut req: Request, ctx: RouteContext<()>) -> worker::Res
                         _=> (),
                     }  
                 },
-                Err(e) => return err_specific(e.to_string()).await,
+                Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00057\"}".to_string(),&(e.to_string() + " | IEC00057"), 500, &ctx).await,
             }
 
             match req.json::<NewItem>().await{
                 Ok(new_item) => {
                     if new_item.item_text.trim().is_empty()  {
-                        return err_specific("Item text cannot be empty.  Please resubmit your item.".to_string()).await;
+                        return err_specific("{\"Error\":\"Item text cannot be empty.  Please resubmit your item.\"}".to_string()).await;
                     }
 
                     if new_item.major_version.is_empty() {
-                        return err_specific("Item major version must be specified.".to_string()).await;
+                        return err_specific("{\"Error\":\"Item major version must be specified.\"}".to_string()).await;
                     }
 
                     match Regex::new(DB_SEMVER_CHARACTERS) {
                         Ok(search_set) => {
                             match search_set.find(&new_item.major_version) {
-                                Some(_) => return err_specific("Disallowed semver characters found, please submit with a corrected majorversion.".to_string()).await,
-                                None => err_specific("I'm not done yet come back later.".to_string()).await,
+                                Some(_) => return err_specific("{\"Error\":\"Disallowed semver characters found, please submit with a corrected majorversion.\"}".to_string()).await,
+                                None => err_specific("{\"Error\":\"I'm not done yet come back later.\"}".to_string()).await,
                             }    
                         },
                         Err(e) => return Err(e.to_string().into())
@@ -909,12 +909,12 @@ pub async fn insert_item(mut req: Request, ctx: RouteContext<()>) -> worker::Res
                     
 
                 },
-                Err(e) => return err_specific(e.to_string()).await,
+                Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00058\"}".to_string(),&(e.to_string() + " | IEC00058"), 500, &ctx).await,
             }
 
 
         }, 
-        Err(e) => return err_specific(e.to_string()).await
+        Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00059\"}".to_string(),&(e.to_string() + " | IEC00059"), 500, &ctx).await
     }
 }
 
@@ -938,69 +938,69 @@ pub async fn update_item(mut req: Request, ctx: RouteContext<()>) -> worker::Res
                     match req.json::<db_fso::FsoItems>().await {
                         Ok(item) => {
                             if item.item_id < 0 {
-                                return err_specific("Invalid item id, cannot update.".to_string()).await;
+                                return err_specific("{\"Error\":\"Invalid item id, cannot update.\"}".to_string()).await;
                             }
 
                             if item.default_value != "~!!NO UPDATE!!~"{
                                 match db_fso::db_generic_update_query(&db_fso::Table::FsoItems, 0, &item.default_value, &item.item_id.to_string(),  &ctx).await {
                                     Ok(_) => (),
-                                    Err(e) => return err_specific(e.to_string()).await,
+                                    Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00060\"}".to_string(),&(e.to_string() + " | IEC00060"), 500, &ctx).await,
                                 }    
                             }
 
                             if item.deprecation_id > -2 {
                                 match db_fso::db_generic_update_query(&db_fso::Table::FsoItems, 1, &item.deprecation_id.to_string(), &item.item_id.to_string(),  &ctx).await {
                                     Ok(_) => (),
-                                    Err(e) => return err_specific(e.to_string()).await,
+                                    Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00061\"}".to_string(),&(e.to_string() + " | IEC00061"), 500, &ctx).await,
                                 }
                             }
 
                             if item.documentation != "~!!NO UPDATE!!~"{
                                 match db_fso::db_generic_update_query(&db_fso::Table::FsoItems, 2, &item.documentation, &item.item_id.to_string(),  &ctx).await {
                                     Ok(_) => (),
-                                    Err(e) => return err_specific(e.to_string()).await,
+                                    Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00062\"}".to_string(),&(e.to_string() + " | IEC00062"), 500, &ctx).await,
                                 }
                             }
 
                             if item.info_type != "~!!NO UPDATE!!~"{
                                 match db_fso::db_generic_update_query(&db_fso::Table::FsoItems, 3, &item.info_type, &item.item_id.to_string(),  &ctx).await {
                                     Ok(_) => (),
-                                    Err(e) => return err_specific(e.to_string()).await,
+                                    Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00063\"}".to_string(),&(e.to_string() + " | IEC00063"), 500, &ctx).await,
                                 }
                             }
 
                             if item.item_text != "~!!NO UPDATE!!~"{
                                 match db_fso::db_generic_update_query(&db_fso::Table::FsoItems, 4, &item.item_text, &item.item_id.to_string(),  &ctx).await {
                                     Ok(_) => (),
-                                    Err(e) => return err_specific(e.to_string()).await,
+                                    Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00064\"}".to_string(),&(e.to_string() + " | IEC00064"), 500, &ctx).await,
                                 }
                             }
 
                             if item.major_version != "~!!NO UPDATE!!~"{
                                 match db_fso::db_generic_update_query(&db_fso::Table::FsoItems, 5, &item.major_version, &item.item_id.to_string(),  &ctx).await {
                                     Ok(_) => (),
-                                    Err(e) => return err_specific(e.to_string()).await,
+                                    Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00065\"}".to_string(),&(e.to_string() + " | IEC00065"), 500, &ctx).await,
                                 }
                             }
                             
                             if item.parent_id > -2 {
                                 match db_fso::db_generic_update_query(&db_fso::Table::FsoItems, 6, &item.parent_id.to_string(), &item.item_id.to_string(),  &ctx).await {
                                     Ok(_) => (),
-                                    Err(e) => return err_specific(e.to_string()).await,
+                                    Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00066\"}".to_string(),&(e.to_string() + " | IEC00066"), 500, &ctx).await,
                                 }
                             }
 
                             if item.restriction_id > -2 {
                                 match db_fso::db_generic_update_query(&db_fso::Table::FsoItems, 7, &item.restriction_id.to_string(), &item.item_id.to_string(),  &ctx).await {
                                     Ok(_) => (),
-                                    Err(e) => return err_specific(e.to_string()).await,
+                                    Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00067\"}".to_string(),&(e.to_string() + " | IEC00067"), 500, &ctx).await,
                                 }
                             }
 
                             if item.table_id > -2 {
                                 match db_fso::db_generic_update_query(&db_fso::Table::FsoItems, 8, &item.table_id.to_string(), &item.item_id.to_string(),  &ctx).await {
                                     Ok(_) => (),
-                                    Err(e) => return err_specific(e.to_string()).await,
+                                    Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00068\"}".to_string(),&(e.to_string() + " | IEC00068"), 500, &ctx).await,
                                 }
                             }
 
@@ -1010,11 +1010,11 @@ pub async fn update_item(mut req: Request, ctx: RouteContext<()>) -> worker::Res
                         Err(e) => return err_specific("{\"Error\":\"".to_string() + &e.to_string() + "\nMake sure that the request json has an item_id, behavior, and description, even if not updating.  If not updating a field (id cannot be updated) mark a string type with \"~!!NO UPDATE!!~\". Use -2 or more negative number for ids for no update.  Echo back other values for no update.\"}").await,
                     }
                 },
-                Err(e) => return err_specific(e.to_string()).await,
+                Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00069\"}".to_string(),&(e.to_string() + " | IEC00069"), 500, &ctx).await,
             }
 
         },
-        Err(e) => return err_specific(e.to_string()).await,
+        Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00070\"}".to_string(),&(e.to_string() + " | IEC00070"), 500, &ctx).await,
     }
 }
 
@@ -1036,7 +1036,7 @@ pub async fn delete_item(req: Request, ctx: RouteContext<()>) -> worker::Result<
                         _=> {},
                     }         
                 },
-                Err(e) => return err_specific(e.to_string()).await,
+                Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00071\"}".to_string(),&(e.to_string() + " | IEC00071"), 500, &ctx).await,
             }
 
             match ctx.param("id"){
@@ -1045,18 +1045,18 @@ pub async fn delete_item(req: Request, ctx: RouteContext<()>) -> worker::Result<
                         Ok(_) =>{
                             match db_fso::db_generic_delete(db_fso::Table::FsoItems, id, &ctx).await {
                                 Ok(_) => return send_success(&"{\"Response\": \"Success!\"}".to_string(), &"".to_string()).await,
-                                Err(e) => return err_specific(e.to_string()).await,
+                                Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00072\"}".to_string(),&(e.to_string() + " | IEC00072"), 500, &ctx).await,
                             }
                             
                         },
-                        Err(_) => return err_specific("Could not parse the item id as an integer, please resubmit!".to_string()).await,
+                        Err(_) => return err_specific("{\"Error\":\"Could not parse the item id as an integer, please resubmit!\"}".to_string()).await,
                     }
                 },
-                None => return err_specific("Please provide a item id to delete, and then resubmit.".to_string()).await,
+                None => return err_specific("{\"Error\":\"Please provide a item id to delete, and then resubmit.\"}".to_string()).await,
             }
         },
 
-        Err(e) => return err_specific(e.to_string()).await,
+        Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00073\"}".to_string(),&(e.to_string() + " | IEC00073"), 500, &ctx).await,
     }
 }
 
@@ -1066,7 +1066,7 @@ pub async fn get_tables(_: Request, ctx: RouteContext<()>) -> worker::Result<Res
             return Ok(Response::from_json(&result.fso_tables).unwrap().with_headers(add_mandatory_headers(&"".to_string()).await));
         },
         Err(e) => {
-            return err_specific(e.to_string()).await;
+            return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00074\"}".to_string(),&(e.to_string() + " | IEC00074"), 500, &ctx).await;
         }
     }
 }
@@ -1075,9 +1075,9 @@ pub async fn get_table(_: Request, ctx: RouteContext<()>) -> worker::Result<Resp
     match ctx.param("id"){
         Some(parameter) => match db_fso::db_generic_search_query(&db_fso::Table::FsoTables, 1, parameter, &"".to_string(), &ctx).await {
             Ok(results) => return Ok(Response::from_json(&results.fso_tables).unwrap().with_headers(add_mandatory_headers(&"".to_string()).await)),
-            Err(e) => return err_specific(e.to_string()).await,
+            Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00075\"}".to_string(),&(e.to_string() + " | IEC00075"), 500, &ctx).await,
         },
-        None => return err_specific("Internal Server Error, route parameter mismatch!".to_string()).await,
+        None => return err_specific("{\"Error\":\"Internal Server Error, route parameter mismatch!\"}".to_string()).await,
     }
 }
 
@@ -1087,7 +1087,7 @@ pub async fn get_aliases(_: Request, ctx: RouteContext<()>) -> worker::Result<Re
             return Ok(Response::from_json(&result.table_aliases).unwrap().with_headers(add_mandatory_headers(&"".to_string()).await));
         },
         Err(e) => {
-            return err_specific(e.to_string()).await;
+            return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00076\"}".to_string(),&(e.to_string() + " | IEC00076"), 500, &ctx).await;
         }
     }
 }
@@ -1096,9 +1096,9 @@ pub async fn get_alias(_: Request, ctx: RouteContext<()>) -> worker::Result<Resp
     match ctx.param("id"){
         Some(parameter) => match db_fso::db_generic_search_query(&db_fso::Table::TableAliases, 1, parameter, &"".to_string(), &ctx).await {
             Ok(results) => return Ok(Response::from_json(&results.table_aliases).unwrap().with_headers(add_mandatory_headers(&"".to_string()).await)),
-            Err(e) => return err_specific(e.to_string()).await,
+            Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00077\"}".to_string(),&(e.to_string() + " | IEC00077"), 500, &ctx).await,
         },
-        None => return err_specific("Internal Server Error, route parameter mismatch!".to_string()).await,
+        None => return err_specific("{\"Error\":\"Internal Server Error, route parameter mismatch!\"}".to_string()).await,
     }
 }
 
@@ -1122,20 +1122,20 @@ pub async fn update_alias(mut req: Request, ctx: RouteContext<()>) -> worker::Re
                     match req.json::<db_fso::TableAlias>().await {
                         Ok(table_alias) => {
                             if table_alias.alias_id < 0 {
-                                return err_specific("Invalid table alias id, cannot update.".to_string()).await;
+                                return err_specific("{\"Error\":\"Invalid table alias id, cannot update.\"}".to_string()).await;
                             }
 
                             if table_alias.filename != "~!!NO UPDATE!!~"{
                                 match db_fso::db_generic_update_query(&db_fso::Table::TableAliases, 0, &table_alias.filename, &table_alias.alias_id.to_string(),  &ctx).await {
                                     Ok(_) => (),
-                                    Err(e) => return err_specific(e.to_string()).await,
+                                    Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00078\"}".to_string(),&(e.to_string() + " | IEC00078"), 500, &ctx).await,
                                 }    
                             }
 
                             if table_alias.table_id > -2{
                                 match db_fso::db_generic_update_query(&db_fso::Table::TableAliases, 1, &table_alias.table_id.to_string(), &table_alias.alias_id.to_string(),  &ctx).await {
                                     Ok(_) => (),
-                                    Err(e) => return err_specific(e.to_string()).await,
+                                    Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00079\"}".to_string(),&(e.to_string() + " | IEC00079"), 500, &ctx).await,
                                 }
                             }
 
@@ -1145,11 +1145,11 @@ pub async fn update_alias(mut req: Request, ctx: RouteContext<()>) -> worker::Re
                         Err(e) => return err_specific("{\"Error\":\"".to_string() + &e.to_string() + "\nMake sure that the request json has an alias_id, filename, and table_id, even if not updating.  If not updating a field (parse_id cannot be updated) mark a string type with \"~!!NO UPDATE!!~\". Use -2 or a more negative number for ids. Echo back other values.\"}").await,
                     }
                 },
-                Err(e) => return err_specific(e.to_string()).await,
+                Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00080\"}".to_string(),&(e.to_string() + " | IEC00080"), 500, &ctx).await,
             }
 
         },
-        Err(e) => return err_specific(e.to_string()).await,
+        Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00081\"}".to_string(),&(e.to_string() + " | IEC00081"), 500, &ctx).await,
     }
 }
 
@@ -1171,7 +1171,7 @@ pub async fn delete_alias(req: Request, ctx: RouteContext<()>) -> worker::Result
                         _=> {},
                     }         
                 },
-                Err(e) => return err_specific(e.to_string()).await,
+                Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00082\"}".to_string(),&(e.to_string() + " | IEC00082"), 500, &ctx).await,
             }
 
             match ctx.param("id"){
@@ -1180,18 +1180,18 @@ pub async fn delete_alias(req: Request, ctx: RouteContext<()>) -> worker::Result
                         Ok(_) =>{
                             match db_fso::db_generic_delete(db_fso::Table::TableAliases, id, &ctx).await {
                                 Ok(_) => return send_success(&"{\"Response\": \"Success!\"}".to_string(), &"".to_string()).await,
-                                Err(e) => return err_specific(e.to_string()).await,
+                                Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00083\"}".to_string(),&(e.to_string() + " | IEC00083"), 500, &ctx).await,
                             }
                             
                         },
-                        Err(_) => return err_specific("Could not parse the alias id as an integer, please resubmit!".to_string()).await,
+                        Err(_) => return err_specific("{\"Error\":\"Could not parse the alias id as an integer, please resubmit!\"}".to_string()).await,
                     }
                 },
-                None => return err_specific("Please provide a alias id to delete, and then resubmit.".to_string()).await,
+                None => return err_specific("{\"Error\":\"Please provide a alias id to delete, and then resubmit.\"}".to_string()).await,
             }
         },
 
-        Err(e) => return err_specific(e.to_string()).await,
+        Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00084\"}".to_string(),&(e.to_string() + " | IEC00084"), 500, &ctx).await,
     }
 }
 
@@ -1201,7 +1201,7 @@ pub async fn get_restrictions(_: Request, ctx: RouteContext<()>) -> worker::Resu
             return Ok(Response::from_json(&result.restrictions).unwrap().with_headers(add_mandatory_headers(&"".to_string()).await));
         },
         Err(e) => {
-            return err_specific(e.to_string()).await;
+            return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00085\"}".to_string(),&(e.to_string() + " | IEC00085"), 500, &ctx).await;
         }
     }
 }
@@ -1210,9 +1210,9 @@ pub async fn get_restriction(_: Request, ctx: RouteContext<()>) -> worker::Resul
     match ctx.param("id"){
         Some(parameter) => match db_fso::db_generic_search_query(&db_fso::Table::Restrictions, 1, parameter, &"".to_string(), &ctx).await {
             Ok(results) => return Ok(Response::from_json(&results.restrictions).unwrap().with_headers(add_mandatory_headers(&"".to_string()).await)),
-            Err(e) => return err_specific(e.to_string()).await,
+            Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00086\"}".to_string(),&(e.to_string() + " | IEC00086"), 500, &ctx).await,
         },
-        None => return err_specific("Internal Server Error, route parameter mismatch!".to_string()).await,
+        None => return err_specific("{\"Error\":\"Internal Server Error, route parameter mismatch!\"}".to_string()).await,
     }
 }
 
@@ -1236,34 +1236,34 @@ pub async fn update_restriction(mut req: Request, ctx: RouteContext<()>) -> work
                     match req.json::<db_fso::Restrictions>().await {
                         Ok(restriction) => {
                             if restriction.restriction_id < 0 {
-                                return err_specific("Invalid restriction id, cannot update.".to_string()).await;
+                                return err_specific("{\"Error\":\"Invalid restriction id, cannot update.\"}".to_string()).await;
                             }
 
                             match db_fso::db_generic_update_query(&db_fso::Table::Restrictions, 0, &restriction.illegal_value_float.to_string(), &restriction.restriction_id.to_string(),  &ctx).await {
                                 Ok(_) => (),
-                                Err(e) => return err_specific(e.to_string()).await,
+                                Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00087\"}".to_string(),&(e.to_string() + " | IEC00087"), 500, &ctx).await,
                             }    
 
                             match db_fso::db_generic_update_query(&db_fso::Table::Restrictions, 1, &restriction.illegal_value_int.to_string(), &restriction.restriction_id.to_string(),  &ctx).await {
                                 Ok(_) => (),
-                                Err(e) => return err_specific(e.to_string()).await,
+                                Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00088\"}".to_string(),&(e.to_string() + " | IEC00088"), 500, &ctx).await,
                             }
                             
                             if restriction.max_string_length > -2 {
                                 match db_fso::db_generic_update_query(&db_fso::Table::Restrictions, 2, &restriction.max_string_length.to_string(), &restriction.restriction_id.to_string(),  &ctx).await {
                                     Ok(_) => (),
-                                    Err(e) => return err_specific(e.to_string()).await,
+                                    Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00089\"}".to_string(),&(e.to_string() + " | IEC00089"), 500, &ctx).await,
                                 }    
                             }
 
                             match db_fso::db_generic_update_query(&db_fso::Table::Restrictions, 3, &restriction.max_value.to_string(), &restriction.restriction_id.to_string(),  &ctx).await {
                                 Ok(_) => (),
-                                Err(e) => return err_specific(e.to_string()).await,
+                                Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00090\"}".to_string(),&(e.to_string() + " | IEC00090"), 500, &ctx).await,
                             }    
 
                             match db_fso::db_generic_update_query(&db_fso::Table::Restrictions, 4, &restriction.min_value.to_string(), &restriction.restriction_id.to_string(),  &ctx).await {
                                 Ok(_) => (),
-                                Err(e) => return err_specific(e.to_string()).await,
+                                Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00091\"}".to_string(),&(e.to_string() + " | IEC00091"), 500, &ctx).await,
                             }    
 
                             return send_success(&"{\"Response\": \"Success!\"}".to_string(), &"".to_string()).await
@@ -1272,11 +1272,11 @@ pub async fn update_restriction(mut req: Request, ctx: RouteContext<()>) -> work
                         Err(e) => return err_specific("{\"Error\":\"".to_string() + &e.to_string() + "\nMake sure that the request json has a restriction_id, illegal_value_float, illegal_value_int, max_string_length, max_value, min_value, and description, even if not updating.  If not updating a field (parse_id cannot be updated) mark a string type with \"~!!NO UPDATE!!~\". Use -2 or a more negative number for ids. Echo back other values.\"}").await,
                     }
                 },
-                Err(e) => return err_specific(e.to_string()).await,
+                Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00092\"}".to_string(),&(e.to_string() + " | IEC00092"), 500, &ctx).await,
             }
 
         },
-        Err(e) => return err_specific(e.to_string()).await,
+        Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00093\"}".to_string(),&(e.to_string() + " | IEC00093"), 500, &ctx).await,
     }
 }
 
@@ -1298,7 +1298,7 @@ pub async fn delete_restriction(req: Request, ctx: RouteContext<()>) -> worker::
                         _=> {},
                     }         
                 },
-                Err(e) => return err_specific(e.to_string()).await,
+                Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00094\"}".to_string(),&(e.to_string() + " | IEC00094"), 500, &ctx).await,
             }
 
             match ctx.param("id"){
@@ -1307,18 +1307,18 @@ pub async fn delete_restriction(req: Request, ctx: RouteContext<()>) -> worker::
                         Ok(_) =>{
                             match db_fso::db_generic_delete(db_fso::Table::Restrictions, id, &ctx).await {
                                 Ok(_) => return send_success(&"{\"Response\": \"Success!\"}".to_string(), &"".to_string()).await,
-                                Err(e) => return err_specific(e.to_string()).await,
+                                Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00095\"}".to_string(),&(e.to_string() + " | IEC00095"), 500, &ctx).await,
                             }
                             
                         },
-                        Err(_) => return err_specific("Could not parse the restriction id as an integer, please resubmit!".to_string()).await,
+                        Err(_) => return err_specific("{\"Error\":\"Could not parse the restriction id as an integer, please resubmit!\"}".to_string()).await,
                     }
                 },
-                None => return err_specific("Please provide a restriction id to delete, and then resubmit.".to_string()).await,
+                None => return err_specific("{\"Error\":\"Please provide a restriction id to delete, and then resubmit.\"}".to_string()).await,
             }
         },
 
-        Err(e) => return err_specific(e.to_string()).await,
+        Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00096\"}".to_string(),&(e.to_string() + " | IEC00096"), 500, &ctx).await,
     }
 }
 
@@ -1328,7 +1328,7 @@ pub async fn get_deprecations(_: Request, ctx: RouteContext<()>) -> worker::Resu
             return Ok(Response::from_json(&result.deprecations).unwrap().with_headers(add_mandatory_headers(&"".to_string()).await));
         },
         Err(e) => {
-            return err_specific(e.to_string()).await;
+            return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00097\"}".to_string(),&(e.to_string() + " | IEC00097"), 500, &ctx).await;
         }
     }
 }
@@ -1337,9 +1337,9 @@ pub async fn get_deprecation(_: Request, ctx: RouteContext<()>) -> worker::Resul
     match ctx.param("id"){
         Some(parameter) => match db_fso::db_generic_search_query(&db_fso::Table::Deprecations, 1, parameter, &"".to_string(), &ctx).await {
             Ok(results) => return Ok(Response::from_json(&results.deprecations).unwrap().with_headers(add_mandatory_headers(&"".to_string()).await)),
-            Err(e) => return err_specific(e.to_string()).await,
+            Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00098\"}".to_string(),&(e.to_string() + " | IEC00098"), 500, &ctx).await,
         },
-        None => return err_specific("Internal Server Error, route parameter mismatch!".to_string()).await,
+        None => return err_specific("{\"Error\":\"Internal Server Error, route parameter mismatch!\"}".to_string()).await,
     }
 }
 
@@ -1363,20 +1363,20 @@ pub async fn update_deprecation(mut req: Request, ctx: RouteContext<()>) -> work
                     match req.json::<db_fso::Deprecations>().await {
                         Ok(deprecation) => {
                             if deprecation.deprecation_id < 0 {
-                                return err_specific("Invalid deprecation id, cannot update.".to_string()).await;
+                                return err_specific("{\"Error\":\"Invalid deprecation id, cannot update.\"}".to_string()).await;
                             }
 
                             if deprecation.date != "~!!NO UPDATE!!~"{
                                 match db_fso::db_generic_update_query(&db_fso::Table::Deprecations, 0, &deprecation.date, &deprecation.deprecation_id.to_string(),  &ctx).await {
                                     Ok(_) => (),
-                                    Err(e) => return err_specific(e.to_string()).await,
+                                    Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00099\"}".to_string(),&(e.to_string() + " | IEC00099"), 500, &ctx).await,
                                 }    
                             }
 
                             if deprecation.version != "~!!NO UPDATE!!~"{
                                 match db_fso::db_generic_update_query(&db_fso::Table::Deprecations, 1, &deprecation.version, &deprecation.deprecation_id.to_string(),  &ctx).await {
                                     Ok(_) => (),
-                                    Err(e) => return err_specific(e.to_string()).await,
+                                    Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00100\"}".to_string(),&(e.to_string() + " | IEC00100"), 500, &ctx).await,
                                 }
                             }
 
@@ -1386,11 +1386,11 @@ pub async fn update_deprecation(mut req: Request, ctx: RouteContext<()>) -> work
                         Err(e) => return err_specific("{\"Error\":\"".to_string() + &e.to_string() + "\nMake sure that the request json has a deprecation_id, date, and version, even if not updating.  If not updating a field (deprecation_id cannot be updated) mark a string type with \"~!!NO UPDATE!!~\". Use -2 or a more negative number for ids. Echo back other values.\"}").await,
                     }
                 },
-                Err(e) => return err_specific(e.to_string()).await,
+                Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00101\"}".to_string(),&(e.to_string() + " | IEC00101"), 500, &ctx).await,
             }
 
         },
-        Err(e) => return err_specific(e.to_string()).await,
+        Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00102\"}".to_string(),&(e.to_string() + " | IEC00102"), 500, &ctx).await,
     }
 }
 
@@ -1412,7 +1412,7 @@ pub async fn delete_deprecation(req: Request, ctx: RouteContext<()>) -> worker::
                         _=> {},
                     }         
                 },
-                Err(e) => return err_specific(e.to_string()).await,
+                Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00103\"}".to_string(),&(e.to_string() + " | IEC00103"), 500, &ctx).await,
             }
 
             match ctx.param("id"){
@@ -1421,18 +1421,18 @@ pub async fn delete_deprecation(req: Request, ctx: RouteContext<()>) -> worker::
                         Ok(_) =>{
                             match db_fso::db_generic_delete(db_fso::Table::ParseBehaviors, id, &ctx).await {
                                 Ok(_) => return send_success(&"{\"Response\": \"Success!\"}".to_string(), &"".to_string()).await,
-                                Err(e) => return err_specific(e.to_string()).await,
+                                Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00104\"}".to_string(),&(e.to_string() + " | IEC00104"), 500, &ctx).await,
                             }
                             
                         },
-                        Err(_) => return err_specific("Could not parse the deprecation id as an integer, please resubmit!".to_string()).await,
+                        Err(_) => return err_specific("{\"Error\":\"Could not parse the deprecation id as an integer, please resubmit!\"}".to_string()).await,
                     }
                 },
-                None => return err_specific("Please provide a deprecation id to delete, and then resubmit.".to_string()).await,
+                None => return err_specific("{\"Error\":\"Please provide a deprecation id to delete, and then resubmit.\"}".to_string()).await,
             }
         },
 
-        Err(e) => return err_specific(e.to_string()).await,
+        Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00105\"}".to_string(),&(e.to_string() + " | IEC00105"), 500, &ctx).await,
     }
 }
 
@@ -1452,7 +1452,7 @@ pub async fn add_bug_report(mut req: Request, ctx: RouteContext<()>) -> worker::
             match req.json::<BugReport>().await{
                 Ok(report) =>{
                     if report.description.is_empty() {
-                        return err_specific("Please provide a description when submitting a bug report.".to_string()).await
+                        return err_specific("{\"Error\":\"Please provide a description when submitting a bug report.\"}".to_string()).await
                     }
 
                     let mut username = "Anonymous User".to_string();
@@ -1462,18 +1462,18 @@ pub async fn add_bug_report(mut req: Request, ctx: RouteContext<()>) -> worker::
 
                     match db_fso::db_insert_bug_report(&username, &report.bug_type, &report.description, &ctx).await {
                         Ok(_) => send_success(&"{\"Response\": \"Success!\"}".to_string(), &"".to_string()).await,
-                        Err(e) => err_specific(e.to_string()).await,
+                        Err(e) => err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00106\"}".to_string(),&(e.to_string() + " | IEC00106"), 500, &ctx).await,
                     }
         
                 }, 
-                Err(e) => err_specific(e.to_string()).await,
+                Err(e) => err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00107\"}".to_string(),&(e.to_string() + " | IEC00107"), 500, &ctx).await,
 
 
 
 
             }
         },
-        Err(e) => return err_specific(e.to_string()).await,
+        Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00108\"}".to_string(),&(e.to_string() + " | IEC00108"), 500, &ctx).await,
     }
 }
 
@@ -1499,26 +1499,26 @@ pub async fn resolve_bug_report(req: Request, ctx: RouteContext<()>) -> worker::
                             match id.parse::<i32>(){
                                 Ok(parsed_id) =>{
                                     if parsed_id < 0 {
-                                        return err_specific("Invalid bug report id, cannot update.".to_string()).await;
+                                        return err_specific("{\"Error\":\"Invalid bug report id, cannot update.\"}".to_string()).await;
                                     }
 
                                     match db_fso::db_generic_update_query(&db_fso::Table::BugReports, 0, &"3".to_string(), &id,  &ctx).await {
                                         Ok(_) => (),
-                                        Err(e) => return err_specific(e.to_string()).await,
+                                        Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00109\"}".to_string(),&(e.to_string() + " | IEC00109"), 500, &ctx).await,
                                     }
                                 
                                     return send_success(&"{\"Response\": \"Success!\"}".to_string(), &"".to_string()).await
                                 }
-                                Err(_) => return err_specific("Bug report id cannot be parsed as an integer, please resubmit your request.".to_string()).await,
+                                Err(_) => return err_specific("{\"Error\":\"Bug report id cannot be parsed as an integer, please resubmit your request.\"}".to_string()).await,
                             }
                         },
-                        None => return err_specific("Please submit an id in the url as part of the request to acknowledge a bug report.".to_string()).await,
+                        None => return err_specific("{\"Error\":\"Please submit an id in the url as part of the request to acknowledge a bug report.\"}".to_string()).await,
                     }
                 },
-                Err(e) => return err_specific(e.to_string()).await,
+                Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00110\"}".to_string(),&(e.to_string() + " | IEC00110"), 500, &ctx).await,
             }
         }
-        Err(e) => return err_specific(e.to_string()).await,
+        Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00111\"}".to_string(),&(e.to_string() + " | IEC00111"), 500, &ctx).await,
     }
 }
 
@@ -1546,27 +1546,27 @@ pub async fn unresolve_bug_report(req: Request, ctx: RouteContext<()>) -> worker
                             match id.parse::<i32>(){
                                 Ok(parsed_id) =>{
                                     if parsed_id < 0 {
-                                            return err_specific("Invalid bug report id, cannot update.".to_string()).await;
+                                            return err_specific("{\"Error\":\"Invalid bug report id, cannot update.\"}".to_string()).await;
                                     }
 
                                     match db_fso::db_generic_update_query(&db_fso::Table::BugReports, 0, &"0".to_string(), &id.to_string(),  &ctx).await {
                                         Ok(_) => (),
-                                        Err(e) => return err_specific(e.to_string()).await,
+                                        Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00112\"}".to_string(),&(e.to_string() + " | IEC00112"), 500, &ctx).await,
                                     }
 
                                     return send_success(&"{\"Response\": \"Success!\"}".to_string(), &"".to_string()).await
                                 },
 
-                                Err(_) => return err_specific("Bug report id cannot be parsed as an integer, please resubmit your request.".to_string()).await,
+                                Err(_) => return err_specific("{\"Error\":\"Bug report id cannot be parsed as an integer, please resubmit your request.\"}".to_string()).await,
                             }
                         }
-                        None => return err_specific("Please submit an id in the url as part of the request to acknowledge a bug report.".to_string()).await,
+                        None => return err_specific("{\"Error\":\"Please submit an id in the url as part of the request to acknowledge a bug report.\"}".to_string()).await,
                     }
                 },
-                Err(e) => return err_specific(e.to_string()).await,
+                Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00113\"}".to_string(),&(e.to_string() + " | IEC00113"), 500, &ctx).await,
             }
         }
-        Err(e) => return err_specific(e.to_string()).await,
+        Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00114\"}".to_string(),&(e.to_string() + " | IEC00114"), 500, &ctx).await,
     }
 }
 
@@ -1586,10 +1586,10 @@ pub async fn acknowledge_bug_report(req: Request, ctx: RouteContext<()>) -> work
                     match authorizer_role {
                         db_fso::UserRole::OWNER => (),
                         db_fso::UserRole::ADMIN => (),
-                        _=> return err_specific("Only administrators can acknowledge bug reports".to_string()).await,
+                        _=> return err_specific("{\"Error\":\"Only administrators can acknowledge bug reports\"}".to_string()).await,
                     }         
                 },
-                Err(e) => return err_specific(e.to_string()).await,
+                Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00115\"}".to_string(),&(e.to_string() + " | IEC00115"), 500, &ctx).await,
             }
 
             match ctx.param("id"){
@@ -1597,36 +1597,36 @@ pub async fn acknowledge_bug_report(req: Request, ctx: RouteContext<()>) -> work
                     match id.parse::<i32>(){
                         Ok(parsed_id) =>{
                             if parsed_id < 0 {
-                                return err_specific("Invalid bug report id, cannot update.".to_string()).await;
+                                return err_specific("{\"Error\":\"Invalid bug report id, cannot update.\"}".to_string()).await;
                             }
         
                             match db_fso::db_generic_search_query(&db_fso::Table::BugReports, 0, &id, &"".to_string(), &ctx).await {
                                 Ok(bug_report_result) => {
                                     if bug_report_result.bug_reports.is_empty() {
-                                        return err_specific("Could not find a matching bug report.".to_string()).await;
+                                        return err_specific("{\"Error\":\"Could not find a matching bug report.\"}".to_string()).await;
                                     }
         
                                 },
-                                Err(e) => return err_specific(e.to_string()).await,
+                                Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00116\"}".to_string(),&(e.to_string() + " | IEC00116"), 500, &ctx).await,
                             }
         
                             match db_fso::db_generic_update_query(&db_fso::Table::BugReports, 0, &"1".to_string(), &id.to_string(),  &ctx).await {
                                 Ok(_) => (),
-                                Err(e) => return err_specific(e.to_string()).await,
+                                Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00117\"}".to_string(),&(e.to_string() + " | IEC00117"), 500, &ctx).await,
                             }
         
                             return Response::ok("{\"Response\": \"Bug Report Successfully Updated!\"}")
                         },
-                        Err(_) => return err_specific("Bug report id cannot be parsed as an integer, please resubmit your request.".to_string()).await,
+                        Err(_) => return err_specific("{\"Error\":\"Bug report id cannot be parsed as an integer, please resubmit your request.\"}".to_string()).await,
                     }
                     
                 },
 
-                None => return err_specific("Please submit an id in the url as part of the request to acknowledge a bug report.".to_string()).await,
+                None => return err_specific("{\"Error\":\"Please submit an id in the url as part of the request to acknowledge a bug report.\"}".to_string()).await,
             }
 
         }
-        Err(e) => return err_specific(e.to_string()).await,
+        Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00118\"}".to_string(),&(e.to_string() + " | IEC00118"), 500, &ctx).await,
     }
 }
 
@@ -1657,7 +1657,7 @@ pub async fn update_bug_report(mut req: Request, ctx: RouteContext<()>) -> worke
                         _=> (),
                     }         
                 },                
-                Err(e) => return err_specific(e.to_string()).await,
+                Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00119\"}".to_string(),&(e.to_string() + " | IEC00119"), 500, &ctx).await,
             }
 
             let bug_id: i32; 
@@ -1668,29 +1668,29 @@ pub async fn update_bug_report(mut req: Request, ctx: RouteContext<()>) -> worke
                 Some(id) => { 
                     match id.parse::<i32>() {
                         Ok(parsed) => bug_id = parsed,
-                        Err(_) => return err_specific("Cannot parse the supplied bug report id.".to_string()).await,
+                        Err(_) => return err_specific("{\"Error\":\"Cannot parse the supplied bug report id.\"}".to_string()).await,
                     }
                 },
-                None => return err_specific("Invalid bug report id, cannot update.".to_string()).await,
+                None => return err_specific("{\"Error\":\"Invalid bug report id, cannot update.\"}".to_string()).await,
             }
 
             if !administrator {
                 match db_fso::db_generic_search_query(&db_fso::Table::Users, 2, &username, &"".to_string(), &ctx).await {
                     Ok(user_result) => {
                         if user_result.users.is_empty(){
-                            return err_specific("Could not find a matching user for the username logged in somehow. You should probably submit a new bug report.".to_string()).await
+                            return err_specific("{\"Error\":\"Could not find a matching user for the username logged in somehow. You should probably submit a new bug report.\"}".to_string()).await
                         }
 
                         match db_fso::db_generic_search_query(&db_fso::Table::BugReports, 1, &bug_id.to_string(), &"".to_string(), &ctx).await {
                             Ok(bug_report_result) => {
                                 if user_result.users[0].id != bug_report_result.bug_reports[0].user_id {
-                                    return err_specific("Only the reporter of a bug or an administrator can edit the contents of a bug report.".to_string()).await
+                                    return err_specific("{\"Error\":\"Only the reporter of a bug or an administrator can edit the contents of a bug report.\"}".to_string()).await
                                 }
                             }
-                            Err(e) => return err_specific(e.to_string()).await,
+                            Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00120\"}".to_string(),&(e.to_string() + " | IEC00120"), 500, &ctx).await,
                         }
                     },
-                    Err(e) => return err_specific(e.to_string()).await,
+                    Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00121\"}".to_string(),&(e.to_string() + " | IEC00121"), 500, &ctx).await,
                 }
             }
 
@@ -1701,14 +1701,14 @@ pub async fn update_bug_report(mut req: Request, ctx: RouteContext<()>) -> worke
                     if bug_info.bug_type != "~!!NO UPDATE!!~"{
                         match db_fso::db_generic_update_query(&db_fso::Table::BugReports, 1, &bug_info.bug_type, &bug_id.to_string(),  &ctx).await {
                             Ok(_) => (),
-                            Err(e) => return err_specific(e.to_string()).await,
+                            Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00122\"}".to_string(),&(e.to_string() + " | IEC00122"), 500, &ctx).await,
                         }    
                     }
 
                     if bug_info.description != "~!!NO UPDATE!!~"{
                         match db_fso::db_generic_update_query(&db_fso::Table::BugReports, 2, &bug_info.description, &bug_id.to_string(),  &ctx).await {
                             Ok(_) => (),
-                            Err(e) => return err_specific(e.to_string()).await,
+                            Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00123\"}".to_string(),&(e.to_string() + " | IEC00123"), 500, &ctx).await,
                         }
                     }
 
@@ -1719,7 +1719,7 @@ pub async fn update_bug_report(mut req: Request, ctx: RouteContext<()>) -> worke
             }
 
         },
-        Err(e) => return err_specific(e.to_string()).await,
+        Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00124\"}".to_string(),&(e.to_string() + " | IEC00124"), 500, &ctx).await,
     }
 }
 
@@ -1733,7 +1733,7 @@ pub async fn  header_has_token(req: &Request) -> Option<worker::Result<Response>
                 return Some(send_failure(&ERROR_NOT_LOGGED_IN.to_string(), 403).await)
             }        
         },
-        Err(e) => return Some(err_specific(e.to_string()).await),
+        Err(_) => return Some(err_specific("{\"Error\":\"Could not find a login token, please check your inputs and try again. | IEC00125\"}".to_string()).await),
     }
 }
 
@@ -1746,7 +1746,7 @@ pub async fn header_has_username(req: &Request) -> Option<worker::Result<Respons
                 return Some(send_failure(&ERROR_BAD_REQUEST.to_string(), 403).await)
             }        
         },
-        Err(e) => return Some(err_specific(e.to_string()).await),
+        Err(_) => return Some(err_specific("{\"Error\":\"Could not find a username header, please check your inputs and try again. | IEC00126\"}".to_string()).await),
     }
 }
 
@@ -1780,14 +1780,14 @@ pub async fn create_session_and_send(email: &String, ctx: &RouteContext<()>) -> 
 
     match hash_string(&email, &login_token).await {
         Ok(hashed) => hashed_string = hashed,
-        Err(e) => return err_specific(e.to_string() + " at create_session, 1").await,
+        Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00133\"}".to_string(),&(e.to_string() + " | IEC00133"), 500, &ctx).await,
     }
 
     // We give the user two hours to do what they need to do.
     match db_fso::db_session_add(&hashed_string, &email, &(Utc::now() + TimeDelta::hours(2)).to_string(), ctx).await {
         // remember! double {{ }} needed to escape here, even on the right side.
         Ok(_) => return send_success(&"".to_string(), &login_token).await,
-        Err(e) => return err_specific(e.to_string() + " at create_session, 2").await,
+        Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00134\"}".to_string(),&(e.to_string() + " | IEC00134"), 500, &ctx).await,
     }
 }
 
@@ -1899,25 +1899,25 @@ pub async fn header_session_is_valid(req: &Request, db: &D1Database) -> (bool, S
     return return_tuple
 }
 
-pub async fn send_confirmation_link(address : &String, activation_key : &String) -> worker::Result<worker::Response> {
+pub async fn send_confirmation_link(address : &String, activation_key : &String, ctx: &RouteContext<()>) -> worker::Result<worker::Response> {
     if !(EmailAddress::is_valid(&address)){
-        return err_specific(format!("Tried to send automated email to invalid email address {}", address)).await
+        return err_specific(format!("{{\"Error\":\"Tried to send automated email to invalid email address {}\"}}", address)).await
     }
 
     let mut headers : Headers = Headers::new();
     match headers.append("content-type", "application/json"){
         Ok(_) => (),
-        Err(e) => return err_specific(e.to_string()).await,
+        Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00127\"}".to_string(),&(e.to_string() + " | IEC00127"), 500, &ctx).await,
     }
 
     match headers.append("accept", "application/json") {
         Ok(_) => (),
-        Err(e) => return err_specific(e.to_string()).await,
+        Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00128\"}".to_string(),&(e.to_string() + " | IEC00128"), 500, &ctx).await,
     }
 
     match headers.append("api-key", secrets::SMTP_API_KEY) {
         Ok(_) => (),
-        Err(e) => return err_specific(e.to_string()).await,
+        Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00129\"}".to_string(),&(e.to_string() + " | IEC00129"), 500, &ctx).await,
     }
 
     let mut message: EmailMessage = EmailMessage::create_activation_email(address, activation_key);
@@ -1927,7 +1927,7 @@ pub async fn send_confirmation_link(address : &String, activation_key : &String)
 
     match serde_json::to_string(&message) {
         Ok(json_message) => jvalue_out = JsValue::from_str(&json_message),
-        Err(e) => return err_specific(e.to_string()).await,
+        Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00130\"}".to_string(),&(e.to_string() + " | IEC00130"), 500, &ctx).await,
     }
 
     let mut outbound_request = RequestInit::new();
@@ -1939,11 +1939,11 @@ pub async fn send_confirmation_link(address : &String, activation_key : &String)
         Ok(mut res) => { 
             match res.text().await {
                 Ok(text) => return Response::ok(text + "Email sent!"),
-                Err(e) => return err_specific(e.to_string()).await,
+                Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00131\"}".to_string(),&(e.to_string() + " | IEC00131"), 500, &ctx).await,
             }
         },
 
-        Err(e) => return err_specific(e.to_string()).await,
+        Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00132\"}".to_string(),&(e.to_string() + " | IEC00132"), 500, &ctx).await,
     }
 
 }
@@ -1965,7 +1965,10 @@ pub async fn add_mandatory_headers(token: &String) -> worker::Headers {
     headers.set("Access-Control-Allow-Methods", "GET,PATCH,POST,PUT,DELETE").unwrap();
     headers.set("Access-Control-Max-Age", "100000").unwrap();
     if !token.is_empty() {
-        headers.set("Set-Cookie", &format!("ganymede-token={}; HttpOnly; Expires={}; Secure; SameSite=Lax", token, (Utc::now() + TimeDelta::days(7) - TimeDelta::seconds(5))));
+        match headers.set("Set-Cookie", &format!("ganymede-token={}; HttpOnly; Expires={}; Secure; SameSite=Lax", token, (Utc::now() + TimeDelta::days(7) - TimeDelta::seconds(5)))) {
+            Ok(_) => {},
+            Err(_) => {},
+        }
     }
 
     return headers
