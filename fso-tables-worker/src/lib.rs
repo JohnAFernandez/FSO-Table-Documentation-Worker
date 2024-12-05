@@ -1961,7 +1961,7 @@ pub async fn send_failure(body: &String, code: u16) -> worker::Result<Response> 
 pub async fn add_mandatory_headers(token: &String) -> worker::Headers {
     let mut headers: Headers = Headers::new();
 
-    headers.set("Access-Control-Allow-Origin", "https://ganymede.fsotables.com").unwrap();
+    headers.set("Access-Control-Allow-Origin", "https://www.fsotables.com").unwrap();
     headers.set("Access-Control-Allow-Methods", "GET,PATCH,POST,PUT,DELETE").unwrap();
     headers.set("Access-Control-Max-Age", "100000").unwrap();
     if !token.is_empty() {
