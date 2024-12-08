@@ -64,9 +64,6 @@ async fn fetch(req: Request, env: Env, _ctx: Context,) -> worker::Result<Respons
     // Email validations do not need get requests, this is only for the activate user
     // table_aliases, users
     Router::new()
-        .get_async("/", root_get)
-        .get_async("/users", db_fso::db_user_stats_get)       // No Post, put, patch, or delete for overarching category
-        .post_async("/users/register", user_register_new)
         .get_async("/validation/:email/:id", user_confirm_email)
         .get_async("/validation/:email/:id/password", user_confirm_email)
         .get_async("/users/myaccount", user_get_details)
@@ -75,6 +72,10 @@ async fn fetch(req: Request, env: Env, _ctx: Context,) -> worker::Result<Respons
         .post_async("/users/activate", activate_user).put_async("/users/activate", activate_user).patch_async("/users/activate", activate_user)
         .post_async("/users/:username/upgrade", user_upgrade_user_permissions).patch_async("/users/:username/upgrade", user_upgrade_user_permissions)
         .post_async("/users/:username/downgrade", user_downgrade_user_permissions).patch_async("/users/:username/downgrade", user_downgrade_user_permissions)
+        .get_async("/", root_get).options_async("/", send_cors)        
+        // No Post, put, patch, or delete for overarching category
+        .get_async("/users", db_fso::db_user_stats_get).options_async("/users", send_cors)
+        .post_async("/users/register", user_register_new).options_async("users/register", send_cors)
         .delete_async("/users", deactivate_user)
         .get_async("/tables/parse-types", get_parse_types)
         .get_async("/tables/parse-types/:id", get_parse_type)
@@ -1958,6 +1959,10 @@ pub async fn send_failure(body: &String, code: u16) -> worker::Result<Response> 
     return Ok(Response::from_html(body)?.with_headers(add_mandatory_headers(&"".to_string()).await).with_status(code));
 }
 
+pub async fn send_cors(_: Request, _: RouteContext<()>) -> worker::Result<Response> {
+    return Ok(Response::from_html("{\"Response\":\"See headers for options.\"}")?.with_headers(add_mandatory_headers(&"".to_string()).await))
+}
+
 pub async fn add_mandatory_headers(token: &String) -> worker::Headers {
     let mut headers: Headers = Headers::new();
 
@@ -1965,7 +1970,7 @@ pub async fn add_mandatory_headers(token: &String) -> worker::Headers {
     headers.set("Access-Control-Allow-Methods", "GET,PATCH,POST,PUT,DELETE").unwrap();
     headers.set("Access-Control-Max-Age", "100000").unwrap();
     if !token.is_empty() {
-        match headers.set("Set-Cookie", &format!("ganymede-token={}; HttpOnly; Expires={}; Secure; SameSite=Lax", token, (Utc::now() + TimeDelta::days(7) - TimeDelta::seconds(5)))) {
+        match headers.set("Set-Cookie", &format!("ganymede_token={}; HttpOnly; Expires={}; Secure; SameSite=Lax; Domain=fsotables.com;", token, (Utc::now() + TimeDelta::days(7) - TimeDelta::seconds(5)))) {
             Ok(_) => {},
             Err(_) => {},
         }
