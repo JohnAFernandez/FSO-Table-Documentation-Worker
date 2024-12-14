@@ -1983,7 +1983,7 @@ pub async fn add_mandatory_headers(token: &String) -> worker::Headers {
 
     headers.set("Access-Control-Allow-Origin", "https://www.fsotables.com").unwrap();
     headers.set("Access-Control-Allow-Methods", "GET,PATCH,POST,PUT,DELETE").unwrap();
-    headers.set("Access-Control-Allow-Headers", "username,Set-Cookie").unwrap();
+    headers.set("Access-Control-Allow-Headers", "username,Set-Cookie,GanymedeToken").unwrap();
     headers.set("Access-Control-Allow-Credentials","true").unwrap();
     headers.set("Access-Control-Max-Age", "100000").unwrap();
     if !token.is_empty() {
