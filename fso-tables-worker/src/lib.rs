@@ -1741,25 +1741,24 @@ pub async fn update_bug_report(mut req: Request, ctx: RouteContext<()>) -> worke
 
 // SECTION!! generic server tasks
 pub async fn  header_has_token(req: &Request) -> Option<worker::Result<Response>> {
-    match req.headers().has("Cookies"){
+    match req.headers().has("Cookie"){
         Ok(res) => {
             if res { 
                 return None 
             }
-
         },
-        Err(_) => { 
-            match req.headers().has("GanymedeToken"){
-                Ok(res) => {
-                    if res { 
-                        return None 
-                    } else {
-                        return Some(send_failure(&ERROR_BAD_REQUEST.to_string(), 403).await)                
-                    }        
-                },
-                Err(_) => Some(err_specific("{\"Error\":\"Could not find a login token, please check your inputs and try again. | IEC00125\"}".to_string()).await),
-            }   
-        }
+        Err(_) => (),
+    }
+
+    match req.headers().has("GanymedeToken"){
+        Ok(res) => {
+            if res { 
+                return None 
+            } else {
+                return Some(send_failure(&ERROR_BAD_REQUEST.to_string(), 403).await)                
+            }        
+        },
+        Err(e) => return Some(send_failure(&ERROR_BAD_REQUEST.to_string(), 403).await),
     }
 }
 
@@ -1799,17 +1798,17 @@ pub async fn header_get_token(req: &Request) -> worker::Result<String> {
         Err(e) => (),
     }
 
-    match req.headers().get("Cookies"){
+    match req.headers().get("Cookie"){
         Ok(cookies) => {
             match cookies {
                 Some(cookie_string) => {
                     let cookie_vec = cookie_string.split(";");
 
                     for cookie in cookie_vec {
-                        if cookie[0..12] == "GanymedeToken" {
-                            return Ok(cookie[13..]);
-                        } else if (cookie [0..13] == " GanymedeToken" ) {
-                            return Ok(cookie[14..]);
+                        if &cookie[0..12] == "GanymedeToken" {
+                            return Ok(cookie[13..].to_string());
+                        } else if &cookie[0..13] == " GanymedeToken" {
+                            return Ok(cookie[14..].to_string());
                         }
                     }
 
@@ -2018,11 +2017,11 @@ pub async fn add_mandatory_headers(token: &String) -> worker::Headers {
 
     headers.set("Access-Control-Allow-Origin", "https://www.fsotables.com").unwrap();
     headers.set("Access-Control-Allow-Methods", "GET,PATCH,POST,PUT,DELETE").unwrap();
-    headers.set("Access-Control-Allow-Headers", "username,Set-Cookie,GanymedeToken").unwrap();
-    headers.set("Access-Control-Allow-Credentials","true").unwrap();
-    headers.set("Access-Control-Max-Age", "100000").unwrap();
+//    headers.set("Access-Control-Allow-Headers", "username,Set-Cookie,GanymedeToken").unwrap();
+//    headers.set("Access-Control-Allow-Credentials","true").unwrap();
+//    headers.set("Access-Control-Max-Age", "100000").unwrap();
     if !token.is_empty() {
-        match headers.set("Set-Cookie", &format!("GanymedeToken={}; SameSite=None; Secure", token)) {  //(Utc::now() + TimeDelta::days(7) - TimeDelta::seconds(5)))) {
+        match headers.set("Set-Cookie", &format!("GanymedeToken={}; SameSite=Lax; Path=/", token)) {  //(Utc::now() + TimeDelta::days(7) - TimeDelta::seconds(5)))) {
             Ok(_) => {},
             Err(_) => {},
         }
