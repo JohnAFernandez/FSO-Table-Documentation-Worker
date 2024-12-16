@@ -64,83 +64,83 @@ async fn fetch(req: Request, env: Env, _ctx: Context,) -> worker::Result<Respons
     // Email validations do not need get requests, this is only for the activate user
     // table_aliases, users
     Router::new()
-        .get_async("/", root_get)
-        .options_async("/", send_cors)        
+        .get_async("/api/", root_get)
+        .options_async("/api/", send_cors)        
         // No Post, put, patch, or delete for overarching category
-        .get_async("/users", db_fso::db_user_stats_get)
-        .options_async("/users", send_cors)
-        .post_async("/users/register", user_register_new)
-        .options_async("users/register", send_cors)
-        .get_async("/validation/:email/:id", user_confirm_email)
-        .options_async("/validation/:email/:id", send_cors)
-        .get_async("/validation/:email/:id/password", user_confirm_email)
-        .options_async("/validation/:email/:id/password", send_cors)
-        .get_async("/users/myaccount", user_get_details)
-        .options_async("/users/myaccount", send_cors)
-        .post_async("/users/myaccount/password", user_change_password)
-        .options_async("/users/myaccount/password", send_cors)
-        .post_async("/users/login", user_login)
-        .options_async("/users/login", send_cors)
-        .post_async("/users/activate", activate_user).put_async("/users/activate", activate_user).patch_async("/users/activate", activate_user)
-        .options_async("/users/activate", send_cors)
-        .post_async("/users/:username/upgrade", user_upgrade_user_permissions).patch_async("/users/:username/upgrade", user_upgrade_user_permissions)
-        .options_async("/users/:username/upgrade", send_cors)
-        .post_async("/users/:username/downgrade", user_downgrade_user_permissions).patch_async("/users/:username/downgrade", user_downgrade_user_permissions)
-        .options_async("/users/:username/downgrade", send_cors)
-        .delete_async("/users", deactivate_user)
-        .get_async("/tables/parse-types", get_parse_types)
-        .options_async("/tables/parse-types", send_cors)
-        .get_async("/tables/parse-types/:id", get_parse_type)
-        .options_async("/tables/parse-types/:id", send_cors)
-        //.post_async("/tables/parse-types", post_parse_behavior)
-        .patch_async("/tables/parse-types", update_parse_type).put_async("/tables/parse-types", update_parse_type)
-        .delete_async("/tables/parse-types/:id", delete_parse_type) // Admin only
+        .get_async("/api/users", db_fso::db_user_stats_get)
+        .options_async("/api/users", send_cors)
+        .post_async("/api/users/register", user_register_new)
+        .options_async("/api/users/register", send_cors)
+        .get_async("/api/validation/:email/:id", user_confirm_email)
+        .options_async("/api/validation/:email/:id", send_cors)
+        .get_async("/api/validation/:email/:id/password", user_confirm_email)
+        .options_async("/api/validation/:email/:id/password", send_cors)
+        .get_async("/api/users/myaccount", user_get_details)
+        .options_async("/api/users/myaccount", send_cors)
+        .post_async("/api/users/myaccount/password", user_change_password)
+        .options_async("/api/users/myaccount/password", send_cors)
+        .post_async("/api/users/login", user_login)
+        .options_async("/api/users/login", send_cors)
+        .post_async("/api/users/activate", activate_user).put_async("/api/users/activate", activate_user).patch_async("/api/users/activate", activate_user)
+        .options_async("/api/users/activate", send_cors)
+        .post_async("/api/users/:username/upgrade", user_upgrade_user_permissions).patch_async("/api/users/:username/upgrade", user_upgrade_user_permissions)
+        .options_async("/api/users/:username/upgrade", send_cors)
+        .post_async("/api/users/:username/downgrade", user_downgrade_user_permissions).patch_async("/api/users/:username/downgrade", user_downgrade_user_permissions)
+        .options_async("/api/users/:username/downgrade", send_cors)
+        .delete_async("/api/users", deactivate_user)
+        .get_async("/api/tables/parse-types", get_parse_types)
+        .options_async("/api/tables/parse-types", send_cors)
+        .get_async("/api/tables/parse-types/:id", get_parse_type)
+        .options_async("/api/tables/parse-types/:id", send_cors)
+        //.post_async("/api/tables/parse-types", post_parse_behavior)
+        .patch_async("/api/tables/parse-types", update_parse_type).put_async("/api/tables/parse-types", update_parse_type)
+        .delete_async("/api/tables/parse-types/:id", delete_parse_type) // Admin only
         // tables just need to be done manually on my end, because we don't have many tables *and* it's less effort than just populating.
-        .get_async("/tables", get_tables).options_async("/tables", send_cors)
-        .get_async("/tables/items", get_items).options_async("/tables/items", send_cors)
-        .get_async("/tables/items/:id", get_item)
-        .options_async("/tables/items/:id", send_cors)
-        //.post_async("/tables/items", post_item) // Requires login
-        .patch_async("/tables/items", update_item).put_async("/tables/items", update_item) //Requires login 
-        .delete_async("/tables/items/:id", delete_item) // Admin only
-        .get_async("/tables/aliases", get_aliases).options_async("/tables/aliases", send_cors)
-        .get_async("/tables/aliases/:id", get_alias).options_async("/tables/aliases/:id", send_cors)
-        //.post_async("/tables/:id/alias", post_alias) // Requires login
-        .patch_async("/tables/aliases/:id", update_alias).put_async("/tables/aliases/:id", update_alias) // Requires login
-        .delete_async("/tables/aliases/:id", delete_alias) // Admin only
-        .get_async("/tables/:id", get_table).options_async("/tables/:id", send_cors)
-        //.get_async("/tables/:id/items", get_tables_items)
-        .get_async("/tables/restrictions", get_restrictions).options_async("/tables/restrictions", send_cors)
-        .get_async("/tables/restrictions/:id", get_restriction).options_async("/tables/restrictions/:id", send_cors)
-        //.post_async("/tables/items/:id/restriction", post_restriction) // Requires login
-        .patch_async("/tables/restriction/:id", update_restriction).put_async("/tables/restriction/:id", update_restriction) // Requires login
-        .delete_async("/tables/restrictions/:id", delete_restriction) // Admin only
-        .get_async("/tables/deprecations", get_deprecations).options_async("/tables/deprecations", send_cors)
-        .get_async("/tables/deprecations/:id", get_deprecation).options_async("/tables/deprecations/:id", send_cors)
-        //.post_async("/tables/deprecations", post_deprecation) // Requires login
-        .patch_async("/tables/deprecations", update_deprecation).put_async("/tables/deprecations", update_deprecation) // Requires login
-        .delete_async("/tables/deprecations/:id", delete_deprecation) // Admin only
-        //.get_async("/tables/actions/history", get_completed_history) // Requires login
-        //.get_async("/tables/actions/history/:id", get_completed_user_history) // Requires login
-        //.get_async("/tables/actions/approvals", get_approval_requests) // Requires login
-        //.get_async("/tables/actions/approvals/:id", get_approval_requests_user) // Requires login, for seeing just mine, or admin seeing specific other user
-        //.get_async("/tables/actions/rejections", get_rejected_requests) // Requires login
-        //.get_async("/tables/actions/rejections/:id": get_rejcted_requests_user) // Requires login
-        //.post_async("/tables/actions/:id:/approve", approve_request) // Requires login and admin
-        //.post_async("/tables/actions/:id:/reject", reject_request) // Requries login and admin
-        .post_async("/bugreport", add_bug_report).options_async("/bugreport", send_cors)
-        .patch_async("/bugreport/:id/resolve", resolve_bug_report).options_async("/bugreport/:id/resolve", send_cors)
-        .patch_async("/bugreport/:id/acknowledge", acknowledge_bug_report).options_async("/bugreport/:id/acknowledge", send_cors)
-        .patch_async("/bugreport/:id/unresolve", unresolve_bug_report).options_async("/bugreport/:id/unresolve", send_cors)
-        .patch_async("/bugreport/:id/edit", update_bug_report).options_async("/bugreport/:id/edit", send_cors)
-        .get_async("/test", test_all) // This might eventually be a "CI" test, but for now it just displays a message.
-        .or_else_any_method_async("/", send_cors) // TODO, this does not work.
+        .get_async("/api/tables", get_tables).options_async("/api/tables", send_cors)
+        .get_async("/api/tables/items", get_items).options_async("/api/tables/items", send_cors)
+        .get_async("/api/tables/items/:id", get_item)
+        .options_async("/api/tables/items/:id", send_cors)
+        //.post_async("/api/tables/items", post_item) // Requires login
+        .patch_async("/api/tables/items", update_item).put_async("/api/tables/items", update_item) //Requires login 
+        .delete_async("/api/tables/items/:id", delete_item) // Admin only
+        .get_async("/api/tables/aliases", get_aliases).options_async("/api/tables/aliases", send_cors)
+        .get_async("/api/tables/aliases/:id", get_alias).options_async("/api/tables/aliases/:id", send_cors)
+        //.post_async("/api/tables/:id/alias", post_alias) // Requires login
+        .patch_async("/api/tables/aliases/:id", update_alias).put_async("/api/tables/aliases/:id", update_alias) // Requires login
+        .delete_async("/api/tables/aliases/:id", delete_alias) // Admin only
+        .get_async("/api/tables/:id", get_table).options_async("/api/tables/:id", send_cors)
+        //.get_async("/api/tables/:id/items", get_tables_items)
+        .get_async("/api/tables/restrictions", get_restrictions).options_async("/api/tables/restrictions", send_cors)
+        .get_async("/api/tables/restrictions/:id", get_restriction).options_async("/api/tables/restrictions/:id", send_cors)
+        //.post_async("/api/tables/items/:id/restriction", post_restriction) // Requires login
+        .patch_async("/api/tables/restriction/:id", update_restriction).put_async("/api/tables/restriction/:id", update_restriction) // Requires login
+        .delete_async("/api/tables/restrictions/:id", delete_restriction) // Admin only
+        .get_async("/api/tables/deprecations", get_deprecations).options_async("/api/tables/deprecations", send_cors)
+        .get_async("/api/tables/deprecations/:id", get_deprecation).options_async("/api/tables/deprecations/:id", send_cors)
+        //.post_async("/api/tables/deprecations", post_deprecation) // Requires login
+        .patch_async("/api/tables/deprecations", update_deprecation).put_async("/api/tables/deprecations", update_deprecation) // Requires login
+        .delete_async("/api/tables/deprecations/:id", delete_deprecation) // Admin only
+        //.get_async("/api/tables/actions/history", get_completed_history) // Requires login
+        //.get_async("/api/tables/actions/history/:id", get_completed_user_history) // Requires login
+        //.get_async("/api/tables/actions/approvals", get_approval_requests) // Requires login
+        //.get_async("/api/tables/actions/approvals/:id", get_approval_requests_user) // Requires login, for seeing just mine, or admin seeing specific other user
+        //.get_async("/api/tables/actions/rejections", get_rejected_requests) // Requires login
+        //.get_async("/api/tables/actions/rejections/:id": get_rejcted_requests_user) // Requires login
+        //.post_async("/api/tables/actions/:id:/approve", approve_request) // Requires login and admin
+        //.post_async("/api/tables/actions/:id:/reject", reject_request) // Requries login and admin
+        .post_async("/api/bugreport", add_bug_report).options_async("/api/bugreport", send_cors)
+        .patch_async("/api/bugreport/:id/resolve", resolve_bug_report).options_async("/api/bugreport/:id/resolve", send_cors)
+        .patch_async("/api/bugreport/:id/acknowledge", acknowledge_bug_report).options_async("/api/bugreport/:id/acknowledge", send_cors)
+        .patch_async("/api/bugreport/:id/unresolve", unresolve_bug_report).options_async("/api/bugreport/:id/unresolve", send_cors)
+        .patch_async("/api/bugreport/:id/edit", update_bug_report).options_async("/api/bugreport/:id/edit", send_cors)
+        .get_async("/api/test", test_all) // This might eventually be a "CI" test, but for now it just displays a message.
+        .or_else_any_method_async("/api/", send_cors) // TODO, this does not work.
         .run(req, env)
         .await
 
 
         /* // TODO? 
-        .route("/users/:username/email", post(add_email).put(add_email).patch(add_email).delete(api_insufficent_permissions))
+        .route("/api/users/:username/email", post(add_email).put(add_email).patch(add_email).delete(api_insufficent_permissions))
         */
 }
 
