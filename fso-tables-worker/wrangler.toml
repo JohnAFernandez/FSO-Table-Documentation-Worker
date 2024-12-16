@@ -1,6 +1,10 @@
 name = "fso-tables-worker"
 main = "build/worker/shim.mjs"
 compatibility_date = "2024-06-21"
+account_id = "bbf42de7589a15492cd0edfe493e4db9"
+kv_namespaces = [
+    { binding = "database_website_assets", id = "334f8e7469f54b2b831ec616cc5d8847" }
+]
 
 [build]
 command = "cargo install -q worker-build && worker-build --release"
@@ -10,6 +14,6 @@ binding = "fso_table_database"
 database_name = "fso-modoption-d1-db"
 database_id = "facc22be-76a1-43c2-8655-0b043059f646"
 
-# wrangler.toml (wrangler v3.78.6^)
-# [observability]
-# enabled = true
+[observability]
+enabled = true
+
