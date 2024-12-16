@@ -1741,15 +1741,25 @@ pub async fn update_bug_report(mut req: Request, ctx: RouteContext<()>) -> worke
 
 // SECTION!! generic server tasks
 pub async fn  header_has_token(req: &Request) -> Option<worker::Result<Response>> {
-    match req.headers().has("GanymedeToken"){
+    match req.headers().has("Cookies"){
         Ok(res) => {
             if res { 
                 return None 
-            } else {
-                return Some(send_failure(&ERROR_NOT_LOGGED_IN.to_string(), 403).await)
-            }        
+            }
+
         },
-        Err(_) => return Some(err_specific("{\"Error\":\"Could not find a login token, please check your inputs and try again. | IEC00125\"}".to_string()).await),
+        Err(_) => { 
+            match req.headers().has("GanymedeToken"){
+                Ok(res) => {
+                    if res { 
+                        return None 
+                    } else {
+                        return Some(send_failure(&ERROR_BAD_REQUEST.to_string(), 403).await)                
+                    }        
+                },
+                Err(_) => Some(err_specific("{\"Error\":\"Could not find a login token, please check your inputs and try again. | IEC00125\"}".to_string()).await),
+            }   
+        }
     }
 }
 
@@ -1783,11 +1793,36 @@ pub async fn header_get_token(req: &Request) -> worker::Result<String> {
         Ok(token_option) => {
             match token_option {
                 Some(token) => return Ok(token),
-                None => return Err("No token found in header.".to_string().into()),
+                None => (),
             }
         },
-        Err(e) => return Err(e),
+        Err(e) => (),
     }
+
+    match req.headers().get("Cookies"){
+        Ok(cookies) => {
+            match cookies {
+                Some(cookie_string) => {
+                    let cookie_vec = cookie_string.split(";");
+
+                    for cookie in cookie_vec {
+                        if cookie[0..12] == "GanymedeToken" {
+                            return Ok(cookie[13..]);
+                        } else if (cookie [0..13] == " GanymedeToken" ) {
+                            return Ok(cookie[14..]);
+                        }
+                    }
+
+                    return Err("All login token retreival methods failed. Check your input. IEC00135".to_string().into());
+                }
+                None => { 
+                    return Err("All login token retreival methods failed. Check your input. IEC00136".to_string().into());
+                }
+            }
+        },
+        Err(e) => return Err("All login token retreival methods failed. Check your input. IEC00137".to_string().into()),
+    }
+
 }
 
 pub async fn create_session_and_send(email: &String, ctx: &RouteContext<()>) -> worker::Result<Response> {
@@ -2006,7 +2041,7 @@ const ERROR_USER_NOT_ACTIVE: &str = "{\"Error\": \"The user must be active befor
 //const ERR_API_FALLBACK: &str = "{\"Error\": \"A method for this API route does not exist.\"}";
 
 /// CODE 403
-const ERROR_BAD_REQUEST: &str = "{\"Error\": \"Bad request, check your json input.\"}";
+const ERROR_BAD_REQUEST: &str = "{\"Error\": \"Bad request, check your headers and/or JSON input.\"}";
 
 pub async fn err_specific(e: String) -> worker::Result<Response> {
     send_failure(&e, 500).await    
