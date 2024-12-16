@@ -1741,7 +1741,7 @@ pub async fn update_bug_report(mut req: Request, ctx: RouteContext<()>) -> worke
 
 // SECTION!! generic server tasks
 pub async fn  header_has_token(req: &Request) -> Option<worker::Result<Response>> {
-    match req.headers().has("ganymede_token"){
+    match req.headers().has("GanymedeToken"){
         Ok(res) => {
             if res { 
                 return None 
@@ -1779,7 +1779,7 @@ pub async fn header_get_username(req: &Request) -> worker::Result<String> {
 }
 
 pub async fn header_get_token(req: &Request) -> worker::Result<String> {
-    match req.headers().get("ganymede_token"){
+    match req.headers().get("GanymedeToken"){
         Ok(token_option) => {
             match token_option {
                 Some(token) => return Ok(token),
@@ -1857,7 +1857,7 @@ pub async fn hash_string(username: &String, string: &String) -> worker::Result<S
 pub async fn create_random_string() -> String {    
     return rand::thread_rng()
     .sample_iter(&Alphanumeric)
-    .take(16)
+    .take(64)
     .map(char::from)
     .collect();
 }
