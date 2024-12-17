@@ -1802,20 +1802,16 @@ pub async fn header_get_token(req: &Request) -> worker::Result<String> {
         Ok(cookies) => {
             match cookies {
                 Some(cookie_string) => {
-                    let cookie_location = 
-
-                    let cookie_vec = cookie_string.split(";");
-
-                    for cookie in cookie_vec {
-                        if &cookie[0..12] == "GanymedeToken" {
-                            return Ok(cookie[13..].to_string());
-                        } else if &cookie[0..13] == " GanymedeToken" {
-                            return Ok(cookie[14..].to_string());
+                        match cookie_string.find("GanymedeToken=") {
+                            Some(index)=> {
+                                if (cookie_string.len() > index + 77){
+                                    return Ok(cookie_string[index + 14..index + 78].to_string());
+                                }
+                            },
+                            None => (),
                         }
+                        return Err("All login token retreival methods failed. Check your input. IEC00135".to_string().into());
                     }
-
-                    return Err("All login token retreival methods failed. Check your input. IEC00135".to_string().into());
-                }
                 None => { 
                     return Err("All login token retreival methods failed. Check your input. IEC00136".to_string().into());
                 }
@@ -1898,7 +1894,7 @@ pub async fn create_random_string() -> String {
     .collect();
 }
 
-// this is going to be a big one.  We'll need to 1. Lookup an entry on username/tokens
+// this is a big one.  We'll need to 1. Lookup an entry on username/tokens
 // 2. Compare the token they gave us and see if it matches the username. 
 // 3. See if the token is still valid.
 pub async fn header_session_is_valid(req: &Request, db: &D1Database) -> (bool, String)  {
