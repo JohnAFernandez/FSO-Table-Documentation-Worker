@@ -1802,6 +1802,8 @@ pub async fn header_get_token(req: &Request) -> worker::Result<String> {
         Ok(cookies) => {
             match cookies {
                 Some(cookie_string) => {
+                    let cookie_location = 
+
                     let cookie_vec = cookie_string.split(";");
 
                     for cookie in cookie_vec {
@@ -2021,7 +2023,7 @@ pub async fn add_mandatory_headers(token: &String) -> worker::Headers {
 //    headers.set("Access-Control-Allow-Credentials","true").unwrap();
 //    headers.set("Access-Control-Max-Age", "100000").unwrap();
     if !token.is_empty() {
-        match headers.set("Set-Cookie", &format!("GanymedeToken={}; SameSite=Lax; Path=/", token)) {  //(Utc::now() + TimeDelta::days(7) - TimeDelta::seconds(5)))) {
+        match headers.set("Set-Cookie", &format!("GanymedeToken={}; SameSite=Lax; Path=/; Httponly; Secure; Expires={}", token, ( Utc::now() + TimeDelta::days(7) + TimeDelta::seconds(5) ))) {  //)) {
             Ok(_) => {},
             Err(_) => {},
         }
