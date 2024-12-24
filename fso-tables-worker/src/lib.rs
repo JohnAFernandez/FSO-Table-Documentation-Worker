@@ -1,4 +1,4 @@
-use std::io::Read;
+use std::{io::Read, u8::MIN};
 
 use db_fso::{db_generic_delete, db_generic_search_query};
 use serde::{Deserialize, Serialize};
@@ -50,7 +50,7 @@ impl EmailMessage {
             sender : FullEmailAddress::create_full_email("FSO Tables Database User Activations".to_string(), "activations@fsotables.com".to_string()),
             to : vec![], 
             subject : "Account Confirmation Link".to_string(),
-            htmlContent : format!("<h1 style=\"text-align:center\">Welcome to the Fresspace Open Table Database!</h1><br><br><h3>Please <a href=\"https://fso-tables-worker.johnandrewfernandez12.workers.dev/validation/{}/{}\">confirm your email</a>.</h3>", email, code),
+            htmlContent : format!("<h2 style=\"text-align:center\">Welcome to the Fresspace Open Table Database!</h2><br><br><h3>Here is your confirmation code: {}", code),
         }
     }
 }
@@ -182,7 +182,9 @@ pub async fn user_register_new(mut req: Request, ctx: RouteContext<()>) -> worke
                 Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00001\"}".to_string(),&(e.to_string() + " | IEC00001"), 500, &ctx).await,
             };
             
-            let statement = db1.prepare("INSERT INTO users (username, role, active, contribution_count) VALUES (?, 3, 0, 0)").bind(&[email.email.clone().into()]);
+            let salt = create_random_string().await;
+
+            let statement = db1.prepare("INSERT INTO users (username, role, active, contribution_count, password2) VALUES (?1, 3, 0, 0, ?2)").bind(&[JsValue::from(email.email), JsValue::from(salt)]);
             match &statement {
                 Ok(q) => {
                     if let Err(e) = q.run().await {
@@ -195,9 +197,13 @@ pub async fn user_register_new(mut req: Request, ctx: RouteContext<()>) -> worke
 
             let mut success = false;
             let mut error_message = "".to_string();
-            let activation_string = create_random_string().await;
 
-            match hash_string(&email.email, &activation_string).await {
+            // set up a small random string of numbers to send in the email as a confirmation code
+            let mut activation_string = create_random_string().await.trim_matches(char::is_alphabetic(self));
+            let end = MIN(activation_string.len() - 1, 5);
+            activation_string = &activation_string[0..end];
+
+            match hash_string(&salt, &activation_string).await {
                 Ok(scrambled_string) => {
                     match &db1.prepare(format!("INSERT INTO email_validations (username, secure_key) VALUES (?, \"{}\")", &scrambled_string)).bind(&[email.email.clone().into()]) {
                         Ok(q) => {
