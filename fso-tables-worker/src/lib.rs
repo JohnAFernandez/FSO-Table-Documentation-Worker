@@ -49,7 +49,7 @@ impl EmailMessage {
         EmailMessage{
             sender : FullEmailAddress::create_full_email("FSO Tables Database User Activations".to_string(), "activations@fsotables.com".to_string()),
             to : vec![], 
-            subject : "Account Confirmation Link".to_string(),
+            subject : "Account Confirmation Code".to_string(),
             htmlContent : format!("<h2 style=\"text-align:center\">Welcome to the Fresspace Open Table Database!</h2><br><br><h3>Here is your confirmation code: {}", code),
         }
     }
