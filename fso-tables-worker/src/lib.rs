@@ -1,6 +1,6 @@
-use std::{io::Read, u8::MIN};
+use std::{io::Read, cmp};
 
-use db_fso::{db_generic_delete, db_generic_search_query};
+use db_fso::db_generic_search_query;
 use serde::{Deserialize, Serialize};
 use worker::*;
 use email_address::*;
@@ -45,7 +45,7 @@ struct EmailMessage {
 }
 
 impl EmailMessage {
-    fn create_activation_email(email: &String, code: &String) -> EmailMessage{
+    fn create_activation_email(code: &String) -> EmailMessage{
         EmailMessage{
             sender : FullEmailAddress::create_full_email("FSO Tables Database User Activations".to_string(), "activations@fsotables.com".to_string()),
             to : vec![], 
@@ -184,7 +184,7 @@ pub async fn user_register_new(mut req: Request, ctx: RouteContext<()>) -> worke
             
             let salt = create_random_string().await;
 
-            let statement = db1.prepare("INSERT INTO users (username, role, active, contribution_count, password2) VALUES (?1, 3, 0, 0, ?2)").bind(&[JsValue::from(email.email), JsValue::from(salt)]);
+            let statement = db1.prepare("INSERT INTO users (username, role, active, contribution_count, password2) VALUES (?1, 3, 0, 0, ?2)").bind(&[JsValue::from(&email.email), JsValue::from(&salt)]);
             match &statement {
                 Ok(q) => {
                     if let Err(e) = q.run().await {
@@ -199,13 +199,14 @@ pub async fn user_register_new(mut req: Request, ctx: RouteContext<()>) -> worke
             let mut error_message = "".to_string();
 
             // set up a small random string of numbers to send in the email as a confirmation code
-            let mut activation_string = create_random_string().await.trim_matches(char::is_alphabetic(self));
-            let end = MIN(activation_string.len() - 1, 5);
+            let random_string = create_random_string().await;
+            let mut activation_string = random_string.trim_matches(char::is_alphabetic);
+            let end = cmp::min(activation_string.len() - 1, 6);
             activation_string = &activation_string[0..end];
 
-            match hash_string(&salt, &activation_string).await {
+            match hash_string(&salt, &activation_string.to_string()).await {
                 Ok(scrambled_string) => {
-                    match &db1.prepare(format!("INSERT INTO email_validations (username, secure_key) VALUES (?, \"{}\")", &scrambled_string)).bind(&[email.email.clone().into()]) {
+                    match &db1.prepare(format!("INSERT INTO email_validations (username, secure_key) VALUES (?, \"{}\")", &scrambled_string)).bind(&[JsValue::from(&email.email)]) {
                         Ok(q) => {
                             // if this fails, then we need to delete the inserted row.        
                             if let Err(e) = q.run().await {
@@ -222,9 +223,9 @@ pub async fn user_register_new(mut req: Request, ctx: RouteContext<()>) -> worke
             }
             
             if success{
-                return send_confirmation_link(&email.email, &activation_string, &ctx).await
+                return send_confirmation_link(&email.email, &activation_string.to_string(), &ctx).await
             } else {
-                let statement = db1.prepare("DELETE FROM email_validations WHERE username = ?").bind(&[email.email.clone().into()]);
+                let statement = db1.prepare("DELETE FROM email_validations WHERE username = ?").bind(&[JsValue::from(&email.email)]);
                 match &statement {
                     Ok(q) => {
                         if let Err(e) = q.run().await {
@@ -243,18 +244,26 @@ pub async fn user_register_new(mut req: Request, ctx: RouteContext<()>) -> worke
 
 }
 
+#[derive(Serialize, Deserialize)]
 struct ConfirmationCodeSubmission{
     code: String,
 }
 
-pub async fn user_confirm_email(req: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
+pub async fn user_confirm_email(mut req: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
     match req.json::<ConfirmationCodeSubmission>().await {
         Ok(key) => {
             match ctx.param("email"){
                 Some(username) => {
                     let hashed: String;
-                    
-                    match hash_string(username, key).await {
+                    let salt_result = db_fso::db_get_user_salt(username, &ctx).await;
+
+                    if salt_result.is_err() {
+                        return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00138\"}".to_string(), &(salt_result.unwrap_err().to_string() + " | IEC00138").to_string(), 500, &ctx).await;
+                    }
+
+                    let salt = salt_result.unwrap();
+
+                    match hash_string(&salt, &key.code).await {
                         Ok(string) => hashed = string,
                         Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00008\"}".to_string(),&(e.to_string() + " | IEC00008"), 500, &ctx).await,
                     }
@@ -283,7 +292,7 @@ pub async fn user_confirm_email(req: Request, ctx: RouteContext<()>) -> worker::
                                             Ok(option) => {
                                                 match option {
                                                     Some(password) => {
-                                                        match hash_string(&username, &password).await {
+                                                        match hash_string(&salt, &password).await {
                                                             Ok(hashed_password) => {
                                                                 match db_fso::db_set_new_pass(&username, &hashed_password, &ctx).await {
                                                                     Ok(_) => (),
@@ -327,7 +336,7 @@ pub async fn user_confirm_email(req: Request, ctx: RouteContext<()>) -> worker::
                 None => return err_specific("{\"Error\":\"Activation failed. The request is missing a username in the url.".to_string()).await,
             }
         },
-        Err(_) => return err_sepcific("{\"Error\":\"Activation failed. The request is missing the activation code in the json input.)".to_string()).await
+        Err(_) => return err_specific("{\"Error\":\"Activation failed. The request is missing the activation code in the json input.)".to_string()).await
     }
 }
 
@@ -544,6 +553,13 @@ pub async fn user_login(mut req: Request, ctx: RouteContext<()>) -> worker::Resu
                         Ok(b) => if !b { return send_failure(&"{\"Error\":\"Incorrect credentials! Please resubmit.\"}".to_string(), 403).await },
                         Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00031\"}".to_string(),&(e.to_string() + " | IEC00031"), 500, &ctx).await,
                     }
+
+                    let salt = db_fso::db_get_user_salt(&login.email, &ctx).await;
+
+                    if salt.is_err() {
+                        return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00139\"}".to_string(),&(salt.unwrap_err().to_string() + " | IEC00139"), 500, &ctx).await;
+                    }
+
                     match hash_string(&login.email, &login.password).await {
                         Ok(hash) => {
                             if db_fso::db_check_password(&login.email, &hash, &db).await {
@@ -1768,7 +1784,7 @@ pub async fn  header_has_token(req: &Request) -> Option<worker::Result<Response>
                 return Some(send_failure(&ERROR_BAD_REQUEST.to_string(), 403).await)                
             }        
         },
-        Err(e) => return Some(send_failure(&ERROR_BAD_REQUEST.to_string(), 403).await),
+        Err(_) => return Some(send_failure(&ERROR_BAD_REQUEST.to_string(), 403).await),
     }
 }
 
@@ -1805,7 +1821,7 @@ pub async fn header_get_token(req: &Request) -> worker::Result<String> {
                 None => (),
             }
         },
-        Err(e) => (),
+        Err(_) => (),
     }
 
     match req.headers().get("Cookie"){
@@ -1814,7 +1830,7 @@ pub async fn header_get_token(req: &Request) -> worker::Result<String> {
                 Some(cookie_string) => {
                         match cookie_string.find("GanymedeToken=") {
                             Some(index)=> {
-                                if (cookie_string.len() > index + 77){
+                                if cookie_string.len() > index + 77{
                                     return Ok(cookie_string[index + 14..index + 78].to_string());
                                 }
                             },
@@ -1827,7 +1843,7 @@ pub async fn header_get_token(req: &Request) -> worker::Result<String> {
                 }
             }
         },
-        Err(e) => return Err("All login token retreival methods failed. Check your input. IEC00137".to_string().into()),
+        Err(_) => return Err("All login token retreival methods failed. Check your input. IEC00137".to_string().into()),
     }
 
 }
@@ -1978,7 +1994,7 @@ pub async fn send_confirmation_link(address : &String, activation_key : &String,
         Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00129\"}".to_string(),&(e.to_string() + " | IEC00129"), 500, &ctx).await,
     }
 
-    let mut message: EmailMessage = EmailMessage::create_activation_email(address, activation_key);
+    let mut message: EmailMessage = EmailMessage::create_activation_email(activation_key);
     message.to.push(FullEmailAddress::create_full_email("User".to_string(), address.to_string()));
 
     let jvalue_out : JsValue;
@@ -1996,7 +2012,7 @@ pub async fn send_confirmation_link(address : &String, activation_key : &String,
     match worker::Fetch::Request(imminent_request).send().await {
         Ok(mut res) => { 
             match res.text().await {
-                Ok(text) => return Response::ok(text + "Email sent!"),
+                Ok(_) => return Response::ok("{\"Response\":\"Email sent!\"}"),
                 Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00131\"}".to_string(),&(e.to_string() + " | IEC00131"), 500, &ctx).await,
             }
         },

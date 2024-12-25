@@ -64,18 +64,18 @@ const TABLE_ALIASES_DELETE_QUERY: &str = "DELETE FROM table_aliases ";
 //const USERS_DELETE_QUERY: &str = "DELETE FROM users ";
 
 // Some (maybe most) of these will end up being unused as specialized functions are already written.  
-const ACTIONS_INSERT_QUERY: &str = "INSERT INTO actions (user_id, action, approved_by_user, timestamp) VALUES (?1, ?2, ?3, ?4)";
-const BUG_REPORT_INSERT_QUERY: &str = "INSERT INTO bug_reports ( user_id, bug_type, description, status, timestamp) VALUES (?1, ?2, ?3, ?4, ?5)";    
-const DEPRECATIONS_INSERT_QUERY: &str = "INSERT INTO deprecations (date, version) VALUES (?1, ?2)"; 
-const EMAIL_VALIDATIONS_INSERT_QUERY: &str = "INSERT INTO email_validations (username) VALUES (?1)";
+//const ACTIONS_INSERT_QUERY: &str = "INSERT INTO actions (user_id, action, approved_by_user, timestamp) VALUES (?1, ?2, ?3, ?4)";
+//const BUG_REPORT_INSERT_QUERY: &str = "INSERT INTO bug_reports ( user_id, bug_type, description, status, timestamp) VALUES (?1, ?2, ?3, ?4, ?5)";    
+//const DEPRECATIONS_INSERT_QUERY: &str = "INSERT INTO deprecations (date, version) VALUES (?1, ?2)"; 
+//const EMAIL_VALIDATIONS_INSERT_QUERY: &str = "INSERT INTO email_validations (username) VALUES (?1)";
 const ERROR_REPORT_INSERT_QUERY: &str = "INSERT INTO error_reports (error, timestamp) VALUES (?1, ?2);";
-const FSO_ITEMS_INSERT_QUERY: &str = "INSERT INTO fso_items (item_text, documentation, major_version, parent_id, table_id, deprecation_id, restriction_id, info_type, table_index, default_value) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)";
+//const FSO_ITEMS_INSERT_QUERY: &str = "INSERT INTO fso_items (item_text, documentation, major_version, parent_id, table_id, deprecation_id, restriction_id, info_type, table_index, default_value) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)";
 //const FSO_TABLES_INSERT_QUERY: &str = "INSERT INTO fso_tables VALUES (?1, ?2)";    
-const PARSE_BEHAVIORS_INSERT_QUERY: &str = "INSERT INTO parse_behaviors (behavior, description) VALUES (?1, ?2)";    
-const RESTRICTIONS_INSERT_QUERY: &str = "INSERT INTO restrictions (min_value, max_value, max_string_length, illegal_value_int, illegal_value_float) VALUES (?1, ?2, ?3, ?4, ?5)";    
-const SESSIONS_INSERT_QUERY: &str = "INSERT INTO sessions (user, expiration) VALUES (?1, ?2)";     
-const TABLE_ALIASES_INSERT_QUERY: &str = "INSERT INTO table_aliases (table_id, filename) VALUES (?1, ?2)";    
-const USERS_INSERT_QUERY: &str = "INSERT INTO users ( username, role, active, email_confirmed, contribution_count, banned: i32) VALUES (?1, ?2, ?3, ?4, ?5, ?6)";
+//const PARSE_BEHAVIORS_INSERT_QUERY: &str = "INSERT INTO parse_behaviors (behavior, description) VALUES (?1, ?2)";    
+//const RESTRICTIONS_INSERT_QUERY: &str = "INSERT INTO restrictions (min_value, max_value, max_string_length, illegal_value_int, illegal_value_float) VALUES (?1, ?2, ?3, ?4, ?5)";    
+//const SESSIONS_INSERT_QUERY: &str = "INSERT INTO sessions (user, expiration) VALUES (?1, ?2)";     
+//const TABLE_ALIASES_INSERT_QUERY: &str = "INSERT INTO table_aliases (table_id, filename) VALUES (?1, ?2)";    
+//const USERS_INSERT_QUERY: &str = "INSERT INTO users ( username, role, active, email_confirmed, contribution_count, banned: i32) VALUES (?1, ?2, ?3, ?4, ?5, ?6)";
 
 // Other patches should be done on the database end.
 const ACTIONS_PATCH_APPROVED_QUERY: &str = "UPDATE actions SET approved_by_user = ?1;";
@@ -133,14 +133,14 @@ const DEPRECATIONS_FILTER: &str = "WHERE deprecation_id = ?;";
 const DEPRECATIONS_FILTER_BINDABLE: &str = "WHERE deprecation_id = ?2;";
 
 const EMAIL_VALIDATION_PENDING_FILTER: &str = "WHERE username = ?;";
-const EMAIL_VALIDATION_PENDING_FILTER_BINDABLE: &str = "WHERE username = ?2;";
+//const EMAIL_VALIDATION_PENDING_FILTER_BINDABLE: &str = "WHERE username = ?2;";
 const EMAIL_VALIDATIONS_VERIFY_FILTER: &str = "WHERE username = ?1 AND secure_key = ?2;";
 
-const FSO_ITEMS_FILTER: &str = "WHERE item_id = ?";
+//const FSO_ITEMS_FILTER: &str = "WHERE item_id = ?";
 const FSO_ITEMS_FILTER_BINDABLE: &str = "WHERE item_id = ?2";
 
 const FSO_TABLES_FILTER: &str = "WHERE table_id = ?;";
-const FSO_TABLES_FILTER_BINDABLE: &str = "WHERE table_id = ?2;";
+//const FSO_TABLES_FILTER_BINDABLE: &str = "WHERE table_id = ?2;";
 
 const PARSE_BEHAVIORS_FILTER: &str = "WHERE behavior_id = ?;";
 const PARSE_BEHAVIORS_FILTER_BINDABLE: &str = "WHERE behavior_id = ?2;";
@@ -159,7 +159,7 @@ const TABLE_ALIASES_FILTER_BINDABLE: &str = "WHERE alias_id = ?2;";
 
 const USERS_USERNAME_FILTER: &str = "WHERE username = ?;";
 const USERS_USER_ID_FILTER: &str = "WHERE id = ?;";
-const USERS_USER_ID_FILTER_BINDABLE: &str = "WHERE id = ?2;";
+//const USERS_USER_ID_FILTER_BINDABLE: &str = "WHERE id = ?2;";
 
 #[derive(Serialize, Deserialize)]
 pub struct FsoTablesQueryResults {
@@ -1006,6 +1006,31 @@ pub async fn db_check_password(email: &String, password: &String, db: &D1Databas
         },
         Err(_) => return false,
     }    
+}
+
+#[derive(Serialize, Deserialize)]
+struct Salt {
+    salt: String,
+}
+
+pub async fn db_get_user_salt(email: &String, ctx: &RouteContext<()> ) -> Result<String> {
+    let db = ctx.env.d1(DB_NAME);
+
+    match &db{
+        Ok(connection) => {
+            let query = connection.prepare("SELECT password2 AS salt FROM users WHERE username = {}");
+            match query.first::<Salt>(None).await {
+                Ok(r) => {
+                    match r {
+                        Some(r2) => Ok(r2.salt),
+                        None => return Err("No Salt found for user".into()),
+                    }
+                },
+                Err(e) => return Err((e.to_string() + " Database error").into()),
+            }
+        }
+        Err(e) => return Err((e.to_string() + " Database error").into()),
+    }            
 }
 
 pub async fn db_set_new_pass(email: &String, password: &String, ctx: &RouteContext<()>) -> Result<()> {
