@@ -71,7 +71,7 @@ async fn fetch(req: Request, env: Env, _ctx: Context,) -> worker::Result<Respons
         .options_async("/api/users", send_cors)
         .post_async("/api/users/register", user_register_new)
         .options_async("/api/users/register", send_cors)
-        .get_async("/api/validation/:email/:id", user_confirm_email)
+        .post_async("/api/validation/:email", user_confirm_email)
         .options_async("/api/validation/:email/:id", send_cors)
         .get_async("/api/validation/:email/:id/password", user_confirm_email)
         .options_async("/api/validation/:email/:id/password", send_cors)
@@ -243,9 +243,13 @@ pub async fn user_register_new(mut req: Request, ctx: RouteContext<()>) -> worke
 
 }
 
+struct ConfirmationCodeSubmission{
+    code: String,
+}
+
 pub async fn user_confirm_email(req: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
-    match ctx.param("id") {
-        Some(key) => {
+    match req.json::<ConfirmationCodeSubmission>().await {
+        Ok(key) => {
             match ctx.param("email"){
                 Some(username) => {
                     let hashed: String;
@@ -320,10 +324,10 @@ pub async fn user_confirm_email(req: Request, ctx: RouteContext<()>) -> worker::
                         Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00016\"}".to_string(),&(e.to_string() + " | IEC00016"), 500, &ctx).await,
                     }
                 },
-                None => return err_specific("{\"Error\":\"Activation failed. The request is missing a username.".to_string()).await,
+                None => return err_specific("{\"Error\":\"Activation failed. The request is missing a username in the url.".to_string()).await,
             }
         },
-        None => return err_specific("{\"Error\":\"Activation failed. The Request is missing the required activation code.".to_string()).await,
+        Err(_) => return err_sepcific("{\"Error\":\"Activation failed. The request is missing the activation code in the json input.)".to_string()).await
     }
 }
 
