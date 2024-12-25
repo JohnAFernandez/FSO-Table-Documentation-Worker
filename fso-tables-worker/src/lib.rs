@@ -556,11 +556,13 @@ pub async fn user_login(mut req: Request, ctx: RouteContext<()>) -> worker::Resu
 
                     let salt = db_fso::db_get_user_salt(&login.email, &ctx).await;
 
-                    if salt.is_err() {
-                        return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00139\"}".to_string(),&(salt.unwrap_err().to_string() + " | IEC00139"), 500, &ctx).await;
+                    if salt_result.is_err() {
+                        return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00139\"}".to_string(),&(salt_result.unwrap_err().to_string() + " | IEC00139"), 500, &ctx).await;
                     }
 
-                    match hash_string(&login.email, &login.password).await {
+                    let salt = salt_result.unwrap();
+
+                    match hash_string(&salt, &login.password).await {
                         Ok(hash) => {
                             if db_fso::db_check_password(&login.email, &hash, &db).await {
                                 return create_session_and_send(&login.email, &ctx).await;
@@ -602,6 +604,16 @@ pub async fn user_change_password(mut req: Request, ctx: RouteContext<()>) -> wo
                     }
                     
                     match hash_string(&username, &password.password).await {                             
+
+                    let salt_result = db_fso::db_get_user_salt(&username, &Some(&ctx), None::<&D1Database>).await;
+
+                    if salt_result.is_err() {
+                        return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00140\"}".to_string(),&(salt_result.unwrap_err().to_string() + " | IEC00140"), 500, &ctx).await;
+                    }
+
+                    let salt = salt_result.unwrap();                    
+
+                    match hash_string(&salt, &password.password).await {                             
                         Ok(hash) => { 
                             match db_fso::db_set_new_pass(&username, &hash, &ctx).await {
                                 Ok(_) => return send_success(&"{\"Response\": \"Password Changed!\"}".to_string(), &"".to_string()).await,
@@ -1958,7 +1970,16 @@ pub async fn header_session_is_valid(req: &Request, db: &D1Database) -> (bool, S
                 return return_tuple;
             }
             
-            let hashed_token = hash_string(&return_tuple.1, &token).await.unwrap();
+            let salt_result = db_fso::db_get_user_salt(&return_tuple.1, &None::<&RouteContext<()>>, Some(&db)).await;
+
+            if salt_result.is_err() {
+                return_tuple.1 = salt_result.unwrap_err().to_string();
+                return return_tuple;
+            }
+
+            let salt = salt_result.unwrap();
+
+            let hashed_token = hash_string(&salt, &token).await.unwrap();
 
             match db_fso::db_check_token(&return_tuple.1, &hashed_token, Utc::now().to_string(), &db).await {
                 Ok(result) => return_tuple.0 = result,
