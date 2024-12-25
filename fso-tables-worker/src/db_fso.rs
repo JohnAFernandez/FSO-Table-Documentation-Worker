@@ -1018,17 +1018,21 @@ pub async fn db_get_user_salt(email: &String, ctx: &RouteContext<()> ) -> Result
 
     match &db{
         Ok(connection) => {
-            let query = connection.prepare("SELECT password2 AS salt FROM users WHERE username = {}");
-            match query.first::<Salt>(None).await {
-                Ok(r) => {
-                    match r {
-                        Some(r2) => Ok(r2.salt),
-                        None => return Err("No Salt found for user".into()),
+            match connection.prepare("SELECT password2 AS salt FROM users WHERE username = ?").bind(&[JsValue::from(email)]){
+                Ok(query) => {
+                    match query.first::<Salt>(None).await {
+                        Ok(r) => {
+                            match r {
+                                Some(r2) => Ok(r2.salt),
+                                None => return Err("No Salt found for user".into()),
+                            }
+                        },
+                        Err(e) => return Err((e.to_string() + " Database error").into()),
                     }
                 },
-                Err(e) => return Err((e.to_string() + " Database error").into()),
-            }
-        }
+                Err(e) => return Err((e.to_string() + "Database error").into()),
+            }            
+        },
         Err(e) => return Err((e.to_string() + " Database error").into()),
     }            
 }
