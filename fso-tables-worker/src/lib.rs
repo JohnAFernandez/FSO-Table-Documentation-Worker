@@ -1877,24 +1877,24 @@ pub async fn create_session_and_send(email: &String, ctx: &RouteContext<()>) -> 
     }
 }
 
-pub async fn hash_string(username: &String, string: &String) -> worker::Result<String> {
+pub async fn hash_string(hasher: &String, string: &String) -> worker::Result<String> {
     // Right here we need to do a little bit of server-only stuff!! For safety.  Only on production!
 
     // So this needs some documentation.
     // Basically, we need to convert the string into its u8 array and then into it's u64 array, because that is what randChaCha accepts
-    let bytes = username.as_bytes();
+    let bytes = hasher.as_bytes();
     
     if bytes.is_empty() {
-        return Err("Empty username, cannot login.".to_string().into());
+        return Err("Empty salt, cannot login.".to_string().into());
     }
 
     let mut counter = 0;
-    let mut username_seed: u64 = 0;
+    let mut hasher_seed: u64 = 0;
 
     for byte in bytes.bytes() {
-        username_seed *= 256; 
+        hasher_seed *= 256; 
         match byte{
-            Ok(b) => username_seed += b as u64,
+            Ok(b) => hasher += b as u64,
             Err(_) => (),
         }
 
@@ -1907,7 +1907,7 @@ pub async fn hash_string(username: &String, string: &String) -> worker::Result<S
     // RandChaCha will provide a repeatable result from the username so that even if the way that cloudflare structures its servers
     // We do not need to worry about the seeds changing.
     // So we generate the salt string using the seeded rng 
-    let rng = rand_chacha::ChaCha12Rng::seed_from_u64(username_seed);
+    let rng = rand_chacha::ChaCha12Rng::seed_from_u64(hasher_seed);
     let salt = SaltString::generate(rng);
     
     match Argon2::default().hash_password(string.as_bytes(), &salt) {
