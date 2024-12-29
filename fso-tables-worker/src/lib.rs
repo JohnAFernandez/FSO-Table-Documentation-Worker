@@ -53,6 +53,15 @@ impl EmailMessage {
             htmlContent : format!("<h2 style=\"text-align:center\">Welcome to the Fresspace Open Table Database!</h2><br><br><h3>Here is your confirmation code: {}", code),
         }
     }
+
+    fn create_password_reset_email(code: &String) -> EmailMessage{
+        EmailMessage{
+            sender : FullEmailAddress::create_full_email("FSO Tables Database Password Reset".to_string(), "credential.helper@fsotables.com".to_string()),
+            to : vec![], 
+            subject : "Account Reset".to_string(),
+            htmlContent : format!("<h2 style=\"text-align:center\">This is not set up yet.  Please contact Cyborg for password reset instructions.</h2><br><br><h3>Here is your confirmation code: {}", code),
+        }
+    }
 }
 
 
@@ -79,6 +88,8 @@ async fn fetch(req: Request, env: Env, _ctx: Context,) -> worker::Result<Respons
         .options_async("/api/users/myaccount", send_cors)
         .post_async("/api/users/myaccount/password", user_change_password)
         .options_async("/api/users/myaccount/password", send_cors)
+        .post_async("users/reset-password", user_reset_password)
+        .options_async("users/reset-password", send_cors)
         .post_async("/api/users/login", user_login)
         .options_async("/api/users/login", send_cors)
         .post_async("/api/users/activate", activate_user).put_async("/api/users/activate", activate_user).patch_async("/api/users/activate", activate_user)
@@ -223,7 +234,7 @@ pub async fn user_register_new(mut req: Request, ctx: RouteContext<()>) -> worke
             }
             
             if success{
-                return send_confirmation_link(&email.email, &activation_string.to_string(), &ctx).await
+                return send_confirmation_email(&email.email, &activation_string.to_string(), &ctx).await
             } else {
                 let statement = db1.prepare("DELETE FROM email_validations WHERE username = ?").bind(&[JsValue::from(&email.email)]);
                 match &statement {
@@ -642,6 +653,30 @@ pub async fn check_password_requirements(password: &String) -> Result<()> {
         },
         Err(e) => return Err(e.to_string().into())
     }
+}
+
+pub async fn user_reset_password(mut req: Request, ctx: RouteContext<()>) -> worker::Result<Response> {   
+    
+    match ctx.env.d1(DB_NAME){
+        Ok(db) => {
+            let email = req.json::<EmailSubmission>().await;
+            if email.is_err() {
+                return err_specific(ERROR_BAD_REQUEST.to_string()).await;        
+            }
+            
+            let successful_email = email.unwrap().email;
+
+            if !EmailAddress::is_valid(&successful_email) {
+                return err_specific(ERROR_BAD_REQUEST.to_string()).await;
+            }
+        
+            send_password_reset_email(&successful_email, &ctx).await
+        
+        },
+        Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00142\"}".to_string(),&(e.to_string() + " | IEC00142"), 500, &ctx).await,
+
+    }
+
 }
 
 pub async fn user_upgrade_user_permissions(mut req: Request, ctx: RouteContext<()>) -> worker::Result<Response> {    
@@ -1992,7 +2027,58 @@ pub async fn header_session_is_valid(req: &Request, db: &D1Database, ctx: &Route
     return return_tuple
 }
 
-pub async fn send_confirmation_link(address : &String, activation_key : &String, ctx: &RouteContext<()>) -> worker::Result<worker::Response> {
+pub async fn send_password_reset_email(address : &String,  ctx: &RouteContext<()>) -> worker::Result<worker::Response> {
+    if !(EmailAddress::is_valid(&address)){
+        return err_specific(format!("{{\"Error\":\"Tried to send automated email to invalid email address {}\"}}", address)).await
+    }
+
+    let mut headers : Headers = Headers::new();
+    match headers.append("content-type", "application/json"){
+        Ok(_) => (),
+        Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00127\"}".to_string(),&(e.to_string() + " | IEC00127"), 500, &ctx).await,
+    }
+
+    match headers.append("accept", "application/json") {
+        Ok(_) => (),
+        Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00128\"}".to_string(),&(e.to_string() + " | IEC00128"), 500, &ctx).await,
+    }
+
+    match headers.append("api-key", secrets::SMTP_API_KEY) {
+        Ok(_) => (),
+        Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00129\"}".to_string(),&(e.to_string() + " | IEC00129"), 500, &ctx).await,
+    }
+
+    let activation_key = create_random_string().await;
+
+    let mut message: EmailMessage = EmailMessage::create_password_reset_email(&activation_key);
+    message.to.push(FullEmailAddress::create_full_email("User".to_string(), address.to_string()));
+
+    let jvalue_out : JsValue;
+
+    match serde_json::to_string(&message) {
+        Ok(json_message) => jvalue_out = JsValue::from_str(&json_message),
+        Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00130\"}".to_string(),&(e.to_string() + " | IEC00130"), 500, &ctx).await,
+    }
+
+    let mut outbound_request = RequestInit::new();
+    outbound_request.with_method(Method::Post).with_headers(headers).with_body(Some(jvalue_out));
+    
+    let imminent_request = worker::Request::new_with_init("https://api.brevo.com/v3/smtp/email", &outbound_request).unwrap();
+    
+    match worker::Fetch::Request(imminent_request).send().await {
+        Ok(mut res) => { 
+            match res.text().await {
+                Ok(_) => return Response::ok("{\"Response\":\"Email sent!\"}"),
+                Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00131\"}".to_string(),&(e.to_string() + " | IEC00131"), 500, &ctx).await,
+            }
+        },
+
+        Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00132\"}".to_string(),&(e.to_string() + " | IEC00132"), 500, &ctx).await,
+    }
+
+}
+
+pub async fn send_confirmation_email(address : &String, activation_key : &String, ctx: &RouteContext<()>) -> worker::Result<worker::Response> {
     if !(EmailAddress::is_valid(&address)){
         return err_specific(format!("{{\"Error\":\"Tried to send automated email to invalid email address {}\"}}", address)).await
     }
