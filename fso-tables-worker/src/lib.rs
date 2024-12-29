@@ -90,6 +90,8 @@ async fn fetch(req: Request, env: Env, _ctx: Context,) -> worker::Result<Respons
         .options_async("/api/users/myaccount/password", send_cors)
         .post_async("/api/users/reset-password", user_reset_password)
         .options_async("/api/users/reset-password", send_cors)
+        .post_async("/api/users/reset-password", user_reset_password_confirmed)
+        .options_async("/api/users/reset-password", send_cors)
         .post_async("/api/users/login", user_login)
         .options_async("/api/users/login", send_cors)
         .post_async("/api/users/activate", activate_user).put_async("/api/users/activate", activate_user).patch_async("/api/users/activate", activate_user)
@@ -608,7 +610,7 @@ pub async fn user_change_password(mut req: Request, ctx: RouteContext<()>) -> wo
                 Ok(password) => {
                     match check_password_requirements(&password.password).await{
                         Ok(_) => (),
-                        Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00034\"}".to_string(),&(e.to_string() + " | IEC00034"), 500, &ctx).await,
+                        Err(e) => return err_specific(format!("\{\"Error\":\"{}\"\}", e.to_string())).await,
                     }                                       
 
                     let salt_result = db_fso::db_get_user_salt(&username, &ctx).await;
@@ -674,6 +676,8 @@ pub async fn user_reset_password(mut req: Request, ctx: RouteContext<()>) -> wor
                 Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00143\"}".to_string(),&(e.to_string() + " | IEC00143"), 500, &ctx).await,
             };
 
+            // TODO, here is where we add the entry to the password reset to the new password reset table
+
             send_password_reset_email(&successful_email, &ctx).await
         
         },
@@ -681,6 +685,39 @@ pub async fn user_reset_password(mut req: Request, ctx: RouteContext<()>) -> wor
 
     }
 
+}
+
+#[derive(Serialize, Deserialize)]
+struct PasswordReset {
+    code: String,
+    password: String, 
+}
+
+pub async fn user_reset_password_confirmed(mut req: Request, ctx: RouteContext<()>) -> worker::Result<Response> {    
+    match ctx.env.d1(DB_NAME){
+        Ok(db) => {
+            let request = req.json::<PasswordReset>().await;
+            if request.is_err() {
+                return err_specific(ERROR_BAD_REQUEST.to_string()).await;        
+            }
+
+            let code = request.unwrap().code;
+
+            // todo! Here is where we put the code for checking the code from the request.  5 strikes and you're out. 
+
+            let password = request.unwrap().password;
+
+            match check_password_requirements(&password){
+                Ok(_) => (),
+                Err(e) => return err_specific(format!("\{\"Error\":\"{}\"\}", e.to_string())).await,
+            }
+
+
+
+
+        },
+        Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00144\"}".to_string(),&(e.to_string() + " | IEC00144"), 500, &ctx).await,
+    }
 }
 
 pub async fn user_upgrade_user_permissions(mut req: Request, ctx: RouteContext<()>) -> worker::Result<Response> {    
