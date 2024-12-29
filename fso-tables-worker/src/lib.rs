@@ -554,7 +554,7 @@ pub async fn user_login(mut req: Request, ctx: RouteContext<()>) -> worker::Resu
                         Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00031\"}".to_string(),&(e.to_string() + " | IEC00031"), 500, &ctx).await,
                     }
 
-                    let salt = db_fso::db_get_user_salt(&login.email, &ctx).await;
+                    let salt_result = db_fso::db_get_user_salt(&login.email, &ctx).await;
 
                     if salt_result.is_err() {
                         return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00139\"}".to_string(),&(salt_result.unwrap_err().to_string() + " | IEC00139"), 500, &ctx).await;
@@ -601,11 +601,9 @@ pub async fn user_change_password(mut req: Request, ctx: RouteContext<()>) -> wo
                     match check_password_requirements(&password.password).await{
                         Ok(_) => (),
                         Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00034\"}".to_string(),&(e.to_string() + " | IEC00034"), 500, &ctx).await,
-                    }
-                    
-                    match hash_string(&username, &password.password).await {                             
+                    }                                       
 
-                    let salt_result = db_fso::db_get_user_salt(&username, &Some(&ctx), None::<&D1Database>).await;
+                    let salt_result = db_fso::db_get_user_salt(&username, &ctx).await;
 
                     if salt_result.is_err() {
                         return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00140\"}".to_string(),&(salt_result.unwrap_err().to_string() + " | IEC00140"), 500, &ctx).await;
@@ -1894,7 +1892,7 @@ pub async fn hash_string(hasher: &String, string: &String) -> worker::Result<Str
     for byte in bytes.bytes() {
         hasher_seed *= 256; 
         match byte{
-            Ok(b) => hasher += b as u64,
+            Ok(b) => hasher_seed += b as u64,
             Err(_) => (),
         }
 
@@ -1970,7 +1968,7 @@ pub async fn header_session_is_valid(req: &Request, db: &D1Database) -> (bool, S
                 return return_tuple;
             }
             
-            let salt_result = db_fso::db_get_user_salt(&return_tuple.1, &None::<&RouteContext<()>>, Some(&db)).await;
+            let salt_result = db_fso::db_get_user_salt(&return_tuple.1, &RouteContext<()>).await;
 
             if salt_result.is_err() {
                 return_tuple.1 = salt_result.unwrap_err().to_string();
