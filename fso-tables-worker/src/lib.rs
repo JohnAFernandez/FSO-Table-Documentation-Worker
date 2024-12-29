@@ -59,7 +59,7 @@ impl EmailMessage {
             sender : FullEmailAddress::create_full_email("FSO Tables Database Password Reset".to_string(), "credential.helper@fsotables.com".to_string()),
             to : vec![], 
             subject : "Account Reset".to_string(),
-            htmlContent : format!("<h2 style=\"text-align:center\">This is not set up yet.  Please contact Cyborg for password reset instructions.</h2><br><br><h3>Here is your confirmation code: {}", code),
+            htmlContent : format!("<h2 style=\"justify-content: center; display:flex; padding: 50px;\">We received a password reset request for your account on fsotables.com.  Here is your confirmation code: {}</h2>", code),
         }
     }
 }
@@ -210,12 +210,9 @@ pub async fn user_register_new(mut req: Request, ctx: RouteContext<()>) -> worke
             let mut error_message = "".to_string();
 
             // set up a small random string of numbers to send in the email as a confirmation code
-            let random_string = create_random_string().await;
-            let mut activation_string = random_string.trim_matches(char::is_alphabetic);
-            let end = cmp::min(activation_string.len() - 1, 6);
-            activation_string = &activation_string[0..end];
+            let activation_string = create_random_code().await;
 
-            match hash_string(&salt, &activation_string.to_string()).await {
+            match hash_string(&salt, &activation_string).await {
                 Ok(scrambled_string) => {
                     match &db1.prepare(format!("INSERT INTO email_validations (username, secure_key) VALUES (?, \"{}\")", &scrambled_string)).bind(&[JsValue::from(&email.email)]) {
                         Ok(q) => {
@@ -1972,6 +1969,12 @@ pub async fn create_random_string() -> String {
     .collect();
 }
 
+pub async fn create_random_code() -> String {    
+    return rand::thread_rng()
+    .gen_range(100000..999999)
+    .to_string()
+}
+
 // this is a big one.  We'll need to 1. Lookup an entry on username/tokens
 // 2. Compare the token they gave us and see if it matches the username. 
 // 3. See if the token is still valid.
@@ -2055,7 +2058,7 @@ pub async fn send_password_reset_email(address : &String,  ctx: &RouteContext<()
         Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00129\"}".to_string(),&(e.to_string() + " | IEC00129"), 500, &ctx).await,
     }
 
-    let activation_key = create_random_string().await;
+    let activation_key = create_random_code().await;
 
     let mut message: EmailMessage = EmailMessage::create_password_reset_email(&activation_key);
     message.to.push(FullEmailAddress::create_full_email("User".to_string(), address.to_string()));
