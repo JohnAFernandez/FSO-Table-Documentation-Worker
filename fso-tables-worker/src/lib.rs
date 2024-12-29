@@ -353,7 +353,7 @@ pub struct UserDetails{
 pub async fn user_get_details(req: Request, ctx: RouteContext<()>) -> worker::Result<Response> {    
     match ctx.env.d1(DB_NAME) {
         Ok(db) => {
-            let session_result = header_session_is_valid(&req, &db).await;
+            let session_result = header_session_is_valid(&req, &db, &ctx).await;
             if !session_result.0 {
                 return send_failure(&ERROR_NOT_LOGGED_IN.to_string(), 403).await
             }
@@ -374,7 +374,7 @@ pub async fn user_get_details(req: Request, ctx: RouteContext<()>) -> worker::Re
 pub async fn deactivate_user(mut req: Request, ctx: RouteContext<()>) -> worker::Result<Response> {    
     match ctx.env.d1(DB_NAME) {
         Ok(db) => {
-            let session_result = header_session_is_valid(&req, &db).await;
+            let session_result = header_session_is_valid(&req, &db, &ctx).await;
             if !session_result.0 {
                 return err_specific("{\"Error\":\"".to_string() + &session_result.1 + "\"}").await
             }
@@ -443,7 +443,7 @@ pub async fn deactivate_user(mut req: Request, ctx: RouteContext<()>) -> worker:
 pub async fn activate_user(mut req: Request, ctx: RouteContext<()>) -> worker::Result<Response> {  
     match ctx.env.d1(DB_NAME) {
         Ok(db) => {
-            let session_result = header_session_is_valid(&req, &db).await;
+            let session_result = header_session_is_valid(&req, &db, &ctx).await;
             if !session_result.0 {
                 return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await
             }
@@ -590,7 +590,7 @@ pub async fn user_change_password(mut req: Request, ctx: RouteContext<()>) -> wo
     match ctx.env.d1(DB_NAME) {
         Ok(db) => {
 
-            let session_result = header_session_is_valid(&req, &db).await;
+            let session_result = header_session_is_valid(&req, &db, &ctx).await;
             if !session_result.0 {
                 return send_failure(&ERROR_NOT_LOGGED_IN.to_string(), 403).await
             }
@@ -647,7 +647,7 @@ pub async fn check_password_requirements(password: &String) -> Result<()> {
 pub async fn user_upgrade_user_permissions(mut req: Request, ctx: RouteContext<()>) -> worker::Result<Response> {    
     match ctx.env.d1(DB_NAME) {
         Ok(db) => {
-            let session_result = header_session_is_valid(&req, &db).await;
+            let session_result = header_session_is_valid(&req, &db, &ctx).await;
             if !session_result.0 {
                 return send_failure(&ERROR_NOT_LOGGED_IN.to_string(), 403).await
             }
@@ -710,7 +710,7 @@ pub async fn user_downgrade_user_permissions(mut req: Request, ctx: RouteContext
   
     match ctx.env.d1(DB_NAME) {
         Ok(db) => {
-            let session_result = header_session_is_valid(&req, &db).await;
+            let session_result = header_session_is_valid(&req, &db, &ctx).await;
             if !session_result.0 {
                 return send_failure(&ERROR_NOT_LOGGED_IN.to_string(), 403).await
             }
@@ -790,7 +790,7 @@ pub async fn get_parse_type(_: Request, ctx: RouteContext<()>) -> worker::Result
 pub async fn update_parse_type(mut req: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
     match ctx.env.d1(DB_NAME) {
         Ok(db) => {
-            let session_result = header_session_is_valid(&req, &db).await;
+            let session_result = header_session_is_valid(&req, &db, &ctx).await;
             if !session_result.0 {
                 return send_failure(&ERROR_NOT_LOGGED_IN.to_string(), 403).await
             }
@@ -841,7 +841,7 @@ pub async fn update_parse_type(mut req: Request, ctx: RouteContext<()>) -> worke
 pub async fn delete_parse_type(req: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
     match ctx.env.d1(DB_NAME) {
         Ok(db) => {
-            let session_result = header_session_is_valid(&req, &db).await;
+            let session_result = header_session_is_valid(&req, &db, &ctx).await;
             if !session_result.0 {
                 return send_failure(&ERROR_NOT_LOGGED_IN.to_string(), 403).await
             }
@@ -921,7 +921,7 @@ pub struct NewItem{
 pub async fn insert_item(mut req: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
     match ctx.env.d1(DB_NAME) {
         Ok(db) => {
-            let session_result = header_session_is_valid(&req, &db).await;
+            let session_result = header_session_is_valid(&req, &db, &ctx).await;
             if !session_result.0 {
                 return send_failure(&ERROR_NOT_LOGGED_IN.to_string(), 403).await
             }
@@ -973,7 +973,7 @@ pub async fn insert_item(mut req: Request, ctx: RouteContext<()>) -> worker::Res
 pub async fn update_item(mut req: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
     match ctx.env.d1(DB_NAME) {
         Ok(db) => {
-            let session_result = header_session_is_valid(&req, &db).await;
+            let session_result = header_session_is_valid(&req, &db, &ctx).await;
             if !session_result.0 {
                 return send_failure(&ERROR_NOT_LOGGED_IN.to_string(), 403).await
             }
@@ -1073,7 +1073,7 @@ pub async fn update_item(mut req: Request, ctx: RouteContext<()>) -> worker::Res
 pub async fn delete_item(req: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
     match ctx.env.d1(DB_NAME) {
         Ok(db) => {
-            let session_result = header_session_is_valid(&req, &db).await;
+            let session_result = header_session_is_valid(&req, &db, &ctx).await;
             if !session_result.0 {
                 return send_failure(&ERROR_NOT_LOGGED_IN.to_string(), 403).await
             }
@@ -1157,7 +1157,7 @@ pub async fn get_alias(_: Request, ctx: RouteContext<()>) -> worker::Result<Resp
 pub async fn update_alias(mut req: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
     match ctx.env.d1(DB_NAME) {
         Ok(db) => {
-            let session_result = header_session_is_valid(&req, &db).await;
+            let session_result = header_session_is_valid(&req, &db, &ctx).await;
             if !session_result.0 {
                 return send_failure(&ERROR_NOT_LOGGED_IN.to_string(), 403).await
             }
@@ -1208,7 +1208,7 @@ pub async fn update_alias(mut req: Request, ctx: RouteContext<()>) -> worker::Re
 pub async fn delete_alias(req: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
     match ctx.env.d1(DB_NAME) {
         Ok(db) => {
-            let session_result = header_session_is_valid(&req, &db).await;
+            let session_result = header_session_is_valid(&req, &db, &ctx).await;
             if !session_result.0 {
                 return send_failure(&ERROR_NOT_LOGGED_IN.to_string(), 403).await
             }
@@ -1271,7 +1271,7 @@ pub async fn get_restriction(_: Request, ctx: RouteContext<()>) -> worker::Resul
 pub async fn update_restriction(mut req: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
     match ctx.env.d1(DB_NAME) {
         Ok(db) => {
-            let session_result = header_session_is_valid(&req, &db).await;
+            let session_result = header_session_is_valid(&req, &db, &ctx).await;
             if !session_result.0 {
                 return send_failure(&ERROR_NOT_LOGGED_IN.to_string(), 403).await
             }
@@ -1335,7 +1335,7 @@ pub async fn update_restriction(mut req: Request, ctx: RouteContext<()>) -> work
 pub async fn delete_restriction(req: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
     match ctx.env.d1(DB_NAME) {
         Ok(db) => {
-            let session_result = header_session_is_valid(&req, &db).await;
+            let session_result = header_session_is_valid(&req, &db, &ctx).await;
             if !session_result.0 {
                 return send_failure(&ERROR_NOT_LOGGED_IN.to_string(), 403).await
             }
@@ -1398,7 +1398,7 @@ pub async fn get_deprecation(_: Request, ctx: RouteContext<()>) -> worker::Resul
 pub async fn update_deprecation(mut req: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
     match ctx.env.d1(DB_NAME) {
         Ok(db) => {
-            let session_result = header_session_is_valid(&req, &db).await;
+            let session_result = header_session_is_valid(&req, &db, &ctx).await;
             if !session_result.0 {
                 return send_failure(&ERROR_NOT_LOGGED_IN.to_string(), 403).await
             }
@@ -1449,7 +1449,7 @@ pub async fn update_deprecation(mut req: Request, ctx: RouteContext<()>) -> work
 pub async fn delete_deprecation(req: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
     match ctx.env.d1(DB_NAME) {
         Ok(db) => {
-            let session_result = header_session_is_valid(&req, &db).await;
+            let session_result = header_session_is_valid(&req, &db, &ctx).await;
             if !session_result.0 {
                 return send_failure(&ERROR_NOT_LOGGED_IN.to_string(), 403).await
             }
@@ -1499,7 +1499,7 @@ pub struct BugReport{
 pub async fn add_bug_report(mut req: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
     match ctx.env.d1(DB_NAME) {
         Ok(db) => {
-            let session_result = header_session_is_valid(&req, &db).await;
+            let session_result = header_session_is_valid(&req, &db, &ctx).await;
 
             match req.json::<BugReport>().await{
                 Ok(report) =>{
@@ -1532,7 +1532,7 @@ pub async fn add_bug_report(mut req: Request, ctx: RouteContext<()>) -> worker::
 pub async fn resolve_bug_report(req: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
     match ctx.env.d1(DB_NAME) {
         Ok(db) => {
-            let session_result = header_session_is_valid(&req, &db).await;
+            let session_result = header_session_is_valid(&req, &db, &ctx).await;
             if !session_result.0 {
                 return send_failure(&ERROR_NOT_LOGGED_IN.to_string(), 403).await
             }
@@ -1578,7 +1578,7 @@ pub async fn resolve_bug_report(req: Request, ctx: RouteContext<()>) -> worker::
 pub async fn unresolve_bug_report(req: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
     match ctx.env.d1(DB_NAME) {
         Ok(db) => {
-            let session_result = header_session_is_valid(&req, &db).await;
+            let session_result = header_session_is_valid(&req, &db, &ctx).await;
             if !session_result.0 {
                 return send_failure(&ERROR_NOT_LOGGED_IN.to_string(), 403).await
             }
@@ -1626,7 +1626,7 @@ pub async fn unresolve_bug_report(req: Request, ctx: RouteContext<()>) -> worker
 pub async fn acknowledge_bug_report(req: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
     match ctx.env.d1(DB_NAME) {
         Ok(db) => {
-            let session_result = header_session_is_valid(&req, &db).await;
+            let session_result = header_session_is_valid(&req, &db, &ctx).await;
             if !session_result.0 {
                 return send_failure(&ERROR_NOT_LOGGED_IN.to_string(), 403).await
             }
@@ -1693,7 +1693,7 @@ pub struct BugReportInfo{
 pub async fn update_bug_report(mut req: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
     match ctx.env.d1(DB_NAME) {
         Ok(db) => {
-            let session_result = header_session_is_valid(&req, &db).await;
+            let session_result = header_session_is_valid(&req, &db, &ctx).await;
             if !session_result.0 {
                 return send_failure(&ERROR_NOT_LOGGED_IN.to_string(), 403).await
             }
@@ -1933,7 +1933,7 @@ pub async fn create_random_string() -> String {
 // this is a big one.  We'll need to 1. Lookup an entry on username/tokens
 // 2. Compare the token they gave us and see if it matches the username. 
 // 3. See if the token is still valid.
-pub async fn header_session_is_valid(req: &Request, db: &D1Database) -> (bool, String)  {
+pub async fn header_session_is_valid(req: &Request, db: &D1Database, ctx: &RouteContext<()>) -> (bool, String)  {
     let mut return_tuple = (false, "".to_string());
     
     match header_has_token(&req).await {
@@ -1968,7 +1968,7 @@ pub async fn header_session_is_valid(req: &Request, db: &D1Database) -> (bool, S
                 return return_tuple;
             }
             
-            let salt_result = db_fso::db_get_user_salt(&return_tuple.1, &RouteContext<()>).await;
+            let salt_result = db_fso::db_get_user_salt(&return_tuple.1, ctx).await;
 
             if salt_result.is_err() {
                 return_tuple.1 = salt_result.unwrap_err().to_string();
