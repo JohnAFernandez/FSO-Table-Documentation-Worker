@@ -862,7 +862,7 @@ pub async fn db_email_taken(email: &String, db: &D1Database) -> worker::Result<b
 }
 
 pub async fn db_is_user_banned_or_nonexistant(email: &String, db: &D1Database) -> worker::Result<bool> {
-    let query = db.prepare("SELECT count(*) AS the_count FROM users WHERE username = ? AND banned = 0").bind(&[email.into()]).unwrap();
+    let query = db.prepare("SELECT count(*) AS the_count FROM users WHERE username = ? AND banned = 0 AND email_confirmed = 1").bind(&[email.into()]).unwrap();
 
     match query.first::<BasicCount>(None).await {
         Ok(r) => {

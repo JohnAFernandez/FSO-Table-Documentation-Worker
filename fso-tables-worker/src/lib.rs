@@ -672,7 +672,7 @@ pub async fn user_reset_password(mut req: Request, ctx: RouteContext<()>) -> wor
         
             match db_fso::db_is_user_banned_or_nonexistant(&email.email, &db).await {
                 Ok(exists) => if !exists {
-                    return err_specific("{\"Error\":\"User cannot be found or user is banned\"}".to_string()).await;
+                    return err_specific("{\"Error\":\"User is not fully registered or is banned.\"}".to_string()).await;
                 },
                 Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00143\"}".to_string(),&(e.to_string() + " | IEC00143"), 500, &ctx).await,
             };
