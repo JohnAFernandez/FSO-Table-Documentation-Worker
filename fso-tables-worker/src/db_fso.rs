@@ -1219,6 +1219,44 @@ pub async fn db_check_token(username: &String, token: &String, time: String, db:
     }
 }
 
+struct ResetCodeRecord {
+    code: String,
+    email: String,
+    attempt_count: String,
+    expiration: String,
+}
+
+pub async fn db_check_code(username: &String, code: &String, ctx: &RouteContext<()>) -> Result<> {
+    match  ctx.env.d1(DB_NAME) {
+        Ok(db) => {
+            let query = ("SELECT code, email, attempt_count, expiration FROM email_resets WHERE email = ?;", );
+    
+            match db.prepare(query).bind(&[username.into()]) {
+                Ok(statement) => {                    
+                    match query.first::<ResetCodeRecord>(None).await {                      
+                        Ok(results) => {                             
+                            match results =>
+                                Some()
+
+                            }
+                            match results[0].expiration.parse::<DateTime<chrono::Utc>>(){
+                                Ok(session_time) => { return Ok(time.parse::<DateTime<chrono::Utc>>().unwrap() < session_time); },
+                                Err(_) => return Ok(false),
+                            }
+                        },
+                            Err(_) => return Ok(false),        
+                        }
+                    },
+                
+                Err(e)=> return Err(e),
+            }
+        },
+        Err(e) => return Err(e.into()),
+    }
+
+    return Ok(())
+}
+
 // How to compare timestamps
 /*
 

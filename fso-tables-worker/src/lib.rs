@@ -1,4 +1,4 @@
-use std::{io::Read, cmp};
+use std::{io::Read};
 
 use db_fso::db_generic_search_query;
 use serde::{Deserialize, Serialize};
@@ -610,7 +610,7 @@ pub async fn user_change_password(mut req: Request, ctx: RouteContext<()>) -> wo
                 Ok(password) => {
                     match check_password_requirements(&password.password).await{
                         Ok(_) => (),
-                        Err(e) => return err_specific(format!("\{\"Error\":\"{}\"\}", e.to_string())).await,
+                        Err(e) => return err_specific(format!("{{\"Error\":\"{}\"}}", e.to_string())).await,
                     }                                       
 
                     let salt_result = db_fso::db_get_user_salt(&username, &ctx).await;
@@ -669,7 +669,7 @@ pub async fn user_reset_password(mut req: Request, ctx: RouteContext<()>) -> wor
                 return err_specific(ERROR_BAD_REQUEST.to_string()).await;
             }
         
-            match db_fso::db_is_user_banned_or_nonexistant(&email.email, &db).await {
+            match db_fso::db_is_user_banned_or_nonexistant(&successful_email, &db).await {
                 Ok(exists) => if !exists {
                     return err_specific("{\"Error\":\"User is not fully registered or is banned.\"}".to_string()).await;
                 },
@@ -690,6 +690,7 @@ pub async fn user_reset_password(mut req: Request, ctx: RouteContext<()>) -> wor
 #[derive(Serialize, Deserialize)]
 struct PasswordReset {
     code: String,
+    username: String,
     password: String, 
 }
 
@@ -701,20 +702,41 @@ pub async fn user_reset_password_confirmed(mut req: Request, ctx: RouteContext<(
                 return err_specific(ERROR_BAD_REQUEST.to_string()).await;        
             }
 
+            let username = request.unwrap().username;
+
+            let salt_result = db_fso::db_get_user_salt(&username, &ctx).await;
+            if salt_result.is_err() {
+                return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00140\"}".to_string(),&(salt_result.unwrap_err().to_string() + " | IEC00140"), 500, &ctx).await;
+            }
+
             let code = request.unwrap().code;
 
-            // todo! Here is where we put the code for checking the code from the request.  5 strikes and you're out. 
+            match hash_string(&salt_result.unwrap(), &code).await {                             
+                Ok(hashed_code) => {
+                    match db_fso::db_check_code(&username, &hashed_code, &ctx){
+                        Ok(_) => (),
+                        Err(e) => return err_specific(e.to_string()).await,
+                    }        
+                },
+                Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00145\"}".to_string(),&(salt_result.unwrap_err().to_string() + " | IEC00145"), 500, &ctx).await,
+            }
 
             let password = request.unwrap().password;
 
-            match check_password_requirements(&password){
+            match check_password_requirements(&password).await{
                 Ok(_) => (),
-                Err(e) => return err_specific(format!("\{\"Error\":\"{}\"\}", e.to_string())).await,
+                Err(e) => return err_specific(format!("{{\"Error\":\"{}\"}}", e.to_string())).await,
             }
 
-
-
-
+            match hash_string(&salt_result.unwrap(), &password.password).await {                             
+                Ok(hash) => { 
+                    match db_fso::db_set_new_pass(&username, &hash, &ctx).await {
+                        Ok(_) => return send_success(&"{\"Response\": \"Password Changed!\"}".to_string(), &"".to_string()).await,
+                        Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00146\"}".to_string(),&(e.to_string() + " | IEC00146"), 500, &ctx).await,
+                    }
+                },
+                Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00147\"}".to_string(),&(e.to_string() + " | IEC00147"), 500, &ctx).await,
+            }            
         },
         Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00144\"}".to_string(),&(e.to_string() + " | IEC00144"), 500, &ctx).await,
     }
