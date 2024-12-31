@@ -1226,6 +1226,21 @@ struct ResetCodeRecord {
     expiration: String,
 }
 
+pub async fn db_add_code_reset(username: &String, code: &String, ctx: &RouteContext<()>) -> Result<> {
+    match  ctx.env.d1(DB_NAME) {
+        Ok(db) => {
+            let query = "INSERT INTO email_resets (code, email, attempt_count, expiration) VALUES (?1, ?2, 0, ?3);";
+            let time =  Utc::now() + TimeDelta::minutes(30);
+            
+            match db.prepare(query).bind(&[JsValue::from(code), JsValue::from(username), JsValue::from(time.to_string())]) {
+                Ok(statement) => return Ok(),
+                Err(e) => return Err(e.into()),
+            }
+        },
+        Err(e) => return Err(e.into()),
+    }
+}
+
 pub async fn db_check_code(username: &String, code: &String, ctx: &RouteContext<()>) -> Result<> {
     match  ctx.env.d1(DB_NAME) {
         Ok(db) => {
@@ -1254,7 +1269,7 @@ pub async fn db_check_code(username: &String, code: &String, ctx: &RouteContext<
 
                                             return Err("{{\"Error\":\"Password Reset Failed\"}}")
                                             },
-                                        Err(_) => return Err("{{\"Error\":\"Internal error caused password reset fail. Please ask an admin to check the expiration date format in the database.\"}}"),
+                                        Err(_) => return Err("{{\"Error\":\"Internal error caused password reset fail. Please ask an admin to check the expiration date format in the database. | IEC00147\"}}"),
                                     }
 
                                     if the_result.attempt_count + 1 > 4 {
@@ -1273,18 +1288,18 @@ pub async fn db_check_code(username: &String, code: &String, ctx: &RouteContext<
                                         }
                                     }
                                 },
-                                Err(e) => Err("{{\"Error\":\"Password reset failed because of internal error\"}}"),
+                                Err(e) => Err("{{\"Error\":\"Password reset failed because of internal error | IEC00148\"}}"),
                             }
                         },
-                        Err(e) => Err("{{\"Error\":\"Password reset failed because of internal error\"}}"),
+                        Err(e) => Err("{{\"Error\":\"Password reset failed because of internal error | IEC00149\"}}"),
                     }
 
                 },
                 
-                Err(e) => Err("{{\"Error\":\"Password reset failed because of internal error\"}}"),
+                Err(e) => Err("{{\"Error\":\"Password reset failed because of internal error | IEC00150\"}}"),
             }
         },
-        Err(e) => return Err(e.into()),
+        Err(e) => Err("{{\"Error\":\"Password reset failed because of internal error | IEC00151\"}}"),
     }
 
     let query2c = "DELETE FROM email_resets WHERE email = ?";
