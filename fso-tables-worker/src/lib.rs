@@ -676,7 +676,10 @@ pub async fn user_reset_password(mut req: Request, ctx: RouteContext<()>) -> wor
                 Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00143\"}".to_string(),&(e.to_string() + " | IEC00143"), 500, &ctx).await,
             };
 
-            // TODO, here is where we add the entry to the password reset to the new password reset table
+            match db_check_code(username: &String, code: &String, ctx: &RouteContext<()>).await {
+                Ok(_) => (),
+                Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00151\"}".to_string(),&(e.to_string() + " | IEC00151"), 500, &ctx).await,            
+            }
 
             send_password_reset_email(&successful_email, &ctx).await
         
