@@ -1,6 +1,6 @@
 use worker::*;
 use serde::{Deserialize, Serialize};
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Utc, TimeDelta};
 use crate::UserDetails;
 use crate::DB_NAME;
 use crate::err_specific;
@@ -1219,21 +1219,25 @@ pub async fn db_check_token(username: &String, token: &String, time: String, db:
     }
 }
 
+#[derive(Serialize, Deserialize)]
 struct ResetCodeRecord {
     code: String,
     email: String,
-    attempt_count: String,
+    attempt_count: i32,
     expiration: String,
 }
 
-pub async fn db_add_code_reset(username: &String, code: &String, ctx: &RouteContext<()>) -> Result<> {
+pub async fn db_add_code_reset(username: &String, code: &String, ctx: &RouteContext<()>) -> Result<()> {
     match  ctx.env.d1(DB_NAME) {
         Ok(db) => {
             let query = "INSERT INTO email_resets (code, email, attempt_count, expiration) VALUES (?1, ?2, 0, ?3);";
-            let time =  Utc::now() + TimeDelta::minutes(30);
-            
+            let mut time =  Utc::now();
+            time = time + TimeDelta::minutes(30);
+
             match db.prepare(query).bind(&[JsValue::from(code), JsValue::from(username), JsValue::from(time.to_string())]) {
-                Ok(statement) => return Ok(),
+                Ok(statement) => {
+                    let _ = statement.run().await;                    
+                    return Ok(())},
                 Err(e) => return Err(e.into()),
             }
         },
@@ -1241,71 +1245,90 @@ pub async fn db_add_code_reset(username: &String, code: &String, ctx: &RouteCont
     }
 }
 
-pub async fn db_check_code(username: &String, code: &String, ctx: &RouteContext<()>) -> Result<> {
+pub async fn db_check_code(username: &String, code: &String, ctx: &RouteContext<()>) -> Result<()> {
     match  ctx.env.d1(DB_NAME) {
         Ok(db) => {
             let query = "SELECT code, email, attempt_count, expiration FROM email_resets WHERE email = ?;";
     
             match db.prepare(query).bind(&[username.into()]) {
                 Ok(statement) => {                    
-                    match bound_query.all().await {
+                    match statement.all().await {
                         Ok(results) =>{
                             match results.results::<ResetCodeRecord>() {
                                 Ok(result) => {
                                     if result.is_empty() {
-                                        return Err("{{\"Error\":\"Password Reset Failed\"}}")
+                                        return Err("{{\"Error\":\"Password Reset Failed\"}}".to_string().into())
                                     }
 
-                                    let the_result = result[0];
+                                    let the_result = &result[0];
                                     let current_time = Utc::now();
 
                                     match the_result.expiration.parse::<DateTime<chrono::Utc>>(){
-                                        Ok(session_time) => if time.parse::<DateTime<chrono::Utc>>().unwrap() < current_time {
+                                        Ok(session_time) => if session_time < current_time {
                                             let query2a = "DELETE FROM email_resets WHERE email = ?";
-                                            query2a.bind()
-                                            match query2a.run() {
-                                                _ => ();
+                                            match db.prepare(query2a).bind(&[username.into()]){
+                                                Ok(prepared) => {
+                                                    match prepared.run() {
+                                                    _ => (),
+                                                    }
+                                                },
+                                                Err(_) => (),
                                             }
-
-                                            return Err("{{\"Error\":\"Password Reset Failed\"}}")
+                                            
+                                            return Err("{{\"Error\":\"Password Reset Failed\"}}".to_string().into())
                                             },
-                                        Err(_) => return Err("{{\"Error\":\"Internal error caused password reset fail. Please ask an admin to check the expiration date format in the database. | IEC00147\"}}"),
+                                        Err(_) => return Err("{{\"Error\":\"Internal error caused password reset fail. Please ask an admin to check the expiration date format in the database. | IEC00147\"}}".to_string().into()),
                                     }
 
                                     if the_result.attempt_count + 1 > 4 {
                                         let query2b = "DELETE FROM email_resets WHERE email = ?";
-                                        query2b.bind(&[username.into()]);
-                                        match query2b.run() {
-                                            _ => return Err("{{\"Error\":\"Password Reset Failed\"}}"),
+                                        match db.prepare(query2b).bind(&[username.into()]){
+                                            Ok(prepared) => {
+                                                match prepared.run() {
+                                                _ => (),
+                                                }
+                                            },
+                                            Err(_) => (),
+                                        }
+                                        
+                                        return Err("{{\"Error\":\"Password Reset Failed\"}}".to_string().into())
+                                        
+                                    }
+
+                                    if &the_result.code != code {
+                                        let query3 = "UPDATE email_resets SET attempt_count = attempt_count + 1 WHERE email = ?";
+                                        match db.prepare(query3).bind(&[username.into()]){
+                                            Ok(bound_query) => {
+                                                match bound_query.run() {
+                                                    _ => return Err("{{\"Error\":\"Password Reset Failed\"}}".to_string().into()),
+                                                }    
+                                            },
+                                            Err(_) => return Err("{{\"Error\":\"Password Reset Failed\"}}".to_string().into()),
                                         }
                                     }
 
-                                    if the_result.code != code {
-                                        let query3 = "UPDATE email_resets SET attempt_count = attempt_count + 1 WHERE email = ?";
-                                        query3.bind(&[username.into()]);
-                                        match query3.run() {
-                                            _ => return Err("{{\"Error\":\"Password Reset Failed\"}}"),
-                                        }
+                                    let query2c = "DELETE FROM email_resets WHERE email = ?";
+                                    match db.prepare(query2c).bind(&[username.into()]){
+                                        Ok(prepared) => {
+                                            match prepared.run() {
+                                            _ => (),
+                                            }
+                                        },
+                                        Err(_) => (),
                                     }
                                 },
-                                Err(e) => Err("{{\"Error\":\"Password reset failed because of internal error | IEC00148\"}}"),
+                                Err(_) => return Err("{{\"Error\":\"Password reset failed because of internal error | IEC00148\"}}".to_string().into()),
                             }
                         },
-                        Err(e) => Err("{{\"Error\":\"Password reset failed because of internal error | IEC00149\"}}"),
+                        Err(_) => return Err("{{\"Error\":\"Password reset failed because of internal error | IEC00149\"}}".to_string().into()),
                     }
 
                 },
                 
-                Err(e) => Err("{{\"Error\":\"Password reset failed because of internal error | IEC00150\"}}"),
+                Err(_) => return Err("{{\"Error\":\"Password reset failed because of internal error | IEC00150\"}}".to_string().into()),
             }
         },
-        Err(e) => Err("{{\"Error\":\"Password reset failed because of internal error | IEC00151\"}}"),
-    }
-
-    let query2c = "DELETE FROM email_resets WHERE email = ?";
-    query2c.bind(&[username.into()]);
-    match query2c.run() {
-        _ => ();
+        Err(_) => return Err("{{\"Error\":\"Password reset failed because of internal error | IEC00151\"}}".to_string().into()),
     }
 
     return Ok(())
