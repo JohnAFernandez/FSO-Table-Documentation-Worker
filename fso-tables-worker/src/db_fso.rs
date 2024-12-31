@@ -1234,6 +1234,16 @@ pub async fn db_add_code_reset(username: &String, code: &String, ctx: &RouteCont
             let mut time =  Utc::now();
             time = time + TimeDelta::minutes(30);
 
+            let prep_query = "DELETE FROM email_resets WHERE email = ?";
+            match db.prepare(prep_query).bind(&[username.into()]){
+                Ok(prepared) => {
+                    match prepared.run() {
+                    _ => (),
+                    }
+                },
+                Err(_) => (),
+            }
+
             match db.prepare(query).bind(&[JsValue::from(code), JsValue::from(username), JsValue::from(time.to_string())]) {
                 Ok(statement) => {
                     let _ = statement.run().await;                    
@@ -1257,7 +1267,7 @@ pub async fn db_check_code(username: &String, code: &String, ctx: &RouteContext<
                             match results.results::<ResetCodeRecord>() {
                                 Ok(result) => {
                                     if result.is_empty() {
-                                        return Err("{{\"Error\":\"Password Reset Failed\"}}".to_string().into())
+                                        return Err("{\"Error\":\"Password Reset Failed\"}".to_string().into())
                                     }
 
                                     let the_result = &result[0];
@@ -1275,9 +1285,9 @@ pub async fn db_check_code(username: &String, code: &String, ctx: &RouteContext<
                                                 Err(_) => (),
                                             }
                                             
-                                            return Err("{{\"Error\":\"Password Reset Failed\"}}".to_string().into())
+                                            return Err("{\"Error\":\"Password Reset Failed\"}".to_string().into())
                                             },
-                                        Err(_) => return Err("{{\"Error\":\"Internal error caused password reset fail. Please ask an admin to check the expiration date format in the database. | IEC00147\"}}".to_string().into()),
+                                        Err(_) => return Err("{\"Error\":\"Internal error caused password reset fail. Please ask an admin to check the expiration date format in the database. | IEC00147\"}".to_string().into()),
                                     }
 
                                     if the_result.attempt_count + 1 > 4 {
@@ -1291,7 +1301,7 @@ pub async fn db_check_code(username: &String, code: &String, ctx: &RouteContext<
                                             Err(_) => (),
                                         }
                                         
-                                        return Err("{{\"Error\":\"Password Reset Failed\"}}".to_string().into())
+                                        return Err("{\"Error\":\"Password Reset Failed\"}".to_string().into())
                                         
                                     }
 
@@ -1300,10 +1310,10 @@ pub async fn db_check_code(username: &String, code: &String, ctx: &RouteContext<
                                         match db.prepare(query3).bind(&[username.into()]){
                                             Ok(bound_query) => {
                                                 match bound_query.run() {
-                                                    _ => return Err("{{\"Error\":\"Password Reset Failed\"}}".to_string().into()),
+                                                    _ => return Err("{\"Error\":\"Password Reset Failed\"}".to_string().into()),
                                                 }    
                                             },
-                                            Err(_) => return Err("{{\"Error\":\"Password Reset Failed\"}}".to_string().into()),
+                                            Err(_) => return Err("{\"Error\":\"Password Reset Failed\"}".to_string().into()),
                                         }
                                     }
 
@@ -1317,18 +1327,18 @@ pub async fn db_check_code(username: &String, code: &String, ctx: &RouteContext<
                                         Err(_) => (),
                                     }
                                 },
-                                Err(_) => return Err("{{\"Error\":\"Password reset failed because of internal error | IEC00148\"}}".to_string().into()),
+                                Err(_) => return Err("{\"Error\":\"Password reset failed because of internal error | IEC00148\"}".to_string().into()),
                             }
                         },
-                        Err(_) => return Err("{{\"Error\":\"Password reset failed because of internal error | IEC00149\"}}".to_string().into()),
+                        Err(_) => return Err("{\"Error\":\"Password reset failed because of internal error | IEC00149\"}".to_string().into()),
                     }
 
                 },
                 
-                Err(_) => return Err("{{\"Error\":\"Password reset failed because of internal error | IEC00150\"}}".to_string().into()),
+                Err(_) => return Err("{\"Error\":\"Password reset failed because of internal error | IEC00150\"}".to_string().into()),
             }
         },
-        Err(_) => return Err("{{\"Error\":\"Password reset failed because of internal error | IEC00151\"}}".to_string().into()),
+        Err(_) => return Err("{\"Error\":\"Password reset failed because of internal error | IEC00151\"}".to_string().into()),
     }
 
     return Ok(())

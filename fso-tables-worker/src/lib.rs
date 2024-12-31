@@ -90,8 +90,8 @@ async fn fetch(req: Request, env: Env, _ctx: Context,) -> worker::Result<Respons
         .options_async("/api/users/myaccount/password", send_cors)
         .post_async("/api/users/reset-password", user_reset_password)
         .options_async("/api/users/reset-password", send_cors)
-        .post_async("/api/users/reset-password", user_reset_password_confirmed)
-        .options_async("/api/users/reset-password", send_cors)
+        .post_async("/api/users/reset-password/confirm", user_reset_password_confirmed)
+        .options_async("/api/users/reset-password/confirm", send_cors)
         .post_async("/api/users/login", user_login)
         .options_async("/api/users/login", send_cors)
         .post_async("/api/users/activate", activate_user).put_async("/api/users/activate", activate_user).patch_async("/api/users/activate", activate_user)
@@ -677,9 +677,23 @@ pub async fn user_reset_password(mut req: Request, ctx: RouteContext<()>) -> wor
             };
 
             let code = create_random_code().await;
-            match db_fso::db_add_code_reset(&successful_email, &code, &ctx).await{
-                Ok(_) => (),
-                Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00152\"}".to_string(),&(e.to_string() + " | IEC00152"), 500, &ctx).await,
+
+            let salt_result = db_fso::db_get_user_salt(&successful_email, &ctx).await;
+
+            if salt_result.is_err() {
+                return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00140\"}".to_string(),&(salt_result.unwrap_err().to_string() + " | IEC00140"), 500, &ctx).await;
+            }
+
+            let salt = salt_result.unwrap();      
+
+            match hash_string(&salt, &code).await {
+                Ok(hashed_code) => {
+                    match db_fso::db_add_code_reset(&successful_email, &hashed_code, &ctx).await{
+                        Ok(_) => (),
+                        Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00152\"}".to_string(),&(e.to_string() + " | IEC00152"), 500, &ctx).await,
+                    }        
+                },
+                Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please wait and try again. | IEC00153\"}".to_string(),&(e.to_string() + " | IEC00153"), 500, &ctx).await,
             }
 
             send_password_reset_email(&successful_email, &code, &ctx).await
