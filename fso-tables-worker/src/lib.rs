@@ -314,7 +314,7 @@ pub async fn user_confirm_email(mut req: Request, ctx: RouteContext<()>) -> work
                                                                     Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00011\"}".to_string(),&(e.to_string() + " | IEC00011"), 500, &ctx).await,
                                                                 }
 
-                                                                return create_session_and_send(&username, &ctx).await;   
+                                                                return create_session_and_send(&username, &salt, &ctx).await;   
                                                             },
                                                             Err(e) => err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00012\"}".to_string(),&(e.to_string() + " | IEC00012"), 500, &ctx).await,
                                                         }
@@ -331,7 +331,7 @@ pub async fn user_confirm_email(mut req: Request, ctx: RouteContext<()>) -> work
                                         }
 
                                         match db_fso::db_set_email_confirmed(&username, &ctx).await {
-                                            Ok(_) => return create_session_and_send(&username, &ctx).await,
+                                            Ok(_) => return create_session_and_send(&username, &salt, &ctx).await,
                                             Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00015\"}".to_string(),&(e.to_string() + " | IEC00015"), 500, &ctx).await,
                                         }
 
@@ -575,7 +575,7 @@ pub async fn user_login(mut req: Request, ctx: RouteContext<()>) -> worker::Resu
                     match hash_string(&salt, &login.password).await {
                         Ok(hash) => {
                             if db_fso::db_check_password(&login.email, &hash, &db).await {
-                                return create_session_and_send(&login.email, &ctx).await;
+                                return create_session_and_send(&login.email, &salt, &ctx).await;
                             } else {
                                 return send_failure(&"{\"Error\":\"Incorrect credentials! Please resubmit.\"}".to_string(), 403).await;
                             }
@@ -1958,11 +1958,11 @@ pub async fn header_get_token(req: &Request) -> worker::Result<String> {
 
 }
 
-pub async fn create_session_and_send(email: &String, ctx: &RouteContext<()>) -> worker::Result<Response> {
+pub async fn create_session_and_send(email: &String, salt: &String, ctx: &RouteContext<()>) -> worker::Result<Response> {
     let login_token = create_random_string().await;
     let hashed_string: String;                                
 
-    match hash_string(&email, &login_token).await {
+    match hash_string(&salt, &login_token).await {
         Ok(hashed) => hashed_string = hashed,
         Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00133\"}".to_string(),&(e.to_string() + " | IEC00133"), 500, &ctx).await,
     }
