@@ -50,7 +50,7 @@ impl EmailMessage {
             sender : FullEmailAddress::create_full_email("FSO Tables Database User Activations".to_string(), "activations@fsotables.com".to_string()),
             to : vec![], 
             subject : "Account Confirmation Code".to_string(),
-            htmlContent : format!("<h2 style=\"text-align:center\">Welcome to the Fresspace Open Table Database!</h2><br><br><h3>Here is your confirmation code: {}", code),
+            htmlContent : format!("<html style=\"background-color: #000000;\"><div style=\"text-align:center; font-family: calibri; padding: 50px; background-color: #242424; color: #cecece; margin-left:50px; margin-right:50px; border-radius: 5px;\"><h2 style=\"display:flex; justify-content: center;\">Welcome to the Ganymede, the Freespace Open Table Option Database</h2> <h3>To activate your account enter this confirmation code at fsotables.com</h3><div style=\"display:flex; justify-content: center;\"><h1 style=\"background-color: #333333; border-radius: 5px; padding:10px; padding-left:15px; padding-right:15px;\">{}</h1></div><br>Account confirmation codes expire in 24 hours.<br><br>If you are unsure why you got this email, please permanently it.</h2></div></html>", code),
         }
     }
 
@@ -58,8 +58,8 @@ impl EmailMessage {
         EmailMessage{
             sender : FullEmailAddress::create_full_email("FSO Tables Database Password Reset".to_string(), "credential.helper@fsotables.com".to_string()),
             to : vec![], 
-            subject : "Account Reset".to_string(),
-            htmlContent : format!("<h2 style=\"justify-content: center; display:flex; padding: 50px;\">We received a password reset request for your account on fsotables.com.  Here is your confirmation code: {}</h2>", code),
+            subject : "Account Reset Code".to_string(),
+            htmlContent : format!("<html style=\"background-color: #000000;\"><div style=\"text-align:center; font-family: calibri; padding: 50px; background-color: #242424; color: #cecece; margin-left:50px; margin-right:50px; border-radius: 5px;\"><h2 style=\"display:flex; justify-content: center;\">We received a password reset request for your fsotables.com account.<br>Here is your confirmation code:</h2><div style=\"display:flex; justify-content: center;\"><h1 style=\"background-color: #333333; border-radius: 5px; padding:10px; padding-left:15px; padding-right:15px;\">{}</h1></div><br>Confirmation codes expire in 30 minutes.<br><br>If you are unsure why you got this code, please permanently delete this email.</h2></div></html>", code),
         }
     }
 }
