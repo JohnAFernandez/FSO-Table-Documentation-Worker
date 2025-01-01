@@ -681,7 +681,7 @@ pub async fn user_reset_password(mut req: Request, ctx: RouteContext<()>) -> wor
             let salt_result = db_fso::db_get_user_salt(&successful_email, &ctx).await;
 
             if salt_result.is_err() {
-                return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00140\"}".to_string(),&(salt_result.unwrap_err().to_string() + " | IEC00140"), 500, &ctx).await;
+                return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00153\"}".to_string(),&(salt_result.unwrap_err().to_string() + " | IEC00153"), 500, &ctx).await;
             }
 
             let salt = salt_result.unwrap();      
@@ -723,7 +723,7 @@ pub async fn user_reset_password_confirmed(mut req: Request, ctx: RouteContext<(
 
     let salt_result = db_fso::db_get_user_salt(&username, &ctx).await;
     if salt_result.is_err() {
-        return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00140\"}".to_string(),&(salt_result.unwrap_err().to_string() + " | IEC00140"), 500, &ctx).await;
+        return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00154\"}".to_string(),&(salt_result.unwrap_err().to_string() + " | IEC00154"), 500, &ctx).await;
     }
 
     let good_salt = salt_result.unwrap();
