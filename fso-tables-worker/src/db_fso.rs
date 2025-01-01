@@ -1237,7 +1237,7 @@ pub async fn db_add_code_reset(username: &String, code: &String, ctx: &RouteCont
             let prep_query = "DELETE FROM email_resets WHERE email = ?";
             match db.prepare(prep_query).bind(&[username.into()]){
                 Ok(prepared) => {
-                    match prepared.run() {
+                    match prepared.run().await {
                     _ => (),
                     }
                 },
@@ -1255,6 +1255,8 @@ pub async fn db_add_code_reset(username: &String, code: &String, ctx: &RouteCont
     }
 }
 
+// TODO, shortsightedly, this only lets you try to set the code once.  We need to separate out the deletion into the calling code to do it properly.
+// OR maybe check password requirements before checking the code.
 pub async fn db_check_code(username: &String, code: &String, ctx: &RouteContext<()>) -> Result<()> {
     match  ctx.env.d1(DB_NAME) {
         Ok(db) => {
@@ -1278,7 +1280,7 @@ pub async fn db_check_code(username: &String, code: &String, ctx: &RouteContext<
                                             let query2a = "DELETE FROM email_resets WHERE email = ?";
                                             match db.prepare(query2a).bind(&[username.into()]){
                                                 Ok(prepared) => {
-                                                    match prepared.run() {
+                                                    match prepared.run().await {
                                                     _ => (),
                                                     }
                                                 },
@@ -1294,7 +1296,7 @@ pub async fn db_check_code(username: &String, code: &String, ctx: &RouteContext<
                                         let query2b = "DELETE FROM email_resets WHERE email = ?";
                                         match db.prepare(query2b).bind(&[username.into()]){
                                             Ok(prepared) => {
-                                                match prepared.run() {
+                                                match prepared.run().await {
                                                 _ => (),
                                                 }
                                             },
@@ -1309,7 +1311,7 @@ pub async fn db_check_code(username: &String, code: &String, ctx: &RouteContext<
                                         let query3 = "UPDATE email_resets SET attempt_count = attempt_count + 1 WHERE email = ?";
                                         match db.prepare(query3).bind(&[username.into()]){
                                             Ok(bound_query) => {
-                                                match bound_query.run() {
+                                                match bound_query.run().await {
                                                     _ => return Err("{\"Error\":\"Password Reset Failed\"}".to_string().into()),
                                                 }    
                                             },
@@ -1320,7 +1322,7 @@ pub async fn db_check_code(username: &String, code: &String, ctx: &RouteContext<
                                     let query2c = "DELETE FROM email_resets WHERE email = ?";
                                     match db.prepare(query2c).bind(&[username.into()]){
                                         Ok(prepared) => {
-                                            match prepared.run() {
+                                            match prepared.run().await {
                                             _ => (),
                                             }
                                         },
