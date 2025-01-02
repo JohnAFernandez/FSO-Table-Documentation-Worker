@@ -898,7 +898,7 @@ pub async fn db_is_user_banned_or_nonexistant(email: &String, db: &D1Database) -
 pub async fn db_set_email_confirmed(email: &String, ctx: &RouteContext<()>) -> Result<()> {
     match ctx.env.d1(DB_NAME){
         Ok(db) => {
-            match db.prepare("UPDATE users SET email_confirmed = 1 WHERE username = ?").bind(&[email.into()]) {
+            match db.prepare("UPDATE users SET email_confirmed = 1, active = 1 WHERE username = ?").bind(&[email.into()]) {
                 Ok(query) => {
                     match query.run().await {
                         Ok(_) => Ok(()),
