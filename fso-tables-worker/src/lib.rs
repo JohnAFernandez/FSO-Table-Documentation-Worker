@@ -189,8 +189,8 @@ pub async fn user_register_new(mut req: Request, ctx: RouteContext<()>) -> worke
     let db = ctx.env.d1(DB_NAME);
     match &db{
         Ok(db1) => {
-            match db_fso::db_email_taken(&email.email, &db1).await {
-                Ok(exists) => if exists {
+            match db_fso::db_user_able_to_register(&email.email, &db1).await {
+                Ok(exists) => if !exists {
                     return err_specific("{\"Error\":\"User already exists\"}".to_string()).await;
                 },
                 Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00001\"}".to_string(),&(e.to_string() + " | IEC00001"), 500, &ctx).await,
