@@ -42,7 +42,7 @@ pub enum Table {
 const ACTIONS_QUERY: &str = "SELECT * FROM actions ";    
 const BUG_REPORT_QUERY: &str = "SELECT * FROM bug_reports ";
 const DEPRECATIONS_QUERY: &str = "SELECT * FROM deprecations "; 
-const EMAIL_VALIDATIONS_QUERY: &str = "SELECT validation_id, username FROM email_validations ";
+const EMAIL_VALIDATIONS_QUERY: &str = "SELECT validation_id, username, expires FROM email_validations ";
 const FSO_ITEMS_QUERY: &str = "SELECT item_id, item_text, documentation, major_version, parent_id, table_id, deprecation_id, restriction_id, info_type, table_index, default_value FROM fso_items";
 const FSO_TABLES_QUERY: &str = "SELECT * FROM fso_tables ";    
 const PARSE_BEHAVIORS_QUERY: &str = "SELECT * FROM parse_behaviors ";    
@@ -224,6 +224,7 @@ pub struct Deprecations {
 pub struct EmailValidations {
     validation_id: i32,
     username: String,
+    pub expires: String,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -873,7 +874,7 @@ pub async fn db_user_able_to_register(email: &String, db: &D1Database) -> worker
     match query.first::<EmailConfirmedCheck>(None).await {
         Ok(info_option) => {
             match info_option {
-                Some(info) => return Ok(info_option.banned == 0 && info_option.email_confirmed == 0),
+                Some(info) => return Ok(info.banned == 0 && info.email_confirmed == 0),
                 None => return Ok(true),
             }
         },
@@ -1250,9 +1251,6 @@ struct ResetCodeRecord {
 pub async fn db_add_code_reset(username: &String, code: &String, ctx: &RouteContext<()>) -> Result<()> {
     match  ctx.env.d1(DB_NAME) {
         Ok(db) => {
-            let query = "INSERT INTO email_resets (code, email, attempt_count, expiration) VALUES (?1, ?2, 0, ?3);";
-            let mut time =  Utc::now();
-            time = time + TimeDelta::minutes(30);
 
             let prep_query = "DELETE FROM email_resets WHERE email = ?";
             match db.prepare(prep_query).bind(&[username.into()]){
@@ -1263,6 +1261,10 @@ pub async fn db_add_code_reset(username: &String, code: &String, ctx: &RouteCont
                 },
                 Err(_) => (),
             }
+
+            let query = "INSERT INTO email_resets (code, email, attempt_count, expiration) VALUES (?1, ?2, 0, ?3);";
+            let mut time =  Utc::now();
+            time = time + TimeDelta::minutes(30);
 
             match db.prepare(query).bind(&[JsValue::from(code), JsValue::from(username), JsValue::from(time.to_string())]) {
                 Ok(statement) => {

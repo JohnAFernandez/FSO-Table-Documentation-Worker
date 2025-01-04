@@ -14,7 +14,7 @@ use argon2::{
 use rand::*;
 use rand::distributions::Alphanumeric;
 use wasm_bindgen::JsValue;
-use chrono::{Utc, TimeDelta};
+use chrono::{Utc, TimeDelta, DateTime};
 mod secrets;
 mod db_fso;
 
@@ -217,7 +217,20 @@ pub async fn user_register_new(mut req: Request, ctx: RouteContext<()>) -> worke
 
             match hash_string(&salt, &activation_string).await {
                 Ok(scrambled_string) => {
-                    match &db1.prepare(format!("INSERT INTO email_validations (username, secure_key) VALUES (?, \"{}\")", &scrambled_string)).bind(&[JsValue::from(&email.email)]) {
+                    match  db1.prepare("DELETE FROM email_validations WHERE username = ?").bind(&[JsValue::from(&email.email)]) {
+                        Ok(q) => {
+                            if let Err(e) = q.run().await {
+                                return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00155\"}".to_string(),&(e.to_string() + " | IEC00155"), 500, &ctx).await;
+                            }
+        
+                        },
+                        Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00156\"}".to_string(),&(e.to_string() + " | IEC00156"), 500, &ctx).await,
+                    }    
+                    
+                    let mut time =  Utc::now();
+                    time = time + TimeDelta::minutes(30);
+
+                    match &db1.prepare(format!("INSERT INTO email_validations (username, secure_key, expires) VALUES (?, \"{}\", \"{}\")", &scrambled_string, time.to_string())).bind(&[JsValue::from(&email.email)]) {
                         Ok(q) => {
                             // if this fails, then we need to delete the inserted row.        
                             if let Err(e) = q.run().await {
@@ -294,6 +307,15 @@ pub async fn user_confirm_email(mut req: Request, ctx: RouteContext<()>) -> work
                                     return err_specific("{\"Error\":\"Email is either already confirmed or in error state. Please contact the admin if you cannot access your account.\"}".to_string()).await;
                                 },
                                 Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00009\"}".to_string(),&(e.to_string() + " | IEC00009"), 500, &ctx).await,
+                            }
+
+                            match result.email_validations[0].expires.parse::<DateTime<chrono::Utc>>(){
+                                Ok(expiration_time) => {
+                                    if Utc::now() > expiration_time{
+                                        return err_specific("{\"Error\":\"Activation link has expired.\"}".to_string()).await;
+                                    }
+                                }
+                                Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00157\"}".to_string(),&(e.to_string() + " | IEC00157"), 500, &ctx).await,
                             }
 
                             match req.headers().has("password"){
