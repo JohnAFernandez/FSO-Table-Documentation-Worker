@@ -94,6 +94,8 @@ async fn fetch(req: Request, env: Env, _ctx: Context,) -> worker::Result<Respons
         .options_async("/api/users/reset-password/confirm", send_cors)
         .post_async("/api/users/login", user_login)
         .options_async("/api/users/login", send_cors)
+        .post_async("/api/users/logout", user_logout)
+        .options_async("/api/users/logout", send_cors)
         .post_async("/api/users/activate", activate_user).put_async("/api/users/activate", activate_user).patch_async("/api/users/activate", activate_user)
         .options_async("/api/users/activate", send_cors)
         .post_async("/api/users/:username/upgrade", user_upgrade_user_permissions).patch_async("/api/users/:username/upgrade", user_upgrade_user_permissions)
@@ -612,6 +614,33 @@ pub async fn user_login(mut req: Request, ctx: RouteContext<()>) -> worker::Resu
     Err(e) => err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00033\"}".to_string(),&(e.to_string() + " | IEC00033"), 500, &ctx).await,
     }
 
+}
+
+pub async fn user_logout(mut req: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
+    match ctx.env.d1(DB_NAME) {
+        Ok(db) => {
+
+            let session_result = header_session_is_valid(&req, &db, &ctx).await;
+            if !session_result.0 {
+                return send_success(&"{\"Response\": \"Partial success, login info was not valid in the first place.\"}".to_string(), &"".to_string()).await
+            }
+
+            let username = session_result.1;
+            let hashed_token = session_result.2;
+
+            match db.prepare("DELETE FROM sessions WHERE key = ?1 AND user = ?2").bind(&[JsValue::from(&hashed_token), JsValue::from(&username)]) {
+                Ok(query) => {
+                    if let Err(e) = query.run().await {
+                        return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00159\"}".to_string(),&(e.to_string() + " | IEC00159"), 500, &ctx).await;
+                    }
+
+                    return send_success(&"{\"Response\": \"Logout Successful!\"}".to_string(), &"".to_string()).await                    
+                },
+                Err(_) => err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00158\"}".to_string(),&(e.to_string() + " | IEC00158"), 500, &ctx).await,,
+            }
+        },
+        Err(e)=> err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00037\"}".to_string(),&(e.to_string() + " | IEC00037"), 500, &ctx).await,
+    }
 }
 
 #[derive(Serialize, Deserialize)]
@@ -2076,8 +2105,8 @@ pub async fn create_random_code() -> String {
 // this is a big one.  We'll need to 1. Lookup an entry on username/tokens
 // 2. Compare the token they gave us and see if it matches the username. 
 // 3. See if the token is still valid.
-pub async fn header_session_is_valid(req: &Request, db: &D1Database, ctx: &RouteContext<()>) -> (bool, String)  {
-    let mut return_tuple = (false, "".to_string());
+pub async fn header_session_is_valid(req: &Request, db: &D1Database, ctx: &RouteContext<()>) -> (bool, String, String)  {
+    let mut return_tuple = (false, "".to_string(), "".to_string());
     
     match header_has_token(&req).await {
         Some(r) => { 
@@ -2127,6 +2156,7 @@ pub async fn header_session_is_valid(req: &Request, db: &D1Database, ctx: &Route
                 Err(e) => return_tuple.1 = e.to_string(),
             }
 
+            return_tuple.2 = hashed_token;
             return return_tuple
         },
         Err(e) => return_tuple.1 = e.to_string(),     
