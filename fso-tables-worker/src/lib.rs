@@ -616,7 +616,7 @@ pub async fn user_login(mut req: Request, ctx: RouteContext<()>) -> worker::Resu
 
 }
 
-pub async fn user_logout(mut req: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
+pub async fn user_logout(req: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
     match ctx.env.d1(DB_NAME) {
         Ok(db) => {
 
@@ -636,7 +636,7 @@ pub async fn user_logout(mut req: Request, ctx: RouteContext<()>) -> worker::Res
 
                     return send_success(&"{\"Response\": \"Logout Successful!\"}".to_string(), &"".to_string()).await                    
                 },
-                Err(_) => err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00158\"}".to_string(),&(e.to_string() + " | IEC00158"), 500, &ctx).await,,
+                Err(e) => err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00158\"}".to_string(),&(e.to_string() + " | IEC00158"), 500, &ctx).await,
             }
         },
         Err(e)=> err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00037\"}".to_string(),&(e.to_string() + " | IEC00037"), 500, &ctx).await,
