@@ -2339,7 +2339,7 @@ pub async fn add_mandatory_headers(token: &String) -> worker::Headers {
 //    headers.set("Access-Control-Allow-Credentials","true").unwrap();
 //    headers.set("Access-Control-Max-Age", "100000").unwrap();
     if !token.is_empty() {
-        match headers.set("Set-Cookie", &format!("GanymedeToken={}; SameSite=Lax; Path=/; Httponly; Secure; Expires={}", token, ( Utc::now() + TimeDelta::days(7) + TimeDelta::seconds(5) ))) {  //)) {
+        match headers.set("Set-Cookie", &format!("GanymedeToken={}; SameSite=Lax; Path=/; Httponly; Secure; Expires={};", token, ( Utc::now() + TimeDelta::days(7) + TimeDelta::seconds(5) ).to_rfc2822())) {  //)) {
             Ok(_) => {},
             Err(_) => {},
         }
