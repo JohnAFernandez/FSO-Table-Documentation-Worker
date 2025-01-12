@@ -705,12 +705,13 @@ pub async fn user_change_password(mut req: Request, ctx: RouteContext<()>) -> wo
             let username = session_result.1;
             match req.json::<Password>().await{
                 Ok(password) => {
-                    match hash_string(session_result.2, password.old_password).await {
+                    match hash_string(&session_result.2, &password.old_password).await {
                         Ok(old_password_hash) => {                       
                             if !db_fso::db_check_password(&username, &old_password_hash, &db).await {
-                                return err_specific("{{\"Error\":\"Old password does not match.\"}}");
+                                return err_specific("{\"Error\":\"Old password does not match.\"}".to_string()).await;
                             }
-                        Err(e) => err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00159\"}".to_string(),&(e.unwrap_err().to_string() + " | IEC00159"), 500, &ctx).await; 
+                        }
+                        Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00159\"}".to_string(),&(e.to_string() + " | IEC00159"), 500, &ctx).await 
                     }
 
                     match check_password_requirements(&password.password).await{
