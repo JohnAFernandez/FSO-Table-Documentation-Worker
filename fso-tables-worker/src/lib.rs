@@ -241,20 +241,36 @@ pub async fn user_register_new(mut req: Request, ctx: RouteContext<()>) -> worke
                 },
                 Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00001\"}".to_string(),&(e.to_string() + " | IEC00001"), 500, &ctx).await,
             };
+            let salt: String;
+
+            match db_fso::db_user_is_incompletely_registered(&email.email, &db1).await {
+                Ok(incomplete) => {
+                    // no record of the user attempting to register before
+                    if !incomplete {
+                        salt = create_random_string().await;
+
+                        let statement = db1.prepare("INSERT INTO users (username, role, active, contribution_count, password2) VALUES (?1, 3, 0, 0, ?2)").bind(&[JsValue::from(&email.email), JsValue::from(&salt)]);
+                        match &statement {
+                            Ok(q) => {
+                                if let Err(e) = q.run().await {
+                                    return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00002\"}".to_string(),&(e.to_string() + " | IEC00002"), 500, &ctx).await;
+                                }
             
-            let salt = create_random_string().await;
+                            },
+                            Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00003\"}".to_string(),&(e.to_string() + " | IEC00003"), 500, &ctx).await,
+                        }            
 
-            let statement = db1.prepare("INSERT INTO users (username, role, active, contribution_count, password2) VALUES (?1, 3, 0, 0, ?2)").bind(&[JsValue::from(&email.email), JsValue::from(&salt)]);
-            match &statement {
-                Ok(q) => {
-                    if let Err(e) = q.run().await {
-                        return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00002\"}".to_string(),&(e.to_string() + " | IEC00002"), 500, &ctx).await;
+                    } else {
+                        // the user has attempted to register before
+                        match db_fso::db_get_user_salt(&email.email, &ctx).await {
+                            Ok(existing_salt) => salt = existing_salt,
+                            Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00162\"}".to_string(),&(e.to_string() + " | IEC00162"), 500, &ctx).await,
+                        }
                     }
-
                 },
-                Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00003\"}".to_string(),&(e.to_string() + " | IEC00003"), 500, &ctx).await,
+                Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00161\"}".to_string(),&(e.to_string() + " | IEC00161"), 500, &ctx).await,
             }
-
+         
             let mut success = false;
             let mut error_message = "".to_string();
 

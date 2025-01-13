@@ -863,7 +863,7 @@ pub async fn db_email_taken(email: &String, db: &D1Database) -> worker::Result<b
 }
 
 #[derive(Serialize, Deserialize)]
-struct EmailConfirmedCheck{
+struct EmailConfirmedBannedCheck{
     email_confirmed: i32,
     banned: i32,
 }
@@ -871,11 +871,30 @@ struct EmailConfirmedCheck{
 pub async fn db_user_able_to_register(email: &String, db: &D1Database) -> worker::Result<bool> {
     let query = db.prepare("SELECT email_confirmed, banned FROM users WHERE username = ?" ).bind(&[email.into()]).unwrap();
 
-    match query.first::<EmailConfirmedCheck>(None).await {
+    match query.first::<EmailConfirmedBannedCheck>(None).await {
         Ok(info_option) => {
             match info_option {
                 Some(info) => return Ok(info.banned == 0 && info.email_confirmed == 0),
                 None => return Ok(true),
+            }
+        },
+        Err(e) => return Err(e),
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+struct EmailConfirmedCheck{
+    email_confirmed: i32,
+}
+
+pub async fn db_user_is_incompletely_registered(email: &String, db: &D1Database) -> worker::Result<bool> {
+    let query = db.prepare("SELECT email_confirmed FROM users WHERE username = ?" ).bind(&[email.into()]).unwrap();
+
+    match query.first::<EmailConfirmedCheck>(None).await {
+        Ok(info_option) => {
+            match info_option {
+                Some(info) => return Ok(info.email_confirmed == 0),
+                None => return Ok(false),
             }
         },
         Err(e) => return Err(e),
