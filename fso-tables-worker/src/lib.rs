@@ -125,9 +125,7 @@ async fn fetch(req: Request, env: Env, _ctx: Context,) -> worker::Result<Respons
         .post_async("/api/users/register", user_register_new)
         .options_async("/api/users/register", send_cors)
         .post_async("/api/validation/:email", user_confirm_email)
-        .options_async("/api/validation/:email/:id", send_cors)
-        .get_async("/api/validation/:email/:id/password", user_confirm_email)
-        .options_async("/api/validation/:email/:id/password", send_cors)
+        .options_async("/api/validation/:email", send_cors)
         .get_async("/api/users/myaccount", user_get_details)
         .options_async("/api/users/myaccount", send_cors)
         .post_async("/api/users/myaccount/password", user_change_password)
@@ -2283,7 +2281,7 @@ pub async fn send_password_reset_email(address : &String, code: &String, ctx: &R
     match worker::Fetch::Request(imminent_request).send().await {
         Ok(mut res) => { 
             match res.text().await {
-                Ok(_) => return Response::ok("{\"Response\":\"Email sent!\"}"),
+                Ok(_) => return send_success(&"{\"Response\":\"Email sent!\"}".to_string(), &"".to_string()).await,
                 Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00131\"}".to_string(),&(e.to_string() + " | IEC00131"), 500, &ctx).await,
             }
         },
@@ -2332,7 +2330,7 @@ pub async fn send_confirmation_email(address : &String, activation_key : &String
     match worker::Fetch::Request(imminent_request).send().await {
         Ok(mut res) => { 
             match res.text().await {
-                Ok(_) => return Response::ok("{\"Response\":\"Email sent!\"}"),
+                Ok(_) => return send_success(&"{\"Response\":\"Email sent!\"}".to_string(), &"".to_string()).await,
                 Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00131\"}".to_string(),&(e.to_string() + " | IEC00131"), 500, &ctx).await,
             }
         },
@@ -2361,7 +2359,7 @@ pub async fn add_mandatory_headers(token: &String) -> worker::Headers {
 //
     headers.set("Access-Control-Allow-Origin", "https://fsotables.com").unwrap();
     headers.set("Access-Control-Allow-Methods", "GET,PATCH,POST,PUT,DELETE").unwrap();
-    headers.set("Access-Control-Allow-Headers", "username,Set-Cookie,GanymedeToken").unwrap();
+    headers.set("Access-Control-Allow-Headers", "username,Set-Cookie,GanymedeToken,password").unwrap();
     headers.set("Access-Control-Allow-Credentials","true").unwrap();
     headers.set("Access-Control-Max-Age", "100000").unwrap();
     if !token.is_empty() {
