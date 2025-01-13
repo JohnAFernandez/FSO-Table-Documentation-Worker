@@ -703,9 +703,18 @@ pub async fn user_change_password(mut req: Request, ctx: RouteContext<()>) -> wo
             }
 
             let username = session_result.1;
+            
+            let salt_result = db_fso::db_get_user_salt(&username, &ctx).await;
+
+            if salt_result.is_err() {
+                return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00160\"}".to_string(),&(salt_result.unwrap_err().to_string() + " | IEC00160"), 500, &ctx).await;
+            }
+
+            let salt = salt_result.unwrap();
+
             match req.json::<Password>().await{
                 Ok(password) => {
-                    match hash_string(&session_result.2, &password.old_password).await {
+                    match hash_string(&salt, &password.old_password).await {
                         Ok(old_password_hash) => {                       
                             if !db_fso::db_check_password(&username, &old_password_hash, &db).await {
                                 return err_specific("{\"Error\":\"Old password does not match.\"}".to_string()).await;
