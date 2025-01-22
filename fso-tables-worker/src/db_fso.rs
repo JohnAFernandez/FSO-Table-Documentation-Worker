@@ -224,7 +224,7 @@ pub struct Deprecations {
 pub struct EmailValidations {
     validation_id: i32,
     username: String,
-    pub expires: String,
+    pub expires: i32,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -390,12 +390,13 @@ pub async fn db_generic_search_query(table: &Table, mode: i8 , key1: &String, ke
                         1 => query += EMAIL_VALIDATION_PENDING_FILTER,
                         // Double Binding requires special case here
                         2 => {
-
                             query = query + EMAIL_VALIDATIONS_VERIFY_FILTER;
-                            match db.prepare(query).bind(&[JsValue::from(key1), JsValue::from(key2)]){
+                            match db.prepare(query.clone()).bind(&[JsValue::from(key1), JsValue::from(key2)]){
                                 Ok(prepped_query)=> {
                                     match prepped_query.all().await {
                                         Ok(results) =>  {
+                                            //return Err(format!("{{\"Error\":\"TESTING, checkpoint 3 reached! on mode 2 key 1 {} key 2 {} query {} \"}}", key1, key2, query.to_string()).into());
+
                                             match results.results::<EmailValidations>(){
                                                 Ok(validations) => {
                                                     let mut query_return = FsoTablesQueryResults::new_results().await;
@@ -546,6 +547,7 @@ pub async fn db_generic_search_query(table: &Table, mode: i8 , key1: &String, ke
                         }
                     },
                     Table::EmailValidations => {
+                        return Err("Got to generic email validation part 2.".to_string().into());
                         match bound_query.all().await {
                             Ok(results) =>{
                                 match results.results::<EmailValidations>() {

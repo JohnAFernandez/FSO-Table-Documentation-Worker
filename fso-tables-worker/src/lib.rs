@@ -338,6 +338,8 @@ struct ConfirmationCodeSubmission{
 pub async fn user_confirm_email(mut req: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
     match req.json::<ConfirmationCodeSubmission>().await {
         Ok(key) => {
+
+
             match ctx.param("email"){
                 Some(username) => {
                     let hashed: String;
@@ -353,30 +355,32 @@ pub async fn user_confirm_email(mut req: Request, ctx: RouteContext<()>) -> work
                         Ok(string) => hashed = string,
                         Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00008\"}".to_string(),&(e.to_string() + " | IEC00008"), 500, &ctx).await,
                     }
-
+                    //return err_specific(format!("{{\"Error\":\"TESTING, checkpoint reached! possible dud\"}}")).await;
                     match db_generic_search_query(&db_fso::Table::EmailValidations, 2, &username, &hashed, &ctx).await{
-                        Ok(result) => {
-                            if result.email_validations.is_empty() {
+                        Ok(email_result) => {
+
+
+                            if email_result.email_validations.is_empty() {
                                 return err_specific("{\"Error\":\"Bad credentials, please resubmit.\"}".to_string()).await
                             }                         
 
                             // double check that we haven't already validated this email.
                             match db_generic_search_query(&db_fso::Table::Users, 2, username, &"".to_string(), &ctx).await {
-                                Ok(results) => 
-                                if results.users.is_empty() {
+                                Ok(user_results) => 
+                                if user_results.users.is_empty() {
                                     return err_specific("{\"Error\":\"No matching user found.\"}".to_string()).await
-                                } else if results.users[0].email_confirmed != 0 {
+                                } else if user_results.users[0].email_confirmed != 0 {
                                     return err_specific("{\"Error\":\"Email is either already confirmed or in error state. Please contact the admin if you cannot access your account.\"}".to_string()).await;
                                 },
                                 Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00009\"}".to_string(),&(e.to_string() + " | IEC00009"), 500, &ctx).await,
                             }
 
-                            match result.email_validations[0].expires.parse::<i64>(){
+                            match email_result.email_validations[0].expires.parse::<i64>(){
                                 Ok(expiration_time) => {
                                     if Utc::now().format(DB_TIME_FORMAT).to_string().parse::<i64>().unwrap() > expiration_time{
                                         return err_specific("{\"Error\":\"Activation link has expired.\"}".to_string()).await;
                                     }
-                                }
+                                },
                                 Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00157\"}".to_string(),&(e.to_string() + " | IEC00157"), 500, &ctx).await,
                             }
 
@@ -401,7 +405,7 @@ pub async fn user_confirm_email(mut req: Request, ctx: RouteContext<()>) -> work
 
                                                                 return create_session_and_send(&username, &salt, &ctx).await;   
                                                             },
-                                                            Err(e) => err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00012\"}".to_string(),&(e.to_string() + " | IEC00012"), 500, &ctx).await,
+                                                            Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00012\"}".to_string(),&(e.to_string() + " | IEC00012"), 500, &ctx).await,
                                                         }
                                                     },
                                                     None => return err_specific("{\"Error\":\"Password missing from headers\"}".to_string()).await,
