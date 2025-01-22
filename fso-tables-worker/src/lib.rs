@@ -692,7 +692,7 @@ pub async fn user_logout(req: Request, ctx: RouteContext<()>) -> worker::Result<
                         return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00159\"}".to_string(),&(e.to_string() + " | IEC00159"), 500, &ctx).await;
                     }
 
-                    return send_success(&"{\"Response\": \"Logout Successful!\"}".to_string(), &"".to_string()).await                    
+                    return send_success(&"{\"Response\": \"Logout Successful!\"}".to_string(), &" ".to_string()).await                    
                 },
                 Err(e) => err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00158\"}".to_string(),&(e.to_string() + " | IEC00158"), 500, &ctx).await,
             }
@@ -2363,7 +2363,7 @@ pub async fn add_mandatory_headers(token: &String) -> worker::Headers {
     headers.set("Access-Control-Allow-Credentials","true").unwrap();
     headers.set("Access-Control-Max-Age", "100000").unwrap();
     if !token.is_empty() {
-        match headers.set("Set-Cookie", &format!("GanymedeToken={}; SameSite=None; Path=/; Httponly; Secure; Expires={}; Domain=fsotables.com", token, ( Utc::now() + TimeDelta::days(7) + TimeDelta::seconds(5) ).to_rfc2822())) {  //)) {
+        match headers.set("Set-Cookie", &format!("GanymedeToken={}; SameSite=None; Path=/; Httponly; Secure; Expires={}; Domain=.fsotables.com", token, ( Utc::now() + TimeDelta::days(7) + TimeDelta::seconds(5) ).to_rfc2822())) {  //)) {
             Ok(_) => {},
             Err(_) => {},
         }
