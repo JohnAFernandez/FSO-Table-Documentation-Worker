@@ -23,6 +23,7 @@ const DB_NAME: &str = "fso_table_database";
 const DB_ALLOWED_PASSWORD_CHARACTERS: &str = "[^0-9A-Za-z~!@#$%^&*()_\\-+={\\[}\\]|\\\\:;<,>.?\\/]";// 
 const DB_MINIMUM_PASSWORD_LENGTH: usize = 10;
 const DB_SEMVER_CHARACTERS: &str = "[^0-9.]";
+pub const DB_TIME_FORMAT: &str = "%Y%m%d%H%M%S"; // Year month day Hour minute second with no spaces, allows direct < > comparisons
 
 #[derive(Serialize)]
 struct FullEmailAddress {
@@ -291,7 +292,7 @@ pub async fn user_register_new(mut req: Request, ctx: RouteContext<()>) -> worke
                     let mut time =  Utc::now();
                     time = time + TimeDelta::minutes(30);
 
-                    match &db1.prepare(format!("INSERT INTO email_validations (username, secure_key, expires) VALUES (?, \"{}\", \"{}\")", &scrambled_string, time.to_string())).bind(&[JsValue::from(&email.email)]) {
+                    match &db1.prepare(format!("INSERT INTO email_validations (username, secure_key, expires) VALUES (?, \"{}\", \"{}\")", &scrambled_string, time.format(DB_TIME_FORMAT).to_string())).bind(&[JsValue::from(&email.email)]) {
                         Ok(q) => {
                             // if this fails, then we need to delete the inserted row.        
                             if let Err(e) = q.run().await {
@@ -370,9 +371,9 @@ pub async fn user_confirm_email(mut req: Request, ctx: RouteContext<()>) -> work
                                 Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00009\"}".to_string(),&(e.to_string() + " | IEC00009"), 500, &ctx).await,
                             }
 
-                            match result.email_validations[0].expires.parse::<DateTime<chrono::Utc>>(){
+                            match result.email_validations[0].expires.parse::<i64>(){
                                 Ok(expiration_time) => {
-                                    if Utc::now() > expiration_time{
+                                    if Utc::now().format(DB_TIME_FORMAT).to_string().parse::<i64>().unwrap() > expiration_time{
                                         return err_specific("{\"Error\":\"Activation link has expired.\"}".to_string()).await;
                                     }
                                 }
@@ -2124,7 +2125,7 @@ pub async fn create_session_and_send(email: &String, salt: &String, ctx: &RouteC
     }
 
     // We give the user two hours to do what they need to do.
-    match db_fso::db_session_add(&hashed_string, &email, &(Utc::now() + TimeDelta::hours(2)).to_string(), ctx).await {
+    match db_fso::db_session_add(&hashed_string, &email, &(Utc::now() + TimeDelta::days(7)).format(DB_TIME_FORMAT).to_string(), ctx).await {
         // remember! double {{ }} needed to escape here, even on the right side.
         Ok(_) => return send_success(&"".to_string(), &login_token).await,
         Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00134\"}".to_string(),&(e.to_string() + " | IEC00134"), 500, &ctx).await,
@@ -2241,7 +2242,7 @@ pub async fn header_session_is_valid(req: &Request, db: &D1Database, ctx: &Route
 
             let hashed_token = hash_string(&salt, &token).await.unwrap();
 
-            match db_fso::db_check_token(&return_tuple.1, &hashed_token, Utc::now().to_string(), &db).await {
+            match db_fso::db_check_token(&return_tuple.1, &hashed_token, Utc::now().format(DB_TIME_FORMAT).to_string(), &db).await {
                 Ok(result) => return_tuple.0 = result,
                 Err(e) => return_tuple.1 = e.to_string(),
             }
@@ -2376,7 +2377,7 @@ pub async fn add_mandatory_headers(token: &String) -> worker::Headers {
     headers.set("Access-Control-Allow-Credentials","true").unwrap();
     headers.set("Access-Control-Max-Age", "100000").unwrap();
     if !token.is_empty() {
-        match headers.set("Set-Cookie", &format!("GanymedeToken={}; SameSite=None; Path=/; Httponly; Secure; Expires={}; Domain=.fsotables.com", token, ( Utc::now() + TimeDelta::days(7) + TimeDelta::seconds(5) ).to_rfc2822())) {  //)) {
+        match headers.set("Set-Cookie", &format!("GanymedeToken={}; SameSite=None; Path=/; Httponly; Secure; Expires={}; Domain=.fsotables.com", token, ( Utc::now() + TimeDelta::days(7) - TimeDelta::seconds(5) ).to_rfc2822())) {  //)) {
             Ok(_) => {},
             Err(_) => {},
         }
