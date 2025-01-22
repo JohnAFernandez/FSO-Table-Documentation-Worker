@@ -136,7 +136,7 @@ const EMAIL_VALIDATION_PENDING_FILTER: &str = "WHERE username = ?;";
 //const EMAIL_VALIDATION_PENDING_FILTER_BINDABLE: &str = "WHERE username = ?2;";
 const EMAIL_VALIDATIONS_VERIFY_FILTER: &str = "WHERE username = ?1 AND secure_key = ?2;";
 
-//const FSO_ITEMS_FILTER: &str = "WHERE item_id = ?";
+const FSO_ITEMS_TABLE_FILTER: &str = "WHERE table_id = ?";
 const FSO_ITEMS_FILTER_BINDABLE: &str = "WHERE item_id = ?2";
 
 const FSO_TABLES_FILTER: &str = "WHERE table_id = ?;";
@@ -421,6 +421,7 @@ pub async fn db_generic_search_query(table: &Table, mode: i8 , key1: &String, ke
 
                     match mode {
                         0 => (),
+                        1 => query += FSO_ITEMS_TABLE_FILTER,
                         _ => return Err("Internal Server Error: Out of range mode in FSO_ITEMS generic query.".into()),
                     }
 

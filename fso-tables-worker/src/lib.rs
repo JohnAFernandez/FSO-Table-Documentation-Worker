@@ -1,4 +1,4 @@
-use std::{io::Read};
+use std::io::Read;
 
 use db_fso::db_generic_search_query;
 use serde::{Deserialize, Serialize};
@@ -153,6 +153,7 @@ async fn fetch(req: Request, env: Env, _ctx: Context,) -> worker::Result<Respons
         .patch_async("/api/tables/parse-types", update_parse_type).put_async("/api/tables/parse-types", update_parse_type)
         .delete_async("/api/tables/parse-types/:id", delete_parse_type) // Admin only
         // tables just need to be done manually on my end, because we don't have many tables *and* it's less effort than just populating.
+        // UPDATE! I finished adding them to the database
         .get_async("/api/tables", get_tables).options_async("/api/tables", send_cors)
         .get_async("/api/tables/items", get_items).options_async("/api/tables/items", send_cors)
         .get_async("/api/tables/items/:id", get_item)
@@ -166,7 +167,7 @@ async fn fetch(req: Request, env: Env, _ctx: Context,) -> worker::Result<Respons
         .patch_async("/api/tables/aliases/:id", update_alias).put_async("/api/tables/aliases/:id", update_alias) // Requires login
         .delete_async("/api/tables/aliases/:id", delete_alias) // Admin only
         .get_async("/api/tables/:id", get_table).options_async("/api/tables/:id", send_cors)
-        //.get_async("/api/tables/:id/items", get_tables_items)
+        .get_async("/api/tables/:id/items", get_tables_items).options_async("/api/tables/:id/items", send_cors)
         .get_async("/api/tables/restrictions", get_restrictions).options_async("/api/tables/restrictions", send_cors)
         .get_async("/api/tables/restrictions/:id", get_restriction).options_async("/api/tables/restrictions/:id", send_cors)
         //.post_async("/api/tables/items/:id/restriction", post_restriction) // Requires login
@@ -1372,7 +1373,19 @@ pub async fn get_table(_: Request, ctx: RouteContext<()>) -> worker::Result<Resp
             Ok(results) => return Ok(Response::from_json(&results.fso_tables).unwrap().with_headers(add_mandatory_headers(&"".to_string()).await)),
             Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00075\"}".to_string(),&(e.to_string() + " | IEC00075"), 500, &ctx).await,
         },
-        None => return err_specific("{\"Error\":\"Internal Server Error, route parameter mismatch!\"}".to_string()).await,
+        None => return err_specific("{\"Error\":\"Bad request, route parameter mismatch!\"}".to_string()).await,
+    }
+}
+
+pub async fn get_tables_items(_: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
+    match ctx.param("id"){
+        Some(parameter) => {
+            match db_fso::db_generic_search_query(&db_fso::Table::FsoItems, 1, parameter, &"".to_string(), &ctx).await {
+                Ok(results) => return Ok(Response::from_json(&results.fso_items).unwrap().with_headers(add_mandatory_headers(&"".to_string()).await)),
+                Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00163\"}".to_string(),&(e.to_string() + " | IEC00163"), 500, &ctx).await,
+            }
+        },
+        None => return err_specific("{\"Error\":\"Bad request, route parameter mismatch!\"}".to_string()).await,
     }
 }
 
