@@ -5,6 +5,7 @@ use crate::UserDetails;
 use crate::DB_NAME;
 use crate::err_specific;
 use crate::JsValue;
+use crate::DB_TIME_FORMAT;
 
 
 #[derive(PartialEq, PartialOrd)]
@@ -272,7 +273,7 @@ pub struct Restrictions {
 pub struct Session {
     id: i32,
     user: String,
-    expiration: String,
+    expiration: i32,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -547,7 +548,7 @@ pub async fn db_generic_search_query(table: &Table, mode: i8 , key1: &String, ke
                         }
                     },
                     Table::EmailValidations => {
-                        return Err("Got to generic email validation part 2.".to_string().into());
+                        //return Err("Got to generic email validation part 2.".to_string().into());
                         match bound_query.all().await {
                             Ok(results) =>{
                                 match results.results::<EmailValidations>() {
@@ -1180,7 +1181,7 @@ pub async fn db_insert_bug_report(username: &String, bug_type: &String, descript
 
     match  ctx.env.d1(DB_NAME) {
         Ok(db) => {
-            let query = format!("INSERT INTO bug_reports (user_id, bug_type, description, status, timestamp) VALUES (\"{}\", ?1, ?2, \"{}\", \"{}\")", user_id, 0, Utc::now());
+            let query = format!("INSERT INTO bug_reports (user_id, bug_type, description, status, timestamp) VALUES (\"{}\", ?1, ?2, \"{}\", \"{}\")", user_id, 0, Utc::now().format(DB_TIME_FORMAT).to_string());
 
             match db.prepare(query).bind(&[JsValue::from(bug_type), JsValue::from(descripton)]) {
                 Ok(statement) => {
@@ -1231,10 +1232,8 @@ pub async fn db_check_token(username: &String, token: &String, time: String, db:
                             if results.is_empty() {
                                 return Ok(false);
                             }
-                            match results[0].expiration.parse::<i64>(){
-                                Ok(session_time) => { return Ok(time.parse::<i64>().unwrap() < session_time); },
-                                Err(_) => return Ok(false),
-                            }
+                            
+                            return Ok(time.parse::<i32>().unwrap() < results[0].expiration);
                         },
                         Err(_) => return Ok(false),        
                     },
@@ -1271,7 +1270,7 @@ pub async fn db_add_code_reset(username: &String, code: &String, ctx: &RouteCont
             let mut time =  Utc::now();
             time = time + TimeDelta::minutes(30);
 
-            match db.prepare(query).bind(&[JsValue::from(code), JsValue::from(username), JsValue::from(time.to_string())]) {
+            match db.prepare(query).bind(&[JsValue::from(code), JsValue::from(username), JsValue::from(time.format(DB_TIME_FORMAT).to_string())]) {
                 Ok(statement) => {
                     let _ = statement.run().await;                    
                     return Ok(())},
@@ -1302,7 +1301,7 @@ pub async fn db_check_code(username: &String, code: &String, ctx: &RouteContext<
                                     let the_result = &result[0];
                                     let current_time = Utc::now();
 
-                                    match the_result.expiration.parse::<DateTime<chrono::Utc>>(){
+                                    match DateTime::parse_from_str(&the_result.expiration, DB_TIME_FORMAT) {
                                         Ok(session_time) => if session_time < current_time {
                                             let query2a = "DELETE FROM email_resets WHERE email = ?";
                                             match db.prepare(query2a).bind(&[username.into()]){
@@ -1313,9 +1312,8 @@ pub async fn db_check_code(username: &String, code: &String, ctx: &RouteContext<
                                                 },
                                                 Err(_) => (),
                                             }
-                                            
-                                            return Err("{\"Error\":\"Password Reset Failed\"}".to_string().into())
-                                            },
+                                            return Err("{\"Error\":\"Password Reset Failed\"}".to_string().into())                                            
+                                        },
                                         Err(_) => return Err("{\"Error\":\"Internal error caused password reset fail. Please ask an admin to check the expiration date format in the database. | IEC00147\"}".to_string().into()),
                                     }
 

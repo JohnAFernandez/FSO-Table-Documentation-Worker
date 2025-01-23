@@ -14,7 +14,7 @@ use argon2::{
 use rand::*;
 use rand::distributions::Alphanumeric;
 use wasm_bindgen::JsValue;
-use chrono::{Utc, TimeDelta, DateTime};
+use chrono::{Utc, TimeDelta};
 mod secrets;
 mod db_fso;
 
@@ -375,13 +375,8 @@ pub async fn user_confirm_email(mut req: Request, ctx: RouteContext<()>) -> work
                                 Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00009\"}".to_string(),&(e.to_string() + " | IEC00009"), 500, &ctx).await,
                             }
 
-                            match email_result.email_validations[0].expires.parse::<i64>(){
-                                Ok(expiration_time) => {
-                                    if Utc::now().format(DB_TIME_FORMAT).to_string().parse::<i64>().unwrap() > expiration_time{
-                                        return err_specific("{\"Error\":\"Activation link has expired.\"}".to_string()).await;
-                                    }
-                                },
-                                Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00157\"}".to_string(),&(e.to_string() + " | IEC00157"), 500, &ctx).await,
+                            if Utc::now().format(DB_TIME_FORMAT).to_string().parse::<i32>().unwrap() > email_result.email_validations[0].expires{
+                                return err_specific("{\"Error\":\"Activation link has expired.\"}".to_string()).await;
                             }
 
                             match req.headers().has("password"){
