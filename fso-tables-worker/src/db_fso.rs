@@ -16,7 +16,7 @@ pub enum UserRole {
     VIEWER = 3, // Waiting for someone to approve an upgrade to a maintainer level
 }
 
-pub async fn number_to_role(n: i32) -> worker::Result<UserRole> {
+pub async fn number_to_role(n: i64) -> worker::Result<UserRole> {
     match n {
         0 => Ok(UserRole::OWNER),
         1 => Ok(UserRole::ADMIN),
@@ -76,7 +76,7 @@ const ERROR_REPORT_INSERT_QUERY: &str = "INSERT INTO error_reports (error, times
 //const RESTRICTIONS_INSERT_QUERY: &str = "INSERT INTO restrictions (min_value, max_value, max_string_length, illegal_value_int, illegal_value_float) VALUES (?1, ?2, ?3, ?4, ?5)";    
 //const SESSIONS_INSERT_QUERY: &str = "INSERT INTO sessions (user, expiration) VALUES (?1, ?2)";     
 //const TABLE_ALIASES_INSERT_QUERY: &str = "INSERT INTO table_aliases (table_id, filename) VALUES (?1, ?2)";    
-//const USERS_INSERT_QUERY: &str = "INSERT INTO users ( username, role, active, email_confirmed, contribution_count, banned: i32) VALUES (?1, ?2, ?3, ?4, ?5, ?6)";
+//const USERS_INSERT_QUERY: &str = "INSERT INTO users ( username, role, active, email_confirmed, contribution_count, banned: i64) VALUES (?1, ?2, ?3, ?4, ?5, ?6)";
 
 // Other patches should be done on the database end.
 const ACTIONS_PATCH_APPROVED_QUERY: &str = "UPDATE actions SET approved_by_user = ?1;";
@@ -197,55 +197,55 @@ impl FsoTablesQueryResults {
 
 #[derive(Serialize, Deserialize)]
 pub struct Actions {
-    pub action_id: i32,
-    pub user_id: i32,
+    pub action_id: i64,
+    pub user_id: i64,
     pub action: String,
-    pub approved_by_user: i32,
+    pub approved_by_user: i64,
     pub timestamp: String,
 }
 
 #[derive(Serialize, Deserialize)]
 pub struct BugReport {
-    pub id: i32,
-    pub user_id: i32,
+    pub id: i64,
+    pub user_id: i64,
     pub bug_type: String,
     pub description: String,
-    pub status: i32,
+    pub status: i64,
     pub timestamp: String,
 }
 
 #[derive(Serialize, Deserialize)]
 pub struct Deprecations {
-    pub deprecation_id: i32,
+    pub deprecation_id: i64,
     pub date: String,
     pub version: String,
 }
 
 #[derive(Serialize, Deserialize)]
 pub struct EmailValidations {
-    validation_id: i32,
+    validation_id: i64,
     username: String,
-    pub expires: i32,
+    pub expires: i64,
 }
 
 #[derive(Serialize, Deserialize)]
 pub struct FsoItems { 
-    pub item_id: i32,
+    pub item_id: i64,
     pub item_text: String,
     pub documentation: String,
     pub major_version: String,
-    pub parent_id: i32,
-    pub table_id: i32,
-    pub deprecation_id: i32,
-    pub restriction_id: i32,
+    pub parent_id: i64,
+    pub table_id: i64,
+    pub deprecation_id: i64,
+    pub restriction_id: i64,
     pub info_type: String,
-    pub table_index: i32,
+    pub table_index: i64,
     pub default_value: String,
 }
 
 #[derive(Serialize, Deserialize)]
 pub struct FsoTables { 
-    pub table_id: i32,
+    pub table_id: i64,
     pub name: String,
     pub filename: String,
     pub modular_extension: String,
@@ -254,49 +254,49 @@ pub struct FsoTables {
 
 #[derive(Deserialize, Serialize)]
 pub struct ParseBehavior{
-    pub behavior_id	: i32,
+    pub behavior_id	: i64,
     pub behavior : String,
     pub description : String,
 }
 
 #[derive(Deserialize, Serialize)]
 pub struct Restrictions {
-    pub restriction_id: i32,
+    pub restriction_id: i64,
     pub min_value: f32,
     pub max_value: f32,
-    pub max_string_length:  i32,
-    pub illegal_value_int:  i32,
+    pub max_string_length:  i64,
+    pub illegal_value_int:  i64,
     pub illegal_value_float:  f32,
 }
 
 #[derive(Deserialize, Serialize)]
 pub struct Session {
-    id: i32,
+    id: i64,
     user: String,
-    expiration: i32,
+    expiration: i64,
 }
 
 #[derive(Deserialize, Serialize)]
 pub struct TableAlias {
-    pub alias_id: i32,
-    pub table_id: i32,
+    pub alias_id: i64,
+    pub table_id: i64,
     pub filename: String,
 }
 
 #[derive(Deserialize, Serialize)]
 pub struct Users {
-    pub id: i32,
+    pub id: i64,
     pub username: String,
-    pub role: i32,
-    pub active: i32,
-    pub email_confirmed: i32,
-    pub contribution_count: i32,
-    pub banned: i32,
+    pub role: i64,
+    pub active: i64,
+    pub email_confirmed: i64,
+    pub contribution_count: i64,
+    pub banned: i64,
 }
 
 #[derive(Serialize, Deserialize)]
 struct Enabled{
-    active: i32,
+    active: i64,
 }
 
 //pub async fn  db_delete_email_validation(_key: &String) -> Result<()>{
@@ -868,8 +868,8 @@ pub async fn db_email_taken(email: &String, db: &D1Database) -> worker::Result<b
 
 #[derive(Serialize, Deserialize)]
 struct EmailConfirmedBannedCheck{
-    email_confirmed: i32,
-    banned: i32,
+    email_confirmed: i64,
+    banned: i64,
 }
 
 pub async fn db_user_able_to_register(email: &String, db: &D1Database) -> worker::Result<bool> {
@@ -888,7 +888,7 @@ pub async fn db_user_able_to_register(email: &String, db: &D1Database) -> worker
 
 #[derive(Serialize, Deserialize)]
 struct EmailConfirmedCheck{
-    email_confirmed: i32,
+    email_confirmed: i64,
 }
 
 pub async fn db_user_is_incompletely_registered(email: &String, db: &D1Database) -> worker::Result<bool> {
@@ -938,17 +938,17 @@ pub async fn db_set_email_confirmed(email: &String, ctx: &RouteContext<()>) -> R
 
 #[derive(Serialize, Deserialize)]
 struct Role{
-    role: i32,
+    role: i64,
 }
 
 #[derive(Deserialize, Serialize)]
 struct BasicCount {
-    the_count: i32,
+    the_count: i64,
 }
 
 #[derive(Deserialize,Serialize)]
 struct Active {
-    active: i32,
+    active: i64,
 }
 
 
@@ -974,7 +974,7 @@ pub async fn db_get_user_role(email: &String, db: &D1Database) -> worker::Result
 }
 
 pub async fn db_force_role(email: &String, db : &D1Database, role: UserRole) -> worker::Result<()> {
-    let role_num : i32;
+    let role_num : i64;
     
     match role {
         UserRole::ADMIN => role_num = 1,
@@ -1160,10 +1160,10 @@ pub async fn db_session_add(token: &String, email: &String, time: &String, ctx: 
 }
 
 pub async fn db_insert_bug_report(username: &String, bug_type: &String, descripton: &String,  ctx: &RouteContext<()>) -> worker::Result<()> {
-    /*user_id: i32,
+    /*user_id: i64,
     bug_type: String,
     description: String,
-    status: i32,
+    status: i64,
     timestamp: String,*/
 
     let mut user_id = -1;
@@ -1233,7 +1233,7 @@ pub async fn db_check_token(username: &String, token: &String, time: String, db:
                                 return Ok(false);
                             }
                             
-                            return Ok(time.parse::<i32>().unwrap() < results[0].expiration);
+                            return Ok(time.parse::<i64>().unwrap() < results[0].expiration);
                         },
                         Err(_) => return Ok(false),        
                     },
@@ -1248,7 +1248,7 @@ pub async fn db_check_token(username: &String, token: &String, time: String, db:
 struct ResetCodeRecord {
     code: String,
     email: String,
-    attempt_count: i32,
+    attempt_count: i64,
     expiration: String,
 }
 

@@ -355,6 +355,7 @@ pub async fn user_confirm_email(mut req: Request, ctx: RouteContext<()>) -> work
                         Ok(string) => hashed = string,
                         Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00008\"}".to_string(),&(e.to_string() + " | IEC00008"), 500, &ctx).await,
                     }
+
                     //return err_specific(format!("{{\"Error\":\"TESTING, checkpoint reached! possible dud\"}}")).await;
                     match db_generic_search_query(&db_fso::Table::EmailValidations, 2, &username, &hashed, &ctx).await{
                         Ok(email_result) => {
@@ -363,6 +364,7 @@ pub async fn user_confirm_email(mut req: Request, ctx: RouteContext<()>) -> work
                             if email_result.email_validations.is_empty() {
                                 return err_specific("{\"Error\":\"Bad credentials, please resubmit.\"}".to_string()).await
                             }                         
+
 
                             // double check that we haven't already validated this email.
                             match db_generic_search_query(&db_fso::Table::Users, 2, username, &"".to_string(), &ctx).await {
@@ -375,7 +377,7 @@ pub async fn user_confirm_email(mut req: Request, ctx: RouteContext<()>) -> work
                                 Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00009\"}".to_string(),&(e.to_string() + " | IEC00009"), 500, &ctx).await,
                             }
 
-                            if Utc::now().format(DB_TIME_FORMAT).to_string().parse::<i32>().unwrap() > email_result.email_validations[0].expires{
+                            if Utc::now().format(DB_TIME_FORMAT).to_string().parse::<i64>().unwrap() > email_result.email_validations[0].expires{
                                 return err_specific("{\"Error\":\"Activation link has expired.\"}".to_string()).await;
                             }
 
