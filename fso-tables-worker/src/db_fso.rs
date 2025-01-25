@@ -1,12 +1,7 @@
 use worker::*;
 use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc, TimeDelta};
-use crate::UserDetails;
-use crate::DB_NAME;
-use crate::err_specific;
-use crate::JsValue;
-use crate::DB_TIME_FORMAT;
-
+use crate::{UserDetails, DB_NAME, err_specific, JsValue, DB_TIME_FORMAT, NewItem};
 
 #[derive(PartialEq, PartialOrd)]
 pub enum UserRole {
@@ -70,7 +65,7 @@ const TABLE_ALIASES_DELETE_QUERY: &str = "DELETE FROM table_aliases ";
 //const DEPRECATIONS_INSERT_QUERY: &str = "INSERT INTO deprecations (date, version) VALUES (?1, ?2)"; 
 //const EMAIL_VALIDATIONS_INSERT_QUERY: &str = "INSERT INTO email_validations (username) VALUES (?1)";
 const ERROR_REPORT_INSERT_QUERY: &str = "INSERT INTO error_reports (error, timestamp) VALUES (?1, ?2);";
-//const FSO_ITEMS_INSERT_QUERY: &str = "INSERT INTO fso_items (item_text, documentation, major_version, parent_id, table_id, deprecation_id, restriction_id, info_type, table_index, default_value) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)";
+const FSO_ITEMS_INSERT_QUERY: &str = "INSERT INTO fso_items (item_text, documentation, major_version, parent_id, table_id, deprecation_id, restriction_id, info_type, table_index, default_value) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)";
 //const FSO_TABLES_INSERT_QUERY: &str = "INSERT INTO fso_tables VALUES (?1, ?2)";    
 //const PARSE_BEHAVIORS_INSERT_QUERY: &str = "INSERT INTO parse_behaviors (behavior, description) VALUES (?1, ?2)";    
 //const RESTRICTIONS_INSERT_QUERY: &str = "INSERT INTO restrictions (min_value, max_value, max_string_length, illegal_value_int, illegal_value_float) VALUES (?1, ?2, ?3, ?4, ?5)";    
@@ -138,6 +133,7 @@ const EMAIL_VALIDATION_PENDING_FILTER: &str = "WHERE username = ?;";
 const EMAIL_VALIDATIONS_VERIFY_FILTER: &str = "WHERE username = ?1 AND secure_key = ?2;";
 
 const FSO_ITEMS_TABLE_FILTER: &str = "WHERE table_id = ?";
+const FSO_ITEMS_TABLE_AND_NAME_FILTER: &str = "WHERE table_id ?1 AND item_text = ?2 AND parent_id = ?3";
 const FSO_ITEMS_FILTER_BINDABLE: &str = "WHERE item_id = ?2";
 
 const FSO_TABLES_FILTER: &str = "WHERE table_id = ?;";
@@ -345,7 +341,7 @@ struct Enabled{
 ///  1 user_id
 ///  2 username
 /// 
-pub async fn db_generic_search_query(table: &Table, mode: i8 , key1: &String, key2: &String, ctx: &RouteContext<()>) -> Result<FsoTablesQueryResults> {
+pub async fn db_generic_search_query(table: &Table, mode: i8 , key1: &String, key2: &String, key3: &String, ctx: &RouteContext<()>) -> Result<FsoTablesQueryResults> {
     match ctx.env.d1(DB_NAME){
         Ok(db) => {
             let mut query = "".to_string();
@@ -424,6 +420,7 @@ pub async fn db_generic_search_query(table: &Table, mode: i8 , key1: &String, ke
                     match mode {
                         0 => (),
                         1 => query += FSO_ITEMS_TABLE_FILTER,
+                        2 => query += FSO_ITEMS_TABLE_AND_NAME_FILTER,
                         _ => return Err("Internal Server Error: Out of range mode in FSO_ITEMS generic query.".into()),
                     }
 
@@ -1133,6 +1130,44 @@ pub async fn db_user_stats_get(_: Request, _ctx: RouteContext<()>) -> worker::Re
     }            
 }
 
+pub async fn db_insert_item(new_item : &NewItem, db : &D1Database) -> Result<i64>{
+    match db.prepare("UPDATE fso_items SET table_index = table_index + 1 WHERE table_id = ?1 AND table_index >= ?2").bind(&[JsValue::from(new_item.table_id), JsValue::from(new_item.table_index)]){
+        Ok(_) => (),
+        Err(e) => return Error(e.into), 
+    }
+
+    match db.prepare(FSO_ITEMS_INSERT_QUERY).bind(&[
+        JsValue::from(new_item.item_text), 
+        JsValue::from(new_item.documentation), 
+        JsValue::from(new_item.major_version),
+        JsValue::from(new_item.parent_id),
+        JSValue::from(new_item.table_id),
+        JsValue::from(new_item.deprecation_id),
+        JsValue::from(new_item.restriction_id),
+        JsValue::from(new_item.info_type),
+        JsValue::from(new_item.table_index),
+        JsValue::from(new_item.default_value)]) 
+    {
+        Ok(query) => {
+            match query.all().await {
+                Ok(_) => return Ok(()),
+                Err(e) => Error(e.into()),
+            }
+        },
+        Err(e) => return Error(e.into()),
+    }
+    // uses FSO_ITEMS_TABLE_AND_NAME_FILTER
+    match db_generic_search_query(&Table::FsoItems, 2, &new_item.table_id.to_string(),&new_item.item_text, &new_item.parent_id.to_string(), &ctx).await {
+        Ok(results) => 
+        {
+            if results.fso_items.is_empty(){
+                return Error("".to_string().into());
+            }
+            return Ok(results.fso_items[0])
+        },
+        Err(e) => return Error(e.into()),
+    }
+}
 
 pub async fn db_session_add(token: &String, email: &String, time: &String, ctx: &RouteContext<()>) -> worker::Result<()> {
 
@@ -1169,7 +1204,7 @@ pub async fn db_insert_bug_report(username: &String, bug_type: &String, descript
     let mut user_id = -1;
 
     if username != "Anonymous User"{
-        match db_generic_search_query(&Table::Users, 2, username, &"".to_string(), ctx).await {
+        match db_generic_search_query(&Table::Users, 2, username, &"".to_string(), &"".to_string(), ctx).await {
             Ok(results) => {
                 if !results.users.is_empty() {
                     user_id = results.users.first().unwrap().id;

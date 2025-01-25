@@ -159,7 +159,7 @@ async fn fetch(req: Request, env: Env, _ctx: Context,) -> worker::Result<Respons
         .get_async("/api/tables/items", get_items).options_async("/api/tables/items", send_cors)
         .get_async("/api/tables/items/:id", get_item)
         .options_async("/api/tables/items/:id", send_cors)
-        //.post_async("/api/tables/items", post_item) // Requires login
+        .post_async("/api/tables/items", insert_item) // Requires login
         .patch_async("/api/tables/items", update_item).put_async("/api/tables/items", update_item) //Requires login 
         .delete_async("/api/tables/items/:id", delete_item) // Admin only
         .get_async("/api/tables/aliases", get_aliases).options_async("/api/tables/aliases", send_cors)
@@ -357,7 +357,7 @@ pub async fn user_confirm_email(mut req: Request, ctx: RouteContext<()>) -> work
                     }
 
                     //return err_specific(format!("{{\"Error\":\"TESTING, checkpoint reached! possible dud\"}}")).await;
-                    match db_generic_search_query(&db_fso::Table::EmailValidations, 2, &username, &hashed, &ctx).await{
+                    match db_generic_search_query(&db_fso::Table::EmailValidations, 2, &username, &hashed, &"".to_string(), &ctx).await{
                         Ok(email_result) => {
 
 
@@ -367,7 +367,7 @@ pub async fn user_confirm_email(mut req: Request, ctx: RouteContext<()>) -> work
 
 
                             // double check that we haven't already validated this email.
-                            match db_generic_search_query(&db_fso::Table::Users, 2, username, &"".to_string(), &ctx).await {
+                            match db_generic_search_query(&db_fso::Table::Users, 2, username, &"".to_string(), &"".to_string(), &ctx).await {
                                 Ok(user_results) => 
                                 if user_results.users.is_empty() {
                                     return err_specific("{\"Error\":\"No matching user found.\"}".to_string()).await
@@ -440,9 +440,9 @@ pub async fn user_confirm_email(mut req: Request, ctx: RouteContext<()>) -> work
 #[derive(Serialize, Deserialize)]
 pub struct UserDetails{
     username: String,
-    role: i32,
-    contribution_count: i32,
-    active: i32,
+    role: i64,
+    contribution_count: i64,
+    active: i64,
 }
 
 
@@ -1016,7 +1016,7 @@ pub async fn user_downgrade_user_permissions(mut req: Request, ctx: RouteContext
 }
 
 pub async fn get_parse_types(_: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
-    match db_fso::db_generic_search_query(&db_fso::Table::ParseBehaviors, 0, &"".to_string(), &"".to_string(), &ctx).await {
+    match db_fso::db_generic_search_query(&db_fso::Table::ParseBehaviors, 0, &"".to_string(), &"".to_string(), &"".to_string(), &ctx).await {
         Ok(results) => return Ok(Response::from_json(&results.parse_behaviors).unwrap().with_headers(add_mandatory_headers(&"".to_string()).await)),
         Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00046\"}".to_string(),&(e.to_string() + " | IEC00046"), 500, &ctx).await,
     }
@@ -1024,7 +1024,7 @@ pub async fn get_parse_types(_: Request, ctx: RouteContext<()>) -> worker::Resul
 
 pub async fn get_parse_type(_: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
     match ctx.param("id"){
-        Some(parameter) => match db_fso::db_generic_search_query(&db_fso::Table::ParseBehaviors, 1, parameter, &"".to_string(), &ctx).await {
+        Some(parameter) => match db_fso::db_generic_search_query(&db_fso::Table::ParseBehaviors, 1, parameter, &"".to_string(), &"".to_string(), &ctx).await {
             Ok(results) => return Ok(Response::from_json(&results.parse_behaviors).unwrap().with_headers(add_mandatory_headers(&"".to_string()).await)),
             Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00047\"}".to_string(),&(e.to_string() + " | IEC00047"), 500, &ctx).await,
         },
@@ -1107,7 +1107,7 @@ pub async fn delete_parse_type(req: Request, ctx: RouteContext<()>) -> worker::R
 
             match ctx.param("id"){
                 Some(id) => {
-                    match id.parse::<i32>(){
+                    match id.parse::<i64>(){
                         Ok(_) =>{
                             match db_fso::db_generic_delete(db_fso::Table::ParseBehaviors, id, &ctx).await {
                                 Ok(_) => return send_success(&"{\"Response\": \"Success!\"}".to_string(), &"".to_string()).await,
@@ -1127,7 +1127,7 @@ pub async fn delete_parse_type(req: Request, ctx: RouteContext<()>) -> worker::R
 }
 
 pub async fn get_items(_: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
-    match db_fso::db_generic_search_query(&db_fso::Table::FsoItems, 0, &"".to_string(), &"".to_string(), &ctx).await {
+    match db_fso::db_generic_search_query(&db_fso::Table::FsoItems, 0, &"".to_string(), &"".to_string(), &"".to_string(), &ctx).await {
         Ok(result) => {
             return Ok(Response::from_json(&result.fso_items).unwrap().with_headers(add_mandatory_headers(&"".to_string()).await));
         },
@@ -1139,7 +1139,7 @@ pub async fn get_items(_: Request, ctx: RouteContext<()>) -> worker::Result<Resp
 
 pub async fn get_item(_: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
     match ctx.param("id"){
-        Some(parameter) => match db_fso::db_generic_search_query(&db_fso::Table::FsoItems, 1, parameter, &"".to_string(), &ctx).await {
+        Some(parameter) => match db_fso::db_generic_search_query(&db_fso::Table::FsoItems, 1, parameter, &"".to_string(), &"".to_string(), &ctx).await {
             Ok(results) => return Ok(Response::from_json(&results.fso_items).unwrap().with_headers(add_mandatory_headers(&"".to_string()).await)),
             Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00056\"}".to_string(),&(e.to_string() + " | IEC00056"), 500, &ctx).await,
         },
@@ -1152,16 +1152,16 @@ pub async fn get_item(_: Request, ctx: RouteContext<()>) -> worker::Result<Respo
 
 #[derive(Serialize, Deserialize)]
 pub struct NewItem{
-    item_text: String,
-    documentation: String,
-    major_version: String, 
-    parent_id: i32,
-    table_id: i32,
-    deprecation_id: i32,
-    restriction_id: i32,
-    info_type: String,
-    table_index: i32,
-    default_value: String,
+    pub item_text: String,
+    pub documentation: String,
+    pub major_version: String, 
+    pub parent_id: i64,
+    pub table_id: i64,
+    pub deprecation_id: i64,
+    pub restriction_id: i64,
+    pub info_type: String,
+    pub table_index: i64,
+    pub default_value: String,
 }
 
 pub async fn insert_item(mut req: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
@@ -1197,14 +1197,29 @@ pub async fn insert_item(mut req: Request, ctx: RouteContext<()>) -> worker::Res
                     match Regex::new(DB_SEMVER_CHARACTERS) {
                         Ok(search_set) => {
                             match search_set.find(&new_item.major_version) {
-                                Some(_) => return err_specific("{\"Error\":\"Disallowed semver characters found, please submit with a corrected majorversion.\"}".to_string()).await,
+                                Some(_) => return err_specific("{\"Error\":\"Disallowed semver characters found, please submit with a corrected major_version.\"}".to_string()).await,
                                 None => err_specific("{\"Error\":\"I'm not done yet come back later.\"}".to_string()).await,
                             }    
                         },
                         Err(e) => return Err(e.to_string().into())
                     }
                 
-                    
+                    if new_item.parent_id < -1 {
+                        return err_specific("{\"Error\":\"Parent item must be specified.  If this item is its own parent, use -1.\"}".to_string())
+                    }
+
+                    if new_item.table_id < -1 {
+                        return err_specific("{\"Error\":\"Table must be specified.\"}".to_string())
+                    }
+
+                    if new_item.info_type.trim().is_empty() {
+                        return err_specific("{\"Error\":\"Info type must be specified.  Items without an input type can use MARKER or NOTE.\"}".to_string())
+                    }
+
+                    match db_fso::db_insert_item(&new_item, &db).await {
+                        Ok(id) => return send_success(&format!("{\"id\":\"{}\"}", id), &"".to_string()),
+                        Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00164\"}".to_string(),&(e.to_string() + " | IEC00164"), 500, &ctx).await,
+                    }
 
                 },
                 Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00058\"}".to_string(),&(e.to_string() + " | IEC00058"), 500, &ctx).await,
@@ -1339,7 +1354,7 @@ pub async fn delete_item(req: Request, ctx: RouteContext<()>) -> worker::Result<
 
             match ctx.param("id"){
                 Some(id) => {
-                    match id.parse::<i32>(){
+                    match id.parse::<i64>(){
                         Ok(_) =>{
                             match db_fso::db_generic_delete(db_fso::Table::FsoItems, id, &ctx).await {
                                 Ok(_) => return send_success(&"{\"Response\": \"Success!\"}".to_string(), &"".to_string()).await,
@@ -1359,7 +1374,7 @@ pub async fn delete_item(req: Request, ctx: RouteContext<()>) -> worker::Result<
 }
 
 pub async fn get_tables(_: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
-    match db_fso::db_generic_search_query(&db_fso::Table::FsoTables, 0, &"".to_string(), &"".to_string(), &ctx).await {
+    match db_fso::db_generic_search_query(&db_fso::Table::FsoTables, 0, &"".to_string(), &"".to_string(), &"".to_string(), &ctx).await {
         Ok(result) => {
             return Ok(Response::from_json(&result.fso_tables).unwrap().with_headers(add_mandatory_headers(&"".to_string()).await));
         },
@@ -1371,7 +1386,7 @@ pub async fn get_tables(_: Request, ctx: RouteContext<()>) -> worker::Result<Res
 
 pub async fn get_table(_: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
     match ctx.param("id"){
-        Some(parameter) => match db_fso::db_generic_search_query(&db_fso::Table::FsoTables, 1, parameter, &"".to_string(), &ctx).await {
+        Some(parameter) => match db_fso::db_generic_search_query(&db_fso::Table::FsoTables, 1, parameter, &"".to_string(),&"".to_string(),  &ctx).await {
             Ok(results) => return Ok(Response::from_json(&results.fso_tables).unwrap().with_headers(add_mandatory_headers(&"".to_string()).await)),
             Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00075\"}".to_string(),&(e.to_string() + " | IEC00075"), 500, &ctx).await,
         },
@@ -1382,7 +1397,7 @@ pub async fn get_table(_: Request, ctx: RouteContext<()>) -> worker::Result<Resp
 pub async fn get_tables_items(_: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
     match ctx.param("id"){
         Some(parameter) => {
-            match db_fso::db_generic_search_query(&db_fso::Table::FsoItems, 1, parameter, &"".to_string(), &ctx).await {
+            match db_fso::db_generic_search_query(&db_fso::Table::FsoItems, 1, parameter, &"".to_string(), &"".to_string(), &ctx).await {
                 Ok(results) => return Ok(Response::from_json(&results.fso_items).unwrap().with_headers(add_mandatory_headers(&"".to_string()).await)),
                 Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00163\"}".to_string(),&(e.to_string() + " | IEC00163"), 500, &ctx).await,
             }
@@ -1392,7 +1407,7 @@ pub async fn get_tables_items(_: Request, ctx: RouteContext<()>) -> worker::Resu
 }
 
 pub async fn get_aliases(_: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
-    match db_fso::db_generic_search_query(&db_fso::Table::TableAliases, 0, &"".to_string(), &"".to_string(), &ctx).await {
+    match db_fso::db_generic_search_query(&db_fso::Table::TableAliases, 0, &"".to_string(), &"".to_string(), &"".to_string(), &ctx).await {
         Ok(result) => {
             return Ok(Response::from_json(&result.table_aliases).unwrap().with_headers(add_mandatory_headers(&"".to_string()).await));
         },
@@ -1404,7 +1419,7 @@ pub async fn get_aliases(_: Request, ctx: RouteContext<()>) -> worker::Result<Re
 
 pub async fn get_alias(_: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
     match ctx.param("id"){
-        Some(parameter) => match db_fso::db_generic_search_query(&db_fso::Table::TableAliases, 1, parameter, &"".to_string(), &ctx).await {
+        Some(parameter) => match db_fso::db_generic_search_query(&db_fso::Table::TableAliases, 1, parameter, &"".to_string(), &"".to_string(), &ctx).await {
             Ok(results) => return Ok(Response::from_json(&results.table_aliases).unwrap().with_headers(add_mandatory_headers(&"".to_string()).await)),
             Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00077\"}".to_string(),&(e.to_string() + " | IEC00077"), 500, &ctx).await,
         },
@@ -1486,7 +1501,7 @@ pub async fn delete_alias(req: Request, ctx: RouteContext<()>) -> worker::Result
 
             match ctx.param("id"){
                 Some(id) => {
-                    match id.parse::<i32>(){
+                    match id.parse::<i64>(){
                         Ok(_) =>{
                             match db_fso::db_generic_delete(db_fso::Table::TableAliases, id, &ctx).await {
                                 Ok(_) => return send_success(&"{\"Response\": \"Success!\"}".to_string(), &"".to_string()).await,
@@ -1506,7 +1521,7 @@ pub async fn delete_alias(req: Request, ctx: RouteContext<()>) -> worker::Result
 }
 
 pub async fn get_restrictions(_: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
-    match db_fso::db_generic_search_query(&db_fso::Table::Restrictions, 0, &"".to_string(), &"".to_string(), &ctx).await {
+    match db_fso::db_generic_search_query(&db_fso::Table::Restrictions, 0, &"".to_string(), &"".to_string(), &"".to_string(), &ctx).await {
         Ok(result) => {
             return Ok(Response::from_json(&result.restrictions).unwrap().with_headers(add_mandatory_headers(&"".to_string()).await));
         },
@@ -1518,7 +1533,7 @@ pub async fn get_restrictions(_: Request, ctx: RouteContext<()>) -> worker::Resu
 
 pub async fn get_restriction(_: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
     match ctx.param("id"){
-        Some(parameter) => match db_fso::db_generic_search_query(&db_fso::Table::Restrictions, 1, parameter, &"".to_string(), &ctx).await {
+        Some(parameter) => match db_fso::db_generic_search_query(&db_fso::Table::Restrictions, 1, parameter, &"".to_string(), &"".to_string(), &ctx).await {
             Ok(results) => return Ok(Response::from_json(&results.restrictions).unwrap().with_headers(add_mandatory_headers(&"".to_string()).await)),
             Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00086\"}".to_string(),&(e.to_string() + " | IEC00086"), 500, &ctx).await,
         },
@@ -1613,7 +1628,7 @@ pub async fn delete_restriction(req: Request, ctx: RouteContext<()>) -> worker::
 
             match ctx.param("id"){
                 Some(id) => {
-                    match id.parse::<i32>(){
+                    match id.parse::<i64>(){
                         Ok(_) =>{
                             match db_fso::db_generic_delete(db_fso::Table::Restrictions, id, &ctx).await {
                                 Ok(_) => return send_success(&"{\"Response\": \"Success!\"}".to_string(), &"".to_string()).await,
@@ -1633,7 +1648,7 @@ pub async fn delete_restriction(req: Request, ctx: RouteContext<()>) -> worker::
 }
 
 pub async fn get_deprecations(_: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
-    match db_fso::db_generic_search_query(&db_fso::Table::Deprecations, 0, &"".to_string(), &"".to_string(), &ctx).await {
+    match db_fso::db_generic_search_query(&db_fso::Table::Deprecations, 0, &"".to_string(), &"".to_string(), &"".to_string(), &ctx).await {
         Ok(result) => {
             return Ok(Response::from_json(&result.deprecations).unwrap().with_headers(add_mandatory_headers(&"".to_string()).await));
         },
@@ -1645,7 +1660,7 @@ pub async fn get_deprecations(_: Request, ctx: RouteContext<()>) -> worker::Resu
 
 pub async fn get_deprecation(_: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
     match ctx.param("id"){
-        Some(parameter) => match db_fso::db_generic_search_query(&db_fso::Table::Deprecations, 1, parameter, &"".to_string(), &ctx).await {
+        Some(parameter) => match db_fso::db_generic_search_query(&db_fso::Table::Deprecations, 1, parameter, &"".to_string(), &"".to_string(), &ctx).await {
             Ok(results) => return Ok(Response::from_json(&results.deprecations).unwrap().with_headers(add_mandatory_headers(&"".to_string()).await)),
             Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00098\"}".to_string(),&(e.to_string() + " | IEC00098"), 500, &ctx).await,
         },
@@ -1727,7 +1742,7 @@ pub async fn delete_deprecation(req: Request, ctx: RouteContext<()>) -> worker::
 
             match ctx.param("id"){
                 Some(id) => {
-                    match id.parse::<i32>(){
+                    match id.parse::<i64>(){
                         Ok(_) =>{
                             match db_fso::db_generic_delete(db_fso::Table::ParseBehaviors, id, &ctx).await {
                                 Ok(_) => return send_success(&"{\"Response\": \"Success!\"}".to_string(), &"".to_string()).await,
@@ -1748,7 +1763,7 @@ pub async fn delete_deprecation(req: Request, ctx: RouteContext<()>) -> worker::
 
 #[derive(Serialize, Deserialize)]
 pub struct BugReport{
-    user_id: i32,
+    user_id: i64,
     bug_type : String,
     description: String,
 }
@@ -1806,7 +1821,7 @@ pub async fn resolve_bug_report(req: Request, ctx: RouteContext<()>) -> worker::
                     }         
                     match ctx.param("id"){
                         Some(id) => {
-                            match id.parse::<i32>(){
+                            match id.parse::<i64>(){
                                 Ok(parsed_id) =>{
                                     if parsed_id < 0 {
                                         return err_specific("{\"Error\":\"Invalid bug report id, cannot update.\"}".to_string()).await;
@@ -1853,7 +1868,7 @@ pub async fn unresolve_bug_report(req: Request, ctx: RouteContext<()>) -> worker
 
                     match ctx.param("id"){
                         Some(id) => {
-                            match id.parse::<i32>(){
+                            match id.parse::<i64>(){
                                 Ok(parsed_id) =>{
                                     if parsed_id < 0 {
                                             return err_specific("{\"Error\":\"Invalid bug report id, cannot update.\"}".to_string()).await;
@@ -1904,13 +1919,13 @@ pub async fn acknowledge_bug_report(req: Request, ctx: RouteContext<()>) -> work
 
             match ctx.param("id"){
                 Some(id) => {
-                    match id.parse::<i32>(){
+                    match id.parse::<i64>(){
                         Ok(parsed_id) =>{
                             if parsed_id < 0 {
                                 return err_specific("{\"Error\":\"Invalid bug report id, cannot update.\"}".to_string()).await;
                             }
         
-                            match db_fso::db_generic_search_query(&db_fso::Table::BugReports, 0, &id, &"".to_string(), &ctx).await {
+                            match db_fso::db_generic_search_query(&db_fso::Table::BugReports, 0, &id, &"".to_string(), &"".to_string(), &ctx).await {
                                 Ok(bug_report_result) => {
                                     if bug_report_result.bug_reports.is_empty() {
                                         return err_specific("{\"Error\":\"Could not find a matching bug report.\"}".to_string()).await;
@@ -1970,13 +1985,13 @@ pub async fn update_bug_report(mut req: Request, ctx: RouteContext<()>) -> worke
                 Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00119\"}".to_string(),&(e.to_string() + " | IEC00119"), 500, &ctx).await,
             }
 
-            let bug_id: i32; 
+            let bug_id: i64; 
 
             // MAJOR TODO!!! getting the id from the URL, we have not been checking that the id is numeric, so we need to go back and verify those are correct.
             // Here is an example of it done correctly, below.
             match ctx.param("id"){
                 Some(id) => { 
-                    match id.parse::<i32>() {
+                    match id.parse::<i64>() {
                         Ok(parsed) => bug_id = parsed,
                         Err(_) => return err_specific("{\"Error\":\"Cannot parse the supplied bug report id.\"}".to_string()).await,
                     }
@@ -1985,13 +2000,13 @@ pub async fn update_bug_report(mut req: Request, ctx: RouteContext<()>) -> worke
             }
 
             if !administrator {
-                match db_fso::db_generic_search_query(&db_fso::Table::Users, 2, &username, &"".to_string(), &ctx).await {
+                match db_fso::db_generic_search_query(&db_fso::Table::Users, 2, &username, &"".to_string(), &"".to_string(), &ctx).await {
                     Ok(user_result) => {
                         if user_result.users.is_empty(){
                             return err_specific("{\"Error\":\"Could not find a matching user for the username logged in somehow. You should probably submit a new bug report.\"}".to_string()).await
                         }
 
-                        match db_fso::db_generic_search_query(&db_fso::Table::BugReports, 1, &bug_id.to_string(), &"".to_string(), &ctx).await {
+                        match db_fso::db_generic_search_query(&db_fso::Table::BugReports, 1, &bug_id.to_string(), &"".to_string(), &"".to_string(), &ctx).await {
                             Ok(bug_report_result) => {
                                 if user_result.users[0].id != bug_report_result.bug_reports[0].user_id {
                                     return err_specific("{\"Error\":\"Only the reporter of a bug or an administrator can edit the contents of a bug report.\"}".to_string()).await
