@@ -341,10 +341,10 @@ struct Enabled{
 ///  1 user_id
 ///  2 username
 /// 
-pub async fn db_generic_search_query_ctx(table: &Table, mode: i8 , key1: &String, key2: &String, key3: &String, ctx: RouteContext<()>) -> Result<FsoTablesQueryResults> {
+pub async fn db_generic_search_query_ctx(table: &Table, mode: i8 , key1: &String, key2: &String, key3: &String, ctx: &RouteContext<()>) -> Result<FsoTablesQueryResults> {
     match ctx.d1(DB_NAME){
-        Ok(db) => db_generic_search_query_db(table, mode, key1, key2, key3, &db),
-        Err(e) => return Error(e.into()),
+        Ok(db) => db_generic_search_query_db(table, mode, key1, key2, key3, &db).await,
+        Err(e) => return Err(e),
     }
 }
 
@@ -467,10 +467,32 @@ pub async fn db_generic_search_query_db(table: &Table, mode: i8 , key1: &String,
             match mode {
                 0 => (),
                 1 => query += FSO_ITEMS_TABLE_FILTER,
-                2 => query += FSO_ITEMS_TABLE_AND_NAME_FILTER,
+                2 => { 
+                    // To simplify hve this separated here.
+                    query += FSO_ITEMS_TABLE_AND_NAME_FILTER;    
+                    match db.prepare(query).bind(&[JsValue::from(key1), JsValue::from(key2), JsValue::from(key3)]){
+                        Ok(prepped_query) => {                
+                            match prepped_query.all().await {
+                                Ok(results) =>  {
+                                    match results.results::<FsoItems>(){
+                                        Ok(items) => {
+                                            let mut query_return = FsoTablesQueryResults::new_results().await;
+                                            query_return.fso_items = items;
+                                            return Ok(query_return);
+                                        },
+                                        Err(e) => return Err(e),                                            
+                                    }
+                                },
+                                Err(e) => return Err(e),
+                            }
+                        },
+                        Err(e) => return Err(e),
+                    }
+                
+
+                },
                 _ => return Err("Internal Server Error: Out of range mode in FSO_ITEMS generic query.".into()),
             }
-
         },
         Table::FsoTables => {
             query += FSO_TABLES_QUERY; 
@@ -1177,39 +1199,39 @@ pub async fn db_user_stats_get(_: Request, _ctx: RouteContext<()>) -> worker::Re
 pub async fn db_insert_item(new_item : &NewItem, db : &D1Database) -> Result<i64>{
     match db.prepare("UPDATE fso_items SET table_index = table_index + 1 WHERE table_id = ?1 AND table_index >= ?2").bind(&[JsValue::from(new_item.table_id), JsValue::from(new_item.table_index)]){
         Ok(_) => (),
-        Err(e) => return Error(e.into), 
+        Err(e) => return Err(e.into()), 
     }
 
     match db.prepare(FSO_ITEMS_INSERT_QUERY).bind(&[
-        JsValue::from(new_item.item_text), 
-        JsValue::from(new_item.documentation), 
-        JsValue::from(new_item.major_version),
-        JsValue::from(new_item.parent_id),
-        JSValue::from(new_item.table_id),
-        JsValue::from(new_item.deprecation_id),
-        JsValue::from(new_item.restriction_id),
-        JsValue::from(new_item.info_type),
-        JsValue::from(new_item.table_index),
-        JsValue::from(new_item.default_value)]) 
+        JsValue::from(&new_item.item_text), 
+        JsValue::from(&new_item.documentation), 
+        JsValue::from(&new_item.major_version),
+        JsValue::from(&new_item.parent_id.to_string()),
+        JsValue::from(&new_item.table_id.to_string()),
+        JsValue::from(&new_item.deprecation_id.to_string()),
+        JsValue::from(&new_item.restriction_id.to_string()),
+        JsValue::from(&new_item.info_type),
+        JsValue::from(&new_item.table_index.to_string()),
+        JsValue::from(&new_item.default_value)]) 
     {
         Ok(query) => {
             match query.all().await {
-                Ok(_) => return Ok(()),
-                Err(e) => Error(e.into()),
+                Ok(_) => (),
+                Err(e) => return Err(e.into()),
             }
         },
-        Err(e) => return Error(e.into()),
+        Err(e) => return Err(e.into()),
     }
     // uses FSO_ITEMS_TABLE_AND_NAME_FILTER
-    match db_generic_search_query_db(&Table::FsoItems, 2, &new_item.table_id.to_string(),&new_item.item_text, &new_item.parent_id.to_string(), &ctx).await {
+    match db_generic_search_query_db(&Table::FsoItems, 2, &new_item.table_id.to_string(),&new_item.item_text, &new_item.parent_id.to_string(), &db).await {
         Ok(results) => 
         {
             if results.fso_items.is_empty(){
-                return Error("".to_string().into());
+                return Err("".to_string().into());
             }
-            return Ok(results.fso_items[0])
+            return Ok(results.fso_items[0].item_id)
         },
-        Err(e) => return Error(e.into()),
+        Err(e) => return Err(e.into()),
     }
 }
 
