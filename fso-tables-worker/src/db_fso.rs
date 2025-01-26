@@ -341,327 +341,371 @@ struct Enabled{
 ///  1 user_id
 ///  2 username
 /// 
-pub async fn db_generic_search_query(table: &Table, mode: i8 , key1: &String, key2: &String, key3: &String, ctx: &RouteContext<()>) -> Result<FsoTablesQueryResults> {
-    match ctx.env.d1(DB_NAME){
-        Ok(db) => {
-            let mut query = "".to_string();
+pub async fn db_generic_search_query_ctx(table: &Table, mode: i8 , key1: &String, key2: &String, key3: &String, ctx: RouteContext<()>) -> Result<FsoTablesQueryResults> {
+    match ctx.d1(DB_NAME){
+        Ok(db) => db_generic_search_query_db(table, mode, key1, key2, key3, &db),
+        Err(e) => return Error(e.into()),
+    }
+}
 
-            match table {
-                Table::Actions => {
-                    query += ACTIONS_QUERY; 
+/// Searches any table in the FSO table database
+/// 
+/// Mode 0 for any table is generic table dump (except for sensitive information, which is only checked against), which will not use the keys.
+/// 
+/// Format:
+/// Table 
+///  Mode Key1 Field1, Key2 Field2
+/// 
+/// Actions 
+///  1 Action_id 
+///  2 User_id 
+///  3 Approved 
+///  4 Key1 User_id, Key2 approved
+/// 
+/// Deprecations
+///  1 deprecation_id
+/// 
+/// Email Validations 
+///  1 User_id
+///  2 Key1, Key2 secure_key
+/// 
+/// FSO Items -- Not complete TODO!!
+/// 
+/// FSO Tables:
+///  1 table_id
+/// 
+/// Parse Behaviors
+///  1 behavior_id
+/// 
+/// Restrictions
+///  1 Restriction_id
+/// 
+/// Sessions
+///  1 key1 user, key2 (session) key 
+/// 
+/// Table Aliases
+///  1 alias_id
+/// 
+/// Users
+///  1 user_id
+///  2 username
+/// 
+pub async fn db_generic_search_query_db(table: &Table, mode: i8 , key1: &String, key2: &String, key3: &String, db: &D1Database) -> Result<FsoTablesQueryResults> {
+    let mut query = "".to_string();
 
-                    match mode {
-                        0 => (),
-                        1 => query += ACTIONS_FILTER_ID,
-                        2 => query += ACTIONS_FILTER_USER_ID,
-                        3 => query += ACTIONS_FILTER_APPROVED,
-                        4 => query = query + ACTIONS_FILTER_USER_APPROVED_A + key2 + ACTIONS_FILTER_USER_APPROVED_B, 
-                        _ => return Err("Internal Server Error: Out of range mode in Actions generic query.".to_string().into()),
-                    }
-                },
-                Table::BugReports => {
-                    query += BUG_REPORT_QUERY; 
+    match table {
+        Table::Actions => {
+            query += ACTIONS_QUERY; 
 
-                    match mode {
-                        0 => (),
-                        1 => query += BUG_REPORT_FILTER,
-                        2 => query += BUG_REPORT_STATUS_FILTER,
-                        _ => return Err("Internal Server Error: Out of range mode in Bug Report generic query.".into()),
-                    }
-                }
-                Table::Deprecations => {
-                    query += DEPRECATIONS_QUERY; 
+            match mode {
+                0 => (),
+                1 => query += ACTIONS_FILTER_ID,
+                2 => query += ACTIONS_FILTER_USER_ID,
+                3 => query += ACTIONS_FILTER_APPROVED,
+                4 => query = query + ACTIONS_FILTER_USER_APPROVED_A + key2 + ACTIONS_FILTER_USER_APPROVED_B, 
+                _ => return Err("Internal Server Error: Out of range mode in Actions generic query.".to_string().into()),
+            }
+        },
+        Table::BugReports => {
+            query += BUG_REPORT_QUERY; 
 
-                    match mode {
-                        0 => (),
-                        1 => query += DEPRECATIONS_FILTER,
-                        _ => return Err("Internal Server Error: Out of range mode in Deprecations generic query.".into()),
-                    }
+            match mode {
+                0 => (),
+                1 => query += BUG_REPORT_FILTER,
+                2 => query += BUG_REPORT_STATUS_FILTER,
+                _ => return Err("Internal Server Error: Out of range mode in Bug Report generic query.".into()),
+            }
+        }
+        Table::Deprecations => {
+            query += DEPRECATIONS_QUERY; 
 
-                },
-                Table::EmailValidations => {
-                    query += EMAIL_VALIDATIONS_QUERY; 
+            match mode {
+                0 => (),
+                1 => query += DEPRECATIONS_FILTER,
+                _ => return Err("Internal Server Error: Out of range mode in Deprecations generic query.".into()),
+            }
 
-                    match mode {
-                        0 => (),
-                        1 => query += EMAIL_VALIDATION_PENDING_FILTER,
-                        // Double Binding requires special case here
-                        2 => {
-                            query = query + EMAIL_VALIDATIONS_VERIFY_FILTER;
-                            match db.prepare(query.clone()).bind(&[JsValue::from(key1), JsValue::from(key2)]){
-                                Ok(prepped_query)=> {
-                                    match prepped_query.all().await {
-                                        Ok(results) =>  {
-                                            //return Err(format!("{{\"Error\":\"TESTING, checkpoint 3 reached! on mode 2 key 1 {} key 2 {} query {} \"}}", key1, key2, query.to_string()).into());
+        },
+        Table::EmailValidations => {
+            query += EMAIL_VALIDATIONS_QUERY; 
 
-                                            match results.results::<EmailValidations>(){
-                                                Ok(validations) => {
-                                                    let mut query_return = FsoTablesQueryResults::new_results().await;
-                                                    query_return.email_validations = validations;
-                                                    return Ok(query_return);
-                                                },
-                                                Err(e) => return Err(e),                                            
-                                            }
+            match mode {
+                0 => (),
+                1 => query += EMAIL_VALIDATION_PENDING_FILTER,
+                // Double Binding requires special case here
+                2 => {
+                    query = query + EMAIL_VALIDATIONS_VERIFY_FILTER;
+                    match db.prepare(query.clone()).bind(&[JsValue::from(key1), JsValue::from(key2)]){
+                        Ok(prepped_query)=> {
+                            match prepped_query.all().await {
+                                Ok(results) =>  {
+                                    //return Err(format!("{{\"Error\":\"TESTING, checkpoint 3 reached! on mode 2 key 1 {} key 2 {} query {} \"}}", key1, key2, query.to_string()).into());
+
+                                    match results.results::<EmailValidations>(){
+                                        Ok(validations) => {
+                                            let mut query_return = FsoTablesQueryResults::new_results().await;
+                                            query_return.email_validations = validations;
+                                            return Ok(query_return);
                                         },
-                                        Err(e) => return Err(e),
+                                        Err(e) => return Err(e),                                            
                                     }
                                 },
                                 Err(e) => return Err(e),
                             }
                         },
-                        _ => return Err("Internal Server Error: Out of range mode in Email Validations generic query.".into()),
+                        Err(e) => return Err(e),
                     }
-
-                }, 
-                // This is definitely not done.  Figuring out all the relevant stuff for FSO items is a lot of effort.
-                Table::FsoItems => {
-                    query += FSO_ITEMS_QUERY; 
-
-                    match mode {
-                        0 => (),
-                        1 => query += FSO_ITEMS_TABLE_FILTER,
-                        2 => query += FSO_ITEMS_TABLE_AND_NAME_FILTER,
-                        _ => return Err("Internal Server Error: Out of range mode in FSO_ITEMS generic query.".into()),
-                    }
-
                 },
-                Table::FsoTables => {
-                    query += FSO_TABLES_QUERY; 
-
-                    match mode {
-                        0 => (),
-                        1 => query += FSO_TABLES_FILTER,
-                        _ => return Err("Internal Server Error: Out of range mode in FSO_Tables generic query.".into()),
-                    }
-
-                },
-                Table::ParseBehaviors => {
-                    query += PARSE_BEHAVIORS_QUERY; 
-
-                    match mode {
-                        0 => (),
-                        1 => query += PARSE_BEHAVIORS_FILTER,
-                        _ => return Err("Internal Server Error: Out of range mode in Parse Behaviors generic query.".into()),
-                    }
-
-                },
-                Table::Restrictions => {
-                    query += RESTRICTIONS_QUERY; 
-
-                    match mode {
-                        0 => (),
-                        1 => query += RESTRICTIONS_FILTER,
-                        _ => return Err("Internal Server Error: Out of range mode in Restrictions generic query.".into()),
-                    }
-
-                },
-                Table::Sessions => {
-                    query += SESSIONS_QUERY; 
-
-                    match mode {
-                        0 => (),
-                        1 => query = query + SESSIONS_FILTER_A + key2,// + SESSIONS_FILTER_B,
-                        _ => return Err("Internal Server Error: Out of range mode in Sessions generic query.".into()),
-                    }
-
-                },
-                Table::TableAliases => {
-                    query += TABLE_ALIASES_QUERY; 
-
-                    match mode {
-                        0 => (),
-                        1 => query += TABLE_ALIASES_FILTER,
-                        _ => return Err("Internal Server Error: Out of range mode in Table Aliases generic query.".into()),
-                    }
-
-                },
-                Table::Users => {
-                    query += USERS_QUERY; 
-
-                    match mode {
-                        0 => (),
-                        1 => query += USERS_USER_ID_FILTER,
-                        2 => query += USERS_USERNAME_FILTER,
-                        _ => return Err("Internal Server Error: Out of range mode in Usernames generic query.".into()),
-                    }
-
-                },
+                _ => return Err("Internal Server Error: Out of range mode in Email Validations generic query.".into()),
             }
 
-            let mut query_return = FsoTablesQueryResults::new_results().await;
+        }, 
+        // This is definitely not done.  Figuring out all the relevant stuff for FSO items is a lot of effort.
+        Table::FsoItems => {
+            query += FSO_ITEMS_QUERY; 
 
-            let bound_query : D1PreparedStatement;
-            if mode == 0 {
-                bound_query = db.prepare(query);
-            } else {
-                match db.prepare(query).bind(&[key1.into()]){
-                    Ok(prepped_query)=> bound_query = prepped_query,
-                    Err(e) => return Err(e),
-                }
+            match mode {
+                0 => (),
+                1 => query += FSO_ITEMS_TABLE_FILTER,
+                2 => query += FSO_ITEMS_TABLE_AND_NAME_FILTER,
+                _ => return Err("Internal Server Error: Out of range mode in FSO_ITEMS generic query.".into()),
             }
 
+        },
+        Table::FsoTables => {
+            query += FSO_TABLES_QUERY; 
 
-                match table {
-                    Table::Actions => {
-                        match bound_query.all().await {
-                            Ok(results) =>{
-                                match results.results::<Actions>() {
-                                    Ok(result) => {
-                                        query_return.actions = result;
-                                        return Ok(query_return);
-                                    },
-                                    Err(e) => return Err(e),
-                                }
-                            },
-                            Err(e)=> return Err(e),
-                        }
-                    },
-                    Table::BugReports => {
-                        match bound_query.all().await {
-                            Ok(results) =>{
-                                match results.results::<BugReport>() {
-                                    Ok(result) => {
-                                        query_return.bug_reports = result;
-                                        return Ok(query_return);
-                                    },
-                                    Err(e) => return Err(e),
-                                }
-                            },
-                            Err(e)=> return Err(e),
-                        }
-                    },                    
-                    Table::Deprecations => {
-                        match bound_query.all().await {
-                            Ok(results) =>{
-                                match results.results::<Deprecations>() {
-                                    Ok(result) => {
-                                        query_return.deprecations = result;
-                                        return Ok(query_return);
-                                    },
-                                    Err(e) => return Err(e),
-                                }
-                            },
-                            Err(e)=> return Err(e),
-                        }
-                    },
-                    Table::EmailValidations => {
-                        //return Err("Got to generic email validation part 2.".to_string().into());
-                        match bound_query.all().await {
-                            Ok(results) =>{
-                                match results.results::<EmailValidations>() {
-                                    Ok(result) => {
-                                        query_return.email_validations = result;
-                                        return Ok(query_return);
-                                    },
-                                    Err(e) => return Err(e),
-                                }
-                            },
-                            Err(e)=> return Err(e),
-                        }
-                    },
-                    Table::FsoItems => {
-                        match bound_query.all().await {
-                            Ok(results) =>{
-                                match results.results::<FsoItems>() {
-                                    Ok(result) => {                                      
-                                        query_return.fso_items = result;
-                                        return Ok(query_return);
-                                    },
-                                    Err(e) => {
-                                        return Err(e.to_string().into())},
-                                }
-                            },
-                            Err(e)=> return Err(e),
-                        }
-                    },
-                    Table::FsoTables => {
-                        match bound_query.all().await {
-                            Ok(results) =>{
-                                match results.results::<FsoTables>() {
-                                    Ok(result) => {
-                                        query_return.fso_tables = result;
-                                        return Ok(query_return);
-                                    },
-                                    Err(e) => return Err(e),
-                                }
-                            },
-                            Err(e)=> return Err(e),
-                        }
-                    },
-                    Table::ParseBehaviors => {
-                        match bound_query.all().await {
-                            Ok(results) =>{
-                                match results.results::<ParseBehavior>() {
-                                    Ok(result) => {
-                                        query_return.parse_behaviors = result;
-                                        return Ok(query_return);
-                                    },
-                                    Err(e) => return Err(e),
-                                }
-                            },
-                            Err(e)=> return Err(e),
-                        }
-                    },
-                    Table::Restrictions => {
-                        match bound_query.all().await {
-                            Ok(results) =>{
-                                match results.results::<Restrictions>() {
-                                    Ok(result) => {
-                                        query_return.restrictions = result;
-                                        return Ok(query_return);
-                                    },
-                                    Err(e) => return Err(e),
-                                }
-                            },
-                            Err(e)=> return Err(e),
-                        }
-                    },
-                    Table::Sessions => {
-                        match bound_query.all().await {
-                            Ok(results) =>{
-                                match results.results::<Session>() {
-                                    Ok(result) => {
-                                        query_return.sessions = result;
-                                        return Ok(query_return);
-                                    },
-                                    Err(e) => return Err(e),
-                                }
-                            },
-                            Err(e)=> return Err(e),
-                        }
-                    },
-                    Table::TableAliases => {
-                        match bound_query.all().await {
-                            Ok(results) =>{
-                                match results.results::<TableAlias>() {
-                                    Ok(result) => {
-                                        query_return.table_aliases = result;
-                                        return Ok(query_return);
-                                    },
-                                    Err(e) => return Err(e),
-                                }
-                            },
-                            Err(e)=> return Err(e),
-                        }
-                    },
-                    Table::Users => {
-                        match bound_query.all().await {
-                            Ok(results) =>{
-                                match results.results::<Users>() {
-                                    Ok(result) => {
-                                        query_return.users = result;
-                                        return Ok(query_return);
-                                    },
-                                    Err(e) => return Err(e),
-                                }
-                            },
-                            Err(e)=> return Err(e),
-                        }
-                    },
-                }                
-            },
-        Err(e)=> return Err(e),            
+            match mode {
+                0 => (),
+                1 => query += FSO_TABLES_FILTER,
+                _ => return Err("Internal Server Error: Out of range mode in FSO_Tables generic query.".into()),
+            }
+
+        },
+        Table::ParseBehaviors => {
+            query += PARSE_BEHAVIORS_QUERY; 
+
+            match mode {
+                0 => (),
+                1 => query += PARSE_BEHAVIORS_FILTER,
+                _ => return Err("Internal Server Error: Out of range mode in Parse Behaviors generic query.".into()),
+            }
+
+        },
+        Table::Restrictions => {
+            query += RESTRICTIONS_QUERY; 
+
+            match mode {
+                0 => (),
+                1 => query += RESTRICTIONS_FILTER,
+                _ => return Err("Internal Server Error: Out of range mode in Restrictions generic query.".into()),
+            }
+
+        },
+        Table::Sessions => {
+            query += SESSIONS_QUERY; 
+
+            match mode {
+                0 => (),
+                1 => query = query + SESSIONS_FILTER_A + key2,// + SESSIONS_FILTER_B,
+                _ => return Err("Internal Server Error: Out of range mode in Sessions generic query.".into()),
+            }
+
+        },
+        Table::TableAliases => {
+            query += TABLE_ALIASES_QUERY; 
+
+            match mode {
+                0 => (),
+                1 => query += TABLE_ALIASES_FILTER,
+                _ => return Err("Internal Server Error: Out of range mode in Table Aliases generic query.".into()),
+            }
+
+        },
+        Table::Users => {
+            query += USERS_QUERY; 
+
+            match mode {
+                0 => (),
+                1 => query += USERS_USER_ID_FILTER,
+                2 => query += USERS_USERNAME_FILTER,
+                _ => return Err("Internal Server Error: Out of range mode in Usernames generic query.".into()),
+            }
+
+        },
     }
+
+    let mut query_return = FsoTablesQueryResults::new_results().await;
+
+    let bound_query : D1PreparedStatement;
+    if mode == 0 {
+        bound_query = db.prepare(query);
+    } else {
+        match db.prepare(query).bind(&[key1.into()]){
+            Ok(prepped_query)=> bound_query = prepped_query,
+            Err(e) => return Err(e),
+        }
+    }
+
+
+    match table {
+        Table::Actions => {
+            match bound_query.all().await {
+                Ok(results) =>{
+                    match results.results::<Actions>() {
+                        Ok(result) => {
+                            query_return.actions = result;
+                            return Ok(query_return);
+                        },
+                        Err(e) => return Err(e),
+                    }
+                },
+                Err(e)=> return Err(e),
+            }
+        },
+        Table::BugReports => {
+            match bound_query.all().await {
+                Ok(results) =>{
+                    match results.results::<BugReport>() {
+                        Ok(result) => {
+                            query_return.bug_reports = result;
+                            return Ok(query_return);
+                        },
+                        Err(e) => return Err(e),
+                    }
+                },
+                Err(e)=> return Err(e),
+            }
+        },                    
+        Table::Deprecations => {
+            match bound_query.all().await {
+                Ok(results) =>{
+                    match results.results::<Deprecations>() {
+                        Ok(result) => {
+                            query_return.deprecations = result;
+                            return Ok(query_return);
+                        },
+                        Err(e) => return Err(e),
+                    }
+                },
+                Err(e)=> return Err(e),
+            }
+        },
+        Table::EmailValidations => {
+            //return Err("Got to generic email validation part 2.".to_string().into());
+            match bound_query.all().await {
+                Ok(results) =>{
+                    match results.results::<EmailValidations>() {
+                        Ok(result) => {
+                            query_return.email_validations = result;
+                            return Ok(query_return);
+                        },
+                        Err(e) => return Err(e),
+                    }
+                },
+                Err(e)=> return Err(e),
+            }
+        },
+        Table::FsoItems => {
+            match bound_query.all().await {
+                Ok(results) =>{
+                    match results.results::<FsoItems>() {
+                        Ok(result) => {                                      
+                            query_return.fso_items = result;
+                            return Ok(query_return);
+                        },
+                        Err(e) => {
+                            return Err(e.to_string().into())},
+                    }
+                },
+                Err(e)=> return Err(e),
+            }
+        },
+        Table::FsoTables => {
+            match bound_query.all().await {
+                Ok(results) =>{
+                    match results.results::<FsoTables>() {
+                        Ok(result) => {
+                            query_return.fso_tables = result;
+                            return Ok(query_return);
+                        },
+                        Err(e) => return Err(e),
+                    }
+                },
+                Err(e)=> return Err(e),
+            }
+        },
+        Table::ParseBehaviors => {
+            match bound_query.all().await {
+                Ok(results) =>{
+                    match results.results::<ParseBehavior>() {
+                        Ok(result) => {
+                            query_return.parse_behaviors = result;
+                            return Ok(query_return);
+                        },
+                        Err(e) => return Err(e),
+                    }
+                },
+                Err(e)=> return Err(e),
+            }
+        },
+        Table::Restrictions => {
+            match bound_query.all().await {
+                Ok(results) =>{
+                    match results.results::<Restrictions>() {
+                        Ok(result) => {
+                            query_return.restrictions = result;
+                            return Ok(query_return);
+                        },
+                        Err(e) => return Err(e),
+                    }
+                },
+                Err(e)=> return Err(e),
+            }
+        },
+        Table::Sessions => {
+            match bound_query.all().await {
+                Ok(results) =>{
+                    match results.results::<Session>() {
+                        Ok(result) => {
+                            query_return.sessions = result;
+                            return Ok(query_return);
+                        },
+                        Err(e) => return Err(e),
+                    }
+                },
+                Err(e)=> return Err(e),
+            }
+        },
+        Table::TableAliases => {
+            match bound_query.all().await {
+                Ok(results) =>{
+                    match results.results::<TableAlias>() {
+                        Ok(result) => {
+                            query_return.table_aliases = result;
+                            return Ok(query_return);
+                        },
+                        Err(e) => return Err(e),
+                    }
+                },
+                Err(e)=> return Err(e),
+            }
+        },
+        Table::Users => {
+            match bound_query.all().await {
+                Ok(results) =>{
+                    match results.results::<Users>() {
+                        Ok(result) => {
+                            query_return.users = result;
+                            return Ok(query_return);
+                        },
+                        Err(e) => return Err(e),
+                    }
+                },
+                Err(e)=> return Err(e),
+            }
+        },
+    }                
 }
 
 pub async fn db_generic_update_query(table: &Table, mode: i8 , key1: &String, key2: &String, ctx: &RouteContext<()>) -> Result<()> {
@@ -1157,7 +1201,7 @@ pub async fn db_insert_item(new_item : &NewItem, db : &D1Database) -> Result<i64
         Err(e) => return Error(e.into()),
     }
     // uses FSO_ITEMS_TABLE_AND_NAME_FILTER
-    match db_generic_search_query(&Table::FsoItems, 2, &new_item.table_id.to_string(),&new_item.item_text, &new_item.parent_id.to_string(), &ctx).await {
+    match db_generic_search_query_db(&Table::FsoItems, 2, &new_item.table_id.to_string(),&new_item.item_text, &new_item.parent_id.to_string(), &ctx).await {
         Ok(results) => 
         {
             if results.fso_items.is_empty(){
@@ -1204,7 +1248,7 @@ pub async fn db_insert_bug_report(username: &String, bug_type: &String, descript
     let mut user_id = -1;
 
     if username != "Anonymous User"{
-        match db_generic_search_query(&Table::Users, 2, username, &"".to_string(), &"".to_string(), ctx).await {
+        match db_generic_search_query_ctx(&Table::Users, 2, username, &"".to_string(), &"".to_string(), ctx).await {
             Ok(results) => {
                 if !results.users.is_empty() {
                     user_id = results.users.first().unwrap().id;
