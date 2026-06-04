@@ -1203,8 +1203,8 @@ pub async fn insert_item(mut req: Request, ctx: RouteContext<()>) -> worker::Res
                         Err(e) => return Err(e.to_string().into())
                     }
                 
-                    if new_item.parent_id < -1 {
-                        return err_specific("{\"Error\":\"Parent item must be specified.  If this item is its own parent, use -1.\"}".to_string()).await
+                    if new_item.parent_id < -2 {
+                        return err_specific("{\"Error\":\"Parent item must be specified.  If this item is its own parent, use -1. If unknown or to be added later, use -2.\"}".to_string()).await
                     }
 
                     if new_item.table_id < -1 {
