@@ -1206,12 +1206,12 @@ pub async fn db_insert_item(new_item : &NewItem, db : &D1Database) -> Result<i64
         JsValue::from(&new_item.item_text), 
         JsValue::from(&new_item.documentation), 
         JsValue::from(&new_item.major_version),
-        JsValue::from(&new_item.parent_id.to_string()),
-        JsValue::from(&new_item.table_id.to_string()),
-        JsValue::from(&new_item.deprecation_id.to_string()),
-        JsValue::from(&new_item.restriction_id.to_string()),
+        JsValue::from(&new_item.parent_id),
+        JsValue::from(&new_item.table_id),
+        JsValue::from(&new_item.deprecation_id),
+        JsValue::from(&new_item.restriction_id),
         JsValue::from(&new_item.info_type),
-        JsValue::from(&new_item.table_index.to_string()),
+        JsValue::from(&new_item.table_index),
         JsValue::from(&new_item.default_value)]) 
     {
         Ok(query) => {
