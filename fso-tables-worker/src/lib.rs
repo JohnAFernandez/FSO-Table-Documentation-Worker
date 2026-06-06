@@ -2276,7 +2276,7 @@ pub async fn send_password_reset_email(address : &String, code: &String, ctx: &R
         return err_specific(format!("{{\"Error\":\"Tried to send automated email to invalid email address {}\"}}", address)).await
     }
 
-    let mut headers : Headers = Headers::new();
+    let headers : Headers = Headers::new();
     match headers.append("content-type", "application/json"){
         Ok(_) => (),
         Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00127\"}".to_string(),&(e.to_string() + " | IEC00127"), 500, &ctx).await,
@@ -2325,7 +2325,7 @@ pub async fn send_confirmation_email(address : &String, activation_key : &String
         return err_specific(format!("{{\"Error\":\"Tried to send automated email to invalid email address {}\"}}", address)).await
     }
 
-    let mut headers : Headers = Headers::new();
+    let headers : Headers = Headers::new();
     match headers.append("content-type", "application/json"){
         Ok(_) => (),
         Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00127\"}".to_string(),&(e.to_string() + " | IEC00127"), 500, &ctx).await,
@@ -2384,7 +2384,7 @@ pub async fn send_cors(_: Request, _: RouteContext<()>) -> worker::Result<Respon
 }
 
 pub async fn add_mandatory_headers(token: &String) -> worker::Headers {
-    let mut headers: Headers = Headers::new();
+    let headers: Headers = Headers::new();
 //
     headers.set("Access-Control-Allow-Origin", "https://fsotables.com").unwrap();
     headers.set("Access-Control-Allow-Methods", "GET,PATCH,POST,PUT,DELETE").unwrap();
