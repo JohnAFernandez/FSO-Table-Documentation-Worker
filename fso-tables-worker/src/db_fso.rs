@@ -158,6 +158,8 @@ const USERS_USERNAME_FILTER: &str = "WHERE username = ?;";
 const USERS_USER_ID_FILTER: &str = "WHERE id = ?;";
 //const USERS_USER_ID_FILTER_BINDABLE: &str = "WHERE id = ?2;";
 
+const ERROR_HELPER: &str = " discovered using the query: ";
+
 #[derive(Serialize, Deserialize)]
 pub struct FsoTablesQueryResults {
     pub actions: Vec<Actions>,
@@ -295,6 +297,10 @@ struct Enabled{
     active: i64,
 }
 
+pub async fn db_prepare_query_error(e: Error, query: String) -> String {
+    return e.to_string() + ERROR_HELPER + &query;
+}
+
 //pub async fn  db_delete_email_validation(_key: &String) -> Result<()>{
 //    return Err("Not yet implemented.".to_string().into());
 //}
@@ -403,7 +409,7 @@ pub async fn db_generic_search_query_db(table: &Table, mode: i8 , key1: &String,
                 2 => query += ACTIONS_FILTER_USER_ID,
                 3 => query += ACTIONS_FILTER_APPROVED,
                 4 => query = query + ACTIONS_FILTER_USER_APPROVED_A + key2 + ACTIONS_FILTER_USER_APPROVED_B, 
-                _ => return Err("Internal Server Error: Out of range mode in Actions generic query.".to_string().into()),
+                _ => return Err(format!("Internal Server Error: Out of range mode <{}> in Actions generic query.", mode).to_string().into()),
             }
         },
         Table::BugReports => {
@@ -413,7 +419,7 @@ pub async fn db_generic_search_query_db(table: &Table, mode: i8 , key1: &String,
                 0 => (),
                 1 => query += BUG_REPORT_FILTER,
                 2 => query += BUG_REPORT_STATUS_FILTER,
-                _ => return Err("Internal Server Error: Out of range mode in Bug Report generic query.".into()),
+                _ => return Err(format!("Internal Server Error: Out of range mode <{}> in Bug Report generic query.", mode).to_string().into()),
             }
         }
         Table::Deprecations => {
@@ -422,7 +428,7 @@ pub async fn db_generic_search_query_db(table: &Table, mode: i8 , key1: &String,
             match mode {
                 0 => (),
                 1 => query += DEPRECATIONS_FILTER,
-                _ => return Err("Internal Server Error: Out of range mode in Deprecations generic query.".into()),
+                _ => return Err(format!("Internal Server Error: Out of range mode <{}> in Deprecations generic query.", mode).to_string().into()),
             }
 
         },
@@ -447,16 +453,16 @@ pub async fn db_generic_search_query_db(table: &Table, mode: i8 , key1: &String,
                                             query_return.email_validations = validations;
                                             return Ok(query_return);
                                         },
-                                        Err(e) => return Err(e),                                            
+                                        Err(e) => return Err((db_prepare_query_error(e, query).await).into()),                                            
                                     }
                                 },
-                                Err(e) => return Err(e),
+                                Err(e) => return Err((db_prepare_query_error(e, query).await).into()),
                             }
                         },
-                        Err(e) => return Err(e),
+                        Err(e) => return Err((db_prepare_query_error(e, query).await).into()),
                     }
                 },
-                _ => return Err("Internal Server Error: Out of range mode in Email Validations generic query.".into()),
+                _ => return Err(format!("Internal Server Error: Out of range mode <{}> in Email Validations generic query.", mode).to_string().into()),
             }
 
         }, 
@@ -470,7 +476,7 @@ pub async fn db_generic_search_query_db(table: &Table, mode: i8 , key1: &String,
                 2 => { 
                     // To simplify have this separated here.
                     query += FSO_ITEMS_TABLE_AND_NAME_FILTER;    
-                    match db.prepare(query).bind(&[JsValue::from(key1), JsValue::from(key2), JsValue::from(key3)]){
+                    match db.prepare(query.clone()).bind(&[JsValue::from(key1), JsValue::from(key2), JsValue::from(key3)]){
                         Ok(prepped_query) => {                
                             match prepped_query.all().await {
                                 Ok(results) =>  {
@@ -480,18 +486,18 @@ pub async fn db_generic_search_query_db(table: &Table, mode: i8 , key1: &String,
                                             query_return.fso_items = items;
                                             return Ok(query_return);
                                         },
-                                        Err(e) => return Err(e),                                            
+                                        Err(e) => return Err((db_prepare_query_error(e, query).await).into()),                                            
                                     }
                                 },
-                                Err(e) => return Err(e),
+                                Err(e) => return Err((db_prepare_query_error(e, query).await).into()),
                             }
                         },
-                        Err(e) => return Err(e),
+                        Err(e) => return Err((db_prepare_query_error(e, query).await).into()),
                     }
                 
 
                 },
-                _ => return Err("Internal Server Error: Out of range mode in FSO_ITEMS generic query.".into()),
+                _ => return Err(format!("Internal Server Error: Out of range mode <{}> in FSO_ITEMS generic query.", mode).to_string().into()),
             }
         },
         Table::FsoTables => {
@@ -500,7 +506,7 @@ pub async fn db_generic_search_query_db(table: &Table, mode: i8 , key1: &String,
             match mode {
                 0 => (),
                 1 => query += FSO_TABLES_FILTER,
-                _ => return Err("Internal Server Error: Out of range mode in FSO_Tables generic query.".into()),
+                _ => return Err(format!("Internal Server Error: Out of range mode <{}> in FSO_Tables generic query.", mode).to_string().into()),
             }
 
         },
@@ -510,7 +516,7 @@ pub async fn db_generic_search_query_db(table: &Table, mode: i8 , key1: &String,
             match mode {
                 0 => (),
                 1 => query += PARSE_BEHAVIORS_FILTER,
-                _ => return Err("Internal Server Error: Out of range mode in Parse Behaviors generic query.".into()),
+                _ => return Err(format!("Internal Server Error: Out of range mode <{}> in Parse Behaviors generic query.", mode).to_string().into()),
             }
 
         },
@@ -520,7 +526,7 @@ pub async fn db_generic_search_query_db(table: &Table, mode: i8 , key1: &String,
             match mode {
                 0 => (),
                 1 => query += RESTRICTIONS_FILTER,
-                _ => return Err("Internal Server Error: Out of range mode in Restrictions generic query.".into()),
+                _ => return Err(format!("Internal Server Error: Out of range mode <{}> in Restrictions generic query.", mode).to_string().into()),
             }
 
         },
@@ -530,7 +536,7 @@ pub async fn db_generic_search_query_db(table: &Table, mode: i8 , key1: &String,
             match mode {
                 0 => (),
                 1 => query = query + SESSIONS_FILTER_A + key2,// + SESSIONS_FILTER_B,
-                _ => return Err("Internal Server Error: Out of range mode in Sessions generic query.".into()),
+                _ => return Err(format!("Internal Server Error: Out of range mode <{}> in Sessions generic query.", mode).to_string().into()),
             }
 
         },
@@ -540,7 +546,7 @@ pub async fn db_generic_search_query_db(table: &Table, mode: i8 , key1: &String,
             match mode {
                 0 => (),
                 1 => query += TABLE_ALIASES_FILTER,
-                _ => return Err("Internal Server Error: Out of range mode in Table Aliases generic query.".into()),
+                _ => return Err(format!("Internal Server Error: Out of range mode <{}> in Table Aliases generic query.", mode).to_string().into()),
             }
 
         },
@@ -551,7 +557,7 @@ pub async fn db_generic_search_query_db(table: &Table, mode: i8 , key1: &String,
                 0 => (),
                 1 => query += USERS_USER_ID_FILTER,
                 2 => query += USERS_USERNAME_FILTER,
-                _ => return Err("Internal Server Error: Out of range mode in Usernames generic query.".into()),
+                _ => return Err(format!("Internal Server Error: Out of range mode <{}> in Usernames generic query.", mode).to_string().into()),
             }
 
         },
@@ -561,11 +567,11 @@ pub async fn db_generic_search_query_db(table: &Table, mode: i8 , key1: &String,
 
     let bound_query : D1PreparedStatement;
     if mode == 0 {
-        bound_query = db.prepare(query);
+        bound_query = db.prepare(query.clone());
     } else {
-        match db.prepare(query).bind(&[key1.into()]){
+        match db.prepare(query.clone()).bind(&[key1.into()]){
             Ok(prepped_query)=> bound_query = prepped_query,
-            Err(e) => return Err(e),
+            Err(e) => return Err((db_prepare_query_error(e, query).await).into()),
         }
     }
 
@@ -579,7 +585,7 @@ pub async fn db_generic_search_query_db(table: &Table, mode: i8 , key1: &String,
                             query_return.actions = result;
                             return Ok(query_return);
                         },
-                        Err(e) => return Err(e),
+                        Err(e) => return Err((db_prepare_query_error(e, query).await).into()),
                     }
                 },
                 Err(e)=> return Err(e),
@@ -593,7 +599,7 @@ pub async fn db_generic_search_query_db(table: &Table, mode: i8 , key1: &String,
                             query_return.bug_reports = result;
                             return Ok(query_return);
                         },
-                        Err(e) => return Err(e),
+                        Err(e) => return Err((db_prepare_query_error(e, query).await).into()),
                     }
                 },
                 Err(e)=> return Err(e),
@@ -607,7 +613,7 @@ pub async fn db_generic_search_query_db(table: &Table, mode: i8 , key1: &String,
                             query_return.deprecations = result;
                             return Ok(query_return);
                         },
-                        Err(e) => return Err(e),
+                        Err(e) => return Err((db_prepare_query_error(e, query).await).into()),
                     }
                 },
                 Err(e)=> return Err(e),
@@ -622,7 +628,7 @@ pub async fn db_generic_search_query_db(table: &Table, mode: i8 , key1: &String,
                             query_return.email_validations = result;
                             return Ok(query_return);
                         },
-                        Err(e) => return Err(e),
+                        Err(e) => return Err((db_prepare_query_error(e, query).await).into()),
                     }
                 },
                 Err(e)=> return Err(e),
@@ -651,7 +657,7 @@ pub async fn db_generic_search_query_db(table: &Table, mode: i8 , key1: &String,
                             query_return.fso_tables = result;
                             return Ok(query_return);
                         },
-                        Err(e) => return Err(e),
+                        Err(e) => return Err((db_prepare_query_error(e, query).await).into()),
                     }
                 },
                 Err(e)=> return Err(e),
@@ -665,7 +671,7 @@ pub async fn db_generic_search_query_db(table: &Table, mode: i8 , key1: &String,
                             query_return.parse_behaviors = result;
                             return Ok(query_return);
                         },
-                        Err(e) => return Err(e),
+                        Err(e) => return Err((db_prepare_query_error(e, query).await).into()),
                     }
                 },
                 Err(e)=> return Err(e),
@@ -679,7 +685,7 @@ pub async fn db_generic_search_query_db(table: &Table, mode: i8 , key1: &String,
                             query_return.restrictions = result;
                             return Ok(query_return);
                         },
-                        Err(e) => return Err(e),
+                        Err(e) => return Err((db_prepare_query_error(e, query).await).into()),
                     }
                 },
                 Err(e)=> return Err(e),
@@ -693,7 +699,7 @@ pub async fn db_generic_search_query_db(table: &Table, mode: i8 , key1: &String,
                             query_return.sessions = result;
                             return Ok(query_return);
                         },
-                        Err(e) => return Err(e),
+                        Err(e) => return Err((db_prepare_query_error(e, query).await).into()),
                     }
                 },
                 Err(e)=> return Err(e),
@@ -707,7 +713,7 @@ pub async fn db_generic_search_query_db(table: &Table, mode: i8 , key1: &String,
                             query_return.table_aliases = result;
                             return Ok(query_return);
                         },
-                        Err(e) => return Err(e),
+                        Err(e) => return Err((db_prepare_query_error(e, query).await).into()),
                     }
                 },
                 Err(e)=> return Err(e),
@@ -721,7 +727,7 @@ pub async fn db_generic_search_query_db(table: &Table, mode: i8 , key1: &String,
                             query_return.users = result;
                             return Ok(query_return);
                         },
-                        Err(e) => return Err(e),
+                        Err(e) => return Err((db_prepare_query_error(e, query).await).into()),
                     }
                 },
                 Err(e)=> return Err(e),
@@ -834,10 +840,10 @@ pub async fn db_generic_update_query(table: &Table, mode: i8 , key1: &String, ke
                 Ok(prepped_query)=> {
                     match prepped_query.run().await {
                         Ok(_) => return Ok(()),
-                        Err(e) => return Err(e),
+                        Err(e) => return Err((db_prepare_query_error(e, query).await).into()),
                     }
                 },
-                Err(e) => return Err(e),
+                Err(e) => return Err((db_prepare_query_error(e, query).await).into()),
             }
         },
         
@@ -887,14 +893,14 @@ pub async fn db_generic_delete(table: Table, id: &String, ctx: &RouteContext<()>
                 },
             }
 
-            match db.prepare(query).bind(&[id.into()]){
+            match db.prepare(query.clone()).bind(&[id.into()]){
                 Ok(prepped_query)=> {
                     match prepped_query.run().await {
                         Ok(_) => return Ok(()),
-                        Err(e) => return Err(e),
+                        Err(e) => return Err((db_prepare_query_error(e, query).await).into()),
                     }        
                 },
-                Err(e) => return Err(e),
+                Err(e) => return Err((db_prepare_query_error(e, query).await).into()),
             }
         },
         Err(e) => return Err(e),
@@ -911,7 +917,7 @@ pub async fn db_has_active_user(email: &String, db: &D1Database) -> worker::Resu
                 None => return Ok(false),
             }
         },
-        Err(e) => return Err(e),
+        Err(e) => return Err((db_prepare_query_error(e, format!("SELECT active FROM users WHERE username = {}", email)).await).into()),
     }
 }
 
@@ -925,7 +931,7 @@ pub async fn db_email_taken(email: &String, db: &D1Database) -> worker::Result<b
                 None => return Ok(false),
             }
         },
-        Err(e) => return Err(e),
+        Err(e) => return Err((db_prepare_query_error(e, format!("SELECT count(*) AS the_count FROM users WHERE username = {}", email)).await).into()),
     }    
 }
 
@@ -945,7 +951,7 @@ pub async fn db_user_able_to_register(email: &String, db: &D1Database) -> worker
                 None => return Ok(true),
             }
         },
-        Err(e) => return Err(e),
+        Err(e) => return Err((db_prepare_query_error(e, format!("SELECT email_confirmed, banned FROM users WHERE username = {}", email)).await).into()),
     }
 }
 
@@ -964,7 +970,7 @@ pub async fn db_user_is_incompletely_registered(email: &String, db: &D1Database)
                 None => return Ok(false),
             }
         },
-        Err(e) => return Err(e),
+        Err(e) => return Err((db_prepare_query_error(e, format!("SELECT email_confirmed FROM users WHERE username = {}", email)).await).into()),
     }
 }
 
@@ -978,7 +984,7 @@ pub async fn db_is_user_banned_or_nonexistant(email: &String, db: &D1Database) -
                 None => return Ok(false),
             }
         },
-        Err(e) => return Err(e),
+        Err(e) => return Err((db_prepare_query_error(e, format!("SELECT count(*) AS the_count FROM users WHERE username = {} AND banned = 0 AND email_confirmed = 1", email)).await).into()),
     }        
 }
 
@@ -989,13 +995,13 @@ pub async fn db_set_email_confirmed(email: &String, ctx: &RouteContext<()>) -> R
                 Ok(query) => {
                     match query.run().await {
                         Ok(_) => Ok(()),
-                        Err(e) => Err(e),
+                        Err(e) => return Err((db_prepare_query_error(e, format!("UPDATE users SET email_confirmed = 1, active = 1 WHERE username = {}", email)).await).into()),
                     }        
                 },
-                Err(e) => Err(e),
+                Err(e) => return Err((db_prepare_query_error(e, format!("UPDATE users SET email_confirmed = 1, active = 1 WHERE username = {}", email)).await).into()),
             }
         },
-        Err(e) => Err(e),
+        Err(e) => return Err((db_prepare_query_error(e, format!("UPDATE users SET email_confirmed = 1, active = 1 WHERE username = {}", email)).await).into()),
     }
 }
 
