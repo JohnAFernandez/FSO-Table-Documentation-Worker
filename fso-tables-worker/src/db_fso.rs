@@ -133,7 +133,7 @@ const EMAIL_VALIDATION_PENDING_FILTER: &str = "WHERE username = ?;";
 const EMAIL_VALIDATIONS_VERIFY_FILTER: &str = "WHERE username = ?1 AND secure_key = ?2;";
 
 const FSO_ITEMS_TABLE_FILTER: &str = "WHERE table_id = ?";
-const FSO_ITEMS_TABLE_AND_NAME_FILTER: &str = "WHERE table_id ?1 AND item_text = ?2 AND parent_id = ?3";
+const FSO_ITEMS_TABLE_AND_NAME_FILTER: &str = "WHERE table_id = ?1 AND item_text = ?2 AND parent_id = ?3";
 const FSO_ITEMS_FILTER_BINDABLE: &str = "WHERE item_id = ?2";
 
 const FSO_TABLES_FILTER: &str = "WHERE table_id = ?;";
@@ -468,7 +468,7 @@ pub async fn db_generic_search_query_db(table: &Table, mode: i8 , key1: &String,
                 0 => (),
                 1 => query += FSO_ITEMS_TABLE_FILTER,
                 2 => { 
-                    // To simplify hve this separated here.
+                    // To simplify have this separated here.
                     query += FSO_ITEMS_TABLE_AND_NAME_FILTER;    
                     match db.prepare(query).bind(&[JsValue::from(key1), JsValue::from(key2), JsValue::from(key3)]){
                         Ok(prepped_query) => {                
