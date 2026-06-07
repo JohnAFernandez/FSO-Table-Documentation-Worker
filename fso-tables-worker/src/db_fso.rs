@@ -2,6 +2,8 @@ use worker::*;
 use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc, TimeDelta};
 use crate::{UserDetails, DB_NAME, err_specific, JsValue, DB_TIME_FORMAT, NewItem};
+use is_number::{is_float, is_integer};
+use serde_json::from_str;
 
 #[derive(PartialEq, PartialOrd)]
 pub enum UserRole {
@@ -86,16 +88,18 @@ const DEPRECATIONS_PATCH_VERSION_QUERY: &str = "UPDATE deprecations SET version 
 
 //No email validations updates if something is wrong with one of those it has to be done on the database side
 
-const FSO_ITEMS_PATCH_ITEM_TEXT_QUERY: &str = "UPDATE deprecations SET item_text = ?1 ";
-const FSO_ITEMS_PATCH_DOCUMENTATION_QUERY: &str = "UPDATE deprecations SET documentation = ?1 ";
-const FSO_ITEMS_PATCH_MAJOR_VERSION_QUERY: &str = "UPDATE deprecations SET major_version = ?1 ";
-const FSO_ITEMS_PATCH_PARENT_ID_QUERY: &str = "UPDATE deprecations SET parent_id = ?1 ";
-const FSO_ITEMS_PATCH_TABLE_ID_QUERY: &str = "UPDATE deprecations SET table_id = ?1 ";
-const FSO_ITEMS_PATCH_DEPRECATION_ID_QUERY: &str = "UPDATE deprecations SET deprecation_id = ?1 ";
-const FSO_ITEMS_PATCH_RESTRICTION_ID_QUERY: &str = "UPDATE deprecations SET restriction_id = ?1 ";
-const FSO_ITEMS_PATCH_INFO_TYPE_QUERY: &str = "UPDATE deprecations SET info_type = ?1 ";
-const FSO_ITEMS_PATCH_TABLE_INDEX_QUERY: &str = "UPDATE deprecations SET table_index = ?1 "; // THIS ONE IS COMPLICATED!!
-const FSO_ITEMS_PATCH_DEFAULT_VALUE_QUERY: &str = "UPDATE deprecations SET default_value = ?1 ";
+const FSO_ITEM_PATCH_STRINGS : [&str; 10] = [
+    "UPDATE fso_items SET default_value = ?1 ", 
+    "UPDATE fso_items SET deprecation_id = ?1 ",
+    "UPDATE fso_items SET documentation = ?1 ",
+    "UPDATE fso_items SET item_text = ?1 ",
+    "UPDATE fso_items SET info_type = ?1 ",
+    "UPDATE fso_items SET major_version = ?1 ",
+    "UPDATE fso_items SET parent_id = ?1 ",
+    "UPDATE fso_items SET restriction_id = ?1 ",
+    "UPDATE fso_items SET table_id = ?1 ",
+    "UPDATE fso_items SET table_index = ?1 "
+    ]; 
 
 // Table Patching to be done by direct editng.
 
@@ -240,6 +244,22 @@ pub struct FsoItems {
     pub table_index: i64,
     pub default_value: String,
 }
+
+#[derive(Deserialize)]
+pub struct FsoItemsPatch { 
+    pub item_id: i32,
+    pub item_text: String,
+    pub documentation: String,
+    pub major_version: String,
+    pub parent_id: String,
+    pub table_id: String,
+    pub deprecation_id: String,
+    pub restriction_id: String,
+    pub info_type: String,
+    pub table_index: String,
+    pub default_value: String,
+}
+
 
 #[derive(Serialize, Deserialize)]
 pub struct FsoTables { 
@@ -736,7 +756,7 @@ pub async fn db_generic_search_query_db(table: &Table, mode: i8 , key1: &String,
     }                
 }
 
-pub async fn db_generic_update_query(table: &Table, mode: i8 , key1: &String, key2: &String, ctx: &RouteContext<()>) -> Result<()> {
+pub async fn db_generic_update_query(table: &Table, mode: usize , key1: &String, key2: &String, ctx: &RouteContext<()>) -> Result<()> {
     match ctx.env.d1(DB_NAME){
         Ok(db) => {
             let mut query = "".to_string();
@@ -768,24 +788,67 @@ pub async fn db_generic_update_query(table: &Table, mode: i8 , key1: &String, ke
                     query += DEPRECATIONS_FILTER_BINDABLE;
                 },
                 Table::EmailValidations => 
-                    return Err("Internal Server Error: Server attempting to update Email Validations with generic update query.".into()), 
+                    return Err("Internal Server Error: Server attempting to update Email Validations with generic update query. Update aborted.".into()), 
                 // This is definitely not done.  Figuring out all the relevant stuff for FSO items is a lot of effort.
                 Table::FsoItems => {
+                    query += &(FSO_ITEM_PATCH_STRINGS[mode].to_owned() + FSO_ITEMS_FILTER_BINDABLE);
+
                     match mode {
-                        0 => query += FSO_ITEMS_PATCH_DEFAULT_VALUE_QUERY,
-                        1 => query += FSO_ITEMS_PATCH_DEPRECATION_ID_QUERY,
-                        2 => query += FSO_ITEMS_PATCH_DOCUMENTATION_QUERY,
-                        3 => query += FSO_ITEMS_PATCH_INFO_TYPE_QUERY,
-                        4 => query += FSO_ITEMS_PATCH_ITEM_TEXT_QUERY,
-                        5 => query += FSO_ITEMS_PATCH_MAJOR_VERSION_QUERY,
-                        6 => query += FSO_ITEMS_PATCH_PARENT_ID_QUERY,
-                        7 => query += FSO_ITEMS_PATCH_RESTRICTION_ID_QUERY,
-                        8 => query += FSO_ITEMS_PATCH_TABLE_ID_QUERY,
-                        9 => query += FSO_ITEMS_PATCH_TABLE_INDEX_QUERY,
+                        // Sorry the order was arbitrary
+                        // 0 Default Value, Deprecation ID, Documentation, Item Text, Info_type, 5 Major Version, Parent ID, Restriction ID, Table ID, 9 Table Index
+                        0 | 9 | 4 | 5 => { 
+                            // no validation needed, even empty strings are ok 
+                            match db.prepare(query.clone()).bind(&[JsValue::from(key1), JsValue::from(key2)]){
+                                Ok(prepped_query)=> {
+                                    match prepped_query.run().await {
+                                        Ok(_) => return Ok(()),
+                                        Err(e) => return Err((db_prepare_query_error(e, query).await).into()),
+                                    }
+                                },
+                                Err(e) => return Err((db_prepare_query_error(e, query).await).into()),
+                            }
+                        }, 
+                        
+                        1 | 6 | 7 | 8 => {
+                            if !is_integer(&key1){
+                                return Err(format!("Cannot set an ID to {} since it is a non-integer.", key1).into());
+                            };
+
+                            match db.prepare(query.clone()).bind(&[JsValue::from(from_str::<i32>(&key1).unwrap()), JsValue::from(key2)]){
+                                Ok(prepped_query)=> {
+                                    match prepped_query.run().await {
+                                        Ok(_) => return Ok(()),
+                                        Err(e) => return Err((db_prepare_query_error(e, query).await).into()),
+                                    }
+                                },
+                                Err(e) => return Err((db_prepare_query_error(e, query).await).into()),
+                            }
+
+
+                        },
+
+                        2 | 3 => {
+                            if key1.is_empty(){
+                                return Err("Neither documentation nor info_type can be empty.".into());
+                            }
+
+                            match db.prepare(query.clone()).bind(&[JsValue::from(key1), JsValue::from(key2)]){
+                                Ok(prepped_query)=> {
+                                    match prepped_query.run().await {
+                                        Ok(_) => return Ok(()),
+                                        Err(e) => return Err((db_prepare_query_error(e, query).await).into()),
+                                    }
+                                },
+                                Err(e) => return Err((db_prepare_query_error(e, query).await).into()),
+                            }
+
+                        },
+
+//                        4 => (), // please change to validate that the Info type is within the correct set in the future 
+//                        5 => (), // please change to verify that major version is in the included set.
                         _ => return Err("Internal Server Error: Out of range mode in FSO_ITEMS generic update query.".into()),
                     }
 
-                    query += FSO_ITEMS_FILTER_BINDABLE;
 
                 },
                 Table::FsoTables => {

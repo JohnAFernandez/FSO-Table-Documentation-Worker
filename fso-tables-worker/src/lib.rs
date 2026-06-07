@@ -1247,9 +1247,9 @@ pub async fn update_item(mut req: Request, ctx: RouteContext<()>) -> worker::Res
                         _=> (),
                     }         
 
-                    match req.json::<db_fso::FsoItems>().await {
+                    match req.json::<db_fso::FsoItemsPatch>().await {
                         Ok(item) => {
-                            if item.item_id < 0 {
+                            if item.item_id < 1 {
                                 return err_specific("{\"Error\":\"Invalid item id, cannot update.\"}".to_string()).await;
                             }
 
@@ -1260,8 +1260,8 @@ pub async fn update_item(mut req: Request, ctx: RouteContext<()>) -> worker::Res
                                 }    
                             }
 
-                            if item.deprecation_id > -2 {
-                                match db_fso::db_generic_update_query(&db_fso::Table::FsoItems, 1, &item.deprecation_id.to_string(), &item.item_id.to_string(),  &ctx).await {
+                            if item.deprecation_id != "~!!NO UPDATE!!~" {
+                                match db_fso::db_generic_update_query(&db_fso::Table::FsoItems, 1, &item.deprecation_id, &item.item_id.to_string(),  &ctx).await {
                                     Ok(_) => (),
                                     Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00061\"}".to_string(),&(e.to_string() + " | IEC00061"), 500, &ctx).await,
                                 }
@@ -1295,21 +1295,21 @@ pub async fn update_item(mut req: Request, ctx: RouteContext<()>) -> worker::Res
                                 }
                             }
                             
-                            if item.parent_id > -2 {
-                                match db_fso::db_generic_update_query(&db_fso::Table::FsoItems, 6, &item.parent_id.to_string(), &item.item_id.to_string(),  &ctx).await {
+                            if item.parent_id != "~!!NO UPDATE!!~" {
+                                match db_fso::db_generic_update_query(&db_fso::Table::FsoItems, 6, &item.parent_id, &item.item_id.to_string(),  &ctx).await {
                                     Ok(_) => (),
                                     Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00066\"}".to_string(),&(e.to_string() + " | IEC00066"), 500, &ctx).await,
                                 }
                             }
 
-                            if item.restriction_id > -2 {
-                                match db_fso::db_generic_update_query(&db_fso::Table::FsoItems, 7, &item.restriction_id.to_string(), &item.item_id.to_string(),  &ctx).await {
+                            if item.restriction_id != "~!!NO UPDATE!!~" {
+                                match db_fso::db_generic_update_query(&db_fso::Table::FsoItems, 7, &item.restriction_id, &item.item_id.to_string(),  &ctx).await {
                                     Ok(_) => (),
                                     Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00067\"}".to_string(),&(e.to_string() + " | IEC00067"), 500, &ctx).await,
                                 }
                             }
 
-                            if item.table_id > -2 {
+                            if item.table_id != "~!!NO UPDATE!!~" {
                                 match db_fso::db_generic_update_query(&db_fso::Table::FsoItems, 8, &item.table_id.to_string(), &item.item_id.to_string(),  &ctx).await {
                                     Ok(_) => (),
                                     Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00068\"}".to_string(),&(e.to_string() + " | IEC00068"), 500, &ctx).await,
@@ -2404,7 +2404,7 @@ pub async fn add_mandatory_headers(token: &String) -> worker::Headers {
 /// CODE 403
 const ERROR_INSUFFICIENT_PERMISSISONS: &str = "{\"Error\": \"This operation is not authorizable via our API at your access level.\"}";
 /// CODE 403
-const ERROR_NOT_LOGGED_IN: &str = "{\"Error\": \"You must be logged and provide an access token to access this endpoint.\"}";
+const ERROR_NOT_LOGGED_IN: &str = "{\"Error\": \"You must be logged in and provide an access token to access this endpoint.\"}";
 /// CODE 403
 const ERROR_USER_NOT_ACTIVE: &str = "{\"Error\": \"The user must be active before it can authorize this type of action\"}";
 /// CODE 404
