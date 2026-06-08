@@ -62,7 +62,7 @@ const TABLE_ALIASES_DELETE_QUERY: &str = "DELETE FROM table_aliases ";
 //const USERS_DELETE_QUERY: &str = "DELETE FROM users ";
 
 // Some (maybe most) of these will end up being unused as specialized functions are already written.  
-//const ACTIONS_INSERT_QUERY: &str = "INSERT INTO actions (user_id, action, approved_by_user, timestamp) VALUES (?1, ?2, ?3, ?4)";
+const ACTIONS_INSERT_QUERY: &str = "INSERT INTO actions (user_id, action, approved_by_user, timestamp, route, item_index, approved) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)";
 //const BUG_REPORT_INSERT_QUERY: &str = "INSERT INTO bug_reports ( user_id, bug_type, description, status, timestamp) VALUES (?1, ?2, ?3, ?4, ?5)";    
 //const DEPRECATIONS_INSERT_QUERY: &str = "INSERT INTO deprecations (date, version) VALUES (?1, ?2)"; 
 //const EMAIL_VALIDATIONS_INSERT_QUERY: &str = "INSERT INTO email_validations (username) VALUES (?1)";
@@ -76,7 +76,7 @@ const FSO_ITEMS_INSERT_QUERY: &str = "INSERT INTO fso_items (item_text, document
 //const USERS_INSERT_QUERY: &str = "INSERT INTO users ( username, role, active, email_confirmed, contribution_count, banned: i64) VALUES (?1, ?2, ?3, ?4, ?5, ?6)";
 
 // Other patches should be done on the database end.
-const ACTIONS_PATCH_APPROVED_QUERY: &str = "UPDATE actions SET approved_by_user = ?1;";
+const ACTIONS_PATCH_APPROVED_QUERY: &str = "UPDATE actions SET approved = 1, approved_by_user = ?1;";
 
 const BUG_REPORT_PATCH_APPROVED_QUERY: &str = "UPDATE bug_reports SET approved_by_user = ?1 ";
 const BUG_REPORT_PATCH_BUGTYPE_QUERY: &str = "UPDATE bug_reports SET bug_type = ?1 ";
@@ -92,8 +92,8 @@ const FSO_ITEM_PATCH_STRINGS : [&str; 10] = [
     "UPDATE fso_items SET default_value = ?1 ", 
     "UPDATE fso_items SET deprecation_id = ?1 ",
     "UPDATE fso_items SET documentation = ?1 ",
-    "UPDATE fso_items SET item_text = ?1 ",
     "UPDATE fso_items SET info_type = ?1 ",
+    "UPDATE fso_items SET item_text = ?1 ",
     "UPDATE fso_items SET major_version = ?1 ",
     "UPDATE fso_items SET parent_id = ?1 ",
     "UPDATE fso_items SET restriction_id = ?1 ",
@@ -118,8 +118,8 @@ const TABLE_ALIASES_PATCH_TABLE_ID_QUERY: &str = "UPDATE table_aliases SET table
 const TABLE_ALIASES_PATCH_FILENAME_QUERY: &str = "UPDATE table_aliases SET filename = ?1 ";
 
 
-const ACTIONS_FILTER_ID: &str = "WHERE action_id = ?;";
-const ACTIONS_FILTER_ID_BINDABLE: &str = "WHERE action_id = ?2;";
+const BINDABLE_ACTIONS_FILTER_ID: &str = "WHERE action_id = ?;";
+const BINDABLE_ACTIONS_FILTER_BY_ID: &str = "WHERE action_id = ?2;";
 const ACTIONS_FILTER_USER_ID: &str = "WHERE user_id = ?;";
 const ACTIONS_FILTER_APPROVED: &str = "WHERE approved = ?;";
 const ACTIONS_FILTER_USER_APPROVED_A: &str = "Where user_id = ? AND approved = ";
@@ -138,7 +138,7 @@ const EMAIL_VALIDATIONS_VERIFY_FILTER: &str = "WHERE username = ?1 AND secure_ke
 
 const FSO_ITEMS_TABLE_FILTER: &str = "WHERE table_id = ?";
 const FSO_ITEMS_TABLE_AND_NAME_FILTER: &str = "WHERE table_id = ?1 AND item_text = ?2 AND parent_id = ?3";
-const FSO_ITEMS_FILTER_BINDABLE: &str = "WHERE item_id = ?2";
+const BINDABLE_FSO_ITEMS_FILTER_: &str = "WHERE item_id = ?2";
 
 const FSO_TABLES_FILTER: &str = "WHERE table_id = ?;";
 //const FSO_TABLES_FILTER_BINDABLE: &str = "WHERE table_id = ?2;";
@@ -425,7 +425,7 @@ pub async fn db_generic_search_query_db(table: &Table, mode: i8 , key1: &String,
 
             match mode {
                 0 => (),
-                1 => query += ACTIONS_FILTER_ID,
+                1 => query += BINDABLE_ACTIONS_FILTER_ID,
                 2 => query += ACTIONS_FILTER_USER_ID,
                 3 => query += ACTIONS_FILTER_APPROVED,
                 4 => query = query + ACTIONS_FILTER_USER_APPROVED_A + key2 + ACTIONS_FILTER_USER_APPROVED_B, 
@@ -763,7 +763,7 @@ pub async fn db_generic_update_query(table: &Table, mode: usize , key1: &String,
 
             match table {
                 Table::Actions => {
-                    query = ACTIONS_PATCH_APPROVED_QUERY.to_owned() + ACTIONS_FILTER_ID_BINDABLE; 
+                    query = ACTIONS_PATCH_APPROVED_QUERY.to_owned() + BINDABLE_ACTIONS_FILTER_BY_ID; 
                 },
                 Table::BugReports => {
 
@@ -791,12 +791,12 @@ pub async fn db_generic_update_query(table: &Table, mode: usize , key1: &String,
                     return Err("Internal Server Error: Server attempting to update Email Validations with generic update query. Update aborted.".into()), 
                 // This is definitely not done.  Figuring out all the relevant stuff for FSO items is a lot of effort.
                 Table::FsoItems => {
-                    query += &(FSO_ITEM_PATCH_STRINGS[mode].to_owned() + FSO_ITEMS_FILTER_BINDABLE);
+                    query += &(FSO_ITEM_PATCH_STRINGS[mode].to_owned() + BINDABLE_FSO_ITEMS_FILTER_);
 
                     match mode {
                         // Sorry the order was arbitrary
-                        // 0 Default Value, Deprecation ID, Documentation, Item Text, Info_type, 5 Major Version, Parent ID, Restriction ID, Table ID, 9 Table Index
-                        0 | 9 | 4 | 5 => { 
+                        // 0 Default Value, Deprecation ID, Documentation, Info_type, Item Text, 5 Major Version, Parent ID, Restriction ID, Table ID, 9 Table Index
+                        0 | 9 | 5 => { 
                             // no validation needed, even empty strings are ok 
                             match db.prepare(query.clone()).bind(&[JsValue::from(key1), JsValue::from(key2)]){
                                 Ok(prepped_query)=> {
@@ -827,9 +827,9 @@ pub async fn db_generic_update_query(table: &Table, mode: usize , key1: &String,
 
                         },
 
-                        2 | 3 => {
+                        2 | 3 | 4 => {
                             if key1.is_empty(){
-                                return Err("Neither documentation nor info_type can be empty.".into());
+                                return Err("Neither documentation, item text, nor info_type can be empty.".into());
                             }
 
                             match db.prepare(query.clone()).bind(&[JsValue::from(key1), JsValue::from(key2)]){
@@ -922,7 +922,7 @@ pub async fn db_generic_delete(table: Table, id: &String, ctx: &RouteContext<()>
 
             match table {
                 Table::Actions => {
-                    query = ACTIONS_DELETE_QUERY.to_owned() + ACTIONS_FILTER_ID;                    
+                    query = ACTIONS_DELETE_QUERY.to_owned() + BINDABLE_ACTIONS_FILTER_ID;                    
                 },
                 Table::BugReports => {
                     query = BUG_REPORT_DELETE_QUERY.to_owned() + BUG_REPORT_FILTER;
