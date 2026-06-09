@@ -167,7 +167,7 @@ const ERROR_HELPER: &str = " discovered using the query: ";
 
 #[derive(Serialize, Deserialize)]
 pub struct FsoTablesQueryResults {
-    pub actions: Vec<Actions>,
+    pub actions: Vec<ActionsExternal>,
     pub bug_reports: Vec<BugReport>,
     pub deprecations: Vec<Deprecations>,
     pub email_validations: Vec<EmailValidations>,
@@ -198,7 +198,7 @@ impl FsoTablesQueryResults {
     }
 }
 
-pub struct Actions_Internal {
+pub struct ActionsInternal {
     pub user_id: i32,
     pub action: String,
     pub approved_by_user: i32,
@@ -207,21 +207,21 @@ pub struct Actions_Internal {
     pub route: String,
 }
 
-impl Actions_internal {
-    pub async fn new_action_internal(user: i32, action: String, approving_user: i32, the_timestsamp: String, is_approved: bool, the_route: String) -> Actions_Internal{
-        Actions_Internal{
+impl ActionsInternal {
+    pub async fn new_action_internal(user: i32, action_string: String, approving_user: i32, the_timestsamp: String, is_approved: bool, the_route: String) -> ActionsInternal{
+        ActionsInternal{
             user_id: user,
             action: action_string,
             approved_by_user: approving_user,
             timestamp: the_timestsamp,
-            approved: is_approved,
+            approved: match is_approved { true => 1, false => 0},
             route: the_route,
         }
     }
 }
 
-#[derive(Serialize)] // Should only need to serialize, since this isn't postable via API
-pub struct Actions_External {
+#[derive(Serialize, Deserialize)] // Should only need to serialize, since this isn't postable via API
+pub struct ActionsExternal {
     pub action_id: i32,
     pub user: String,
     pub action: String,
@@ -454,8 +454,8 @@ pub async fn db_generic_search_query_db(table: &Table, mode: i8 , key1: &String,
                 1 => query += BINDABLE_ACTIONS_FILTER_ID,
                 2 => query += ACTIONS_FILTER_USER_ID,
                 3 => query += ACTIONS_FILTER_APPROVED,
-                4 => query += ACTIONS_FILTER_USER_APPROVED_A + key2 + ACTIONS_FILTER_USER_APPROVED_B, 
-                5 => query += ACTIONS_FILTER_TIMESTAMP; 
+                4 => query += &(ACTIONS_FILTER_USER_APPROVED_A.to_owned() + key2 + ACTIONS_FILTER_USER_APPROVED_B), 
+                5 => query += ACTIONS_FILTER_TIMESTAMP,
                 _ => return Err(format!("Internal Server Error: Out of range mode <{}> in Actions generic query.", mode).to_string().into()),
             }
         },
@@ -627,7 +627,7 @@ pub async fn db_generic_search_query_db(table: &Table, mode: i8 , key1: &String,
         Table::Actions => {
             match bound_query.all().await {
                 Ok(results) =>{
-                    match results.results::<Actions>() {
+                    match results.results::<ActionsExternal>() {
                         Ok(result) => {
                             query_return.actions = result;
                             return Ok(query_return);
@@ -1296,7 +1296,7 @@ pub async fn db_user_stats_get(_: Request, _ctx: RouteContext<()>) -> worker::Re
     }            
 }
 
-pub async fn db_insert_action(new_action: &Actions_Internal, db : &D1Database) -> Result<i32> {
+pub async fn db_insert_action(new_action: &ActionsInternal, db : &D1Database) -> Result<i32> {
     let processed_timestamp = 
 
     match db.prepare(ACTIONS_INSERT_QUERY).bind(&[
@@ -1306,7 +1306,7 @@ pub async fn db_insert_action(new_action: &Actions_Internal, db : &D1Database) -
         JsValue::from(&new_action.timestamp),    
         JsValue::from(&new_action.route),    
         JsValue::from(&new_action.user_id),    
-        JsValue::from(&new_action.item_index),    
+        JsValue::from(&new_action.approved),    
     ])
     {
         Ok(query) => {
@@ -1319,13 +1319,13 @@ pub async fn db_insert_action(new_action: &Actions_Internal, db : &D1Database) -
     }
 
     // uses timestamp filter
-    match db_generic_search_query_db(&Table::Actions, 5, &new_action.timestamp,"".to_string(), "".to_string(), &db).await {
+    match db_generic_search_query_db(&Table::Actions, 5, &new_action.timestamp,&"".to_string(), &"".to_string(), &db).await {
         Ok(results) => 
         {
             if results.actions.is_empty(){
                 return Err("Unable to retrieve action after insertion into table. This is a logic error, please report!".to_string().into());
             }
-            return Ok(results.fso_items[0].item_id)
+            return Ok(results.actions[0].action_id);
         },
         Err(e) => return Err(e.into()),
     }

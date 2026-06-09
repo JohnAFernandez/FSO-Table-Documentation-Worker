@@ -17,6 +17,7 @@ use wasm_bindgen::JsValue;
 use chrono::{Utc, TimeDelta};
 mod secrets;
 mod db_fso;
+use casting::{CastFrom};
 
 
 const DB_NAME: &str = "fso_table_database";    
@@ -1216,13 +1217,39 @@ pub async fn insert_item(mut req: Request, ctx: RouteContext<()>) -> worker::Res
                     }
 
                     match db_fso::db_insert_item(&new_item, &db).await {
-                        Ok(id) => return send_success(&format!("{{\"id\":\"{}\"}}", id), &"".to_string()).await,
-                        Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00164\"}".to_string(),&(e.to_string() + " | IEC00164"), 500, &ctx).await,
-                    }
-                    //id: i32, user: i32, action: String, approving_user: i32, the_timestsamp: String, is_approved: bool, the_route: String
-                    let action = Actions_Internal::new_action_internal(,);
+                        Ok(id) => {                        
+                            // Record the success in the change table
+                            match db_fso::db_generic_search_query_db(&db_fso::Table::Users,2,&username,&"".to_string(), &"".to_string(), &db).await {
+                                Ok (results) => {
+                                    if !results.users.is_empty(){
+                                        let id = i32::cast_from(results.users[0].id);
+                                        //id: i32, user: i32, action: String, approving_user: i32, the_timestsamp: String, is_approved: bool, the_route: String
+                                        let action = db_fso::ActionsInternal::new_action_internal(id, req.text().await.unwrap(),id, Utc::now().format(DB_TIME_FORMAT).to_string(),true,"Add item via API".to_string()).await;
+            
+            
+                                        match db_fso::db_insert_action(&action, &db).await {
+                                            Ok=> (),
+                                            Err(e)=> (),
+                                        }
 
-                    match db_fso::db_insert_action( , &db).await {}
+                                    }
+                                },
+                                Err(e) => (),
+    
+                                Err(e) => (),
+                            }
+
+                            return send_success(&format!("{{\"id\":\"{}\"}}", id), &"".to_string()).await;
+                        }
+                            
+                        Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00164\"}".to_string(),&(e.to_string() + " | IEC00164"), 500, &ctx).await,
+
+
+
+                    }
+
+
+
 
                 },
                 Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00058\"}".to_string(),&(e.to_string() + " | IEC00058"), 500, &ctx).await,
