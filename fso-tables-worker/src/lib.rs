@@ -1219,6 +1219,10 @@ pub async fn insert_item(mut req: Request, ctx: RouteContext<()>) -> worker::Res
                         Ok(id) => return send_success(&format!("{{\"id\":\"{}\"}}", id), &"".to_string()).await,
                         Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00164\"}".to_string(),&(e.to_string() + " | IEC00164"), 500, &ctx).await,
                     }
+                    //id: i32, user: i32, action: String, approving_user: i32, the_timestsamp: String, is_approved: bool, the_route: String
+                    let action = Actions_Internal::new_action_internal(,);
+
+                    match db_fso::db_insert_action( , &db).await {}
 
                 },
                 Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00058\"}".to_string(),&(e.to_string() + " | IEC00058"), 500, &ctx).await,

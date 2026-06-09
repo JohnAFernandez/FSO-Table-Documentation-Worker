@@ -124,6 +124,7 @@ const ACTIONS_FILTER_USER_ID: &str = "WHERE user_id = ?;";
 const ACTIONS_FILTER_APPROVED: &str = "WHERE approved = ?;";
 const ACTIONS_FILTER_USER_APPROVED_A: &str = "Where user_id = ? AND approved = ";
 const ACTIONS_FILTER_USER_APPROVED_B: &str = ";";
+const ACTIONS_FILTER_TIMESTAMP: &str = "WHERE timestamp = ?;";
 
 const BUG_REPORT_FILTER: &str = "WHERE id = ?;";
 const BUG_REPORT_FILTER_BINDABLE: &str = "WHERE id = ?2;";
@@ -197,13 +198,38 @@ impl FsoTablesQueryResults {
     }
 }
 
-#[derive(Serialize, Deserialize)]
-pub struct Actions {
-    pub action_id: i64,
-    pub user_id: i64,
+pub struct Actions_Internal {
+    pub user_id: i32,
     pub action: String,
-    pub approved_by_user: i64,
+    pub approved_by_user: i32,
     pub timestamp: String,
+    pub approved: i32,
+    pub route: String,
+}
+
+impl Actions_internal {
+    pub async fn new_action_internal(user: i32, action: String, approving_user: i32, the_timestsamp: String, is_approved: bool, the_route: String) -> Actions_Internal{
+        Actions_Internal{
+            user_id: user,
+            action: action_string,
+            approved_by_user: approving_user,
+            timestamp: the_timestsamp,
+            approved: is_approved,
+            route: the_route,
+        }
+    }
+}
+
+#[derive(Serialize)] // Should only need to serialize, since this isn't postable via API
+pub struct Actions_External {
+    pub action_id: i32,
+    pub user: String,
+    pub action: String,
+    pub approved_by_user: String,
+    pub timestamp: String,
+    pub item_index: i32,
+    pub approved: i32,
+    pub route: String,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -428,7 +454,8 @@ pub async fn db_generic_search_query_db(table: &Table, mode: i8 , key1: &String,
                 1 => query += BINDABLE_ACTIONS_FILTER_ID,
                 2 => query += ACTIONS_FILTER_USER_ID,
                 3 => query += ACTIONS_FILTER_APPROVED,
-                4 => query = query + ACTIONS_FILTER_USER_APPROVED_A + key2 + ACTIONS_FILTER_USER_APPROVED_B, 
+                4 => query += ACTIONS_FILTER_USER_APPROVED_A + key2 + ACTIONS_FILTER_USER_APPROVED_B, 
+                5 => query += ACTIONS_FILTER_TIMESTAMP; 
                 _ => return Err(format!("Internal Server Error: Out of range mode <{}> in Actions generic query.", mode).to_string().into()),
             }
         },
@@ -791,6 +818,10 @@ pub async fn db_generic_update_query(table: &Table, mode: usize , key1: &String,
                     return Err("Internal Server Error: Server attempting to update Email Validations with generic update query. Update aborted.".into()), 
                 // This is definitely not done.  Figuring out all the relevant stuff for FSO items is a lot of effort.
                 Table::FsoItems => {
+                    
+                    // we will need something like this to properly update item index
+                    //match db.prepare("SELECT table_index FROM fso_items WHERE item_id = ?1;").bind()
+
                     query += &(FSO_ITEM_PATCH_STRINGS[mode].to_owned() + BINDABLE_FSO_ITEMS_FILTER_);
 
                     match mode {
@@ -1265,6 +1296,42 @@ pub async fn db_user_stats_get(_: Request, _ctx: RouteContext<()>) -> worker::Re
     }            
 }
 
+pub async fn db_insert_action(new_action: &Actions_Internal, db : &D1Database) -> Result<i32> {
+    let processed_timestamp = 
+
+    match db.prepare(ACTIONS_INSERT_QUERY).bind(&[
+        JsValue::from(&new_action.user_id),    
+        JsValue::from(&new_action.action),    
+        JsValue::from(&new_action.approved_by_user),    
+        JsValue::from(&new_action.timestamp),    
+        JsValue::from(&new_action.route),    
+        JsValue::from(&new_action.user_id),    
+        JsValue::from(&new_action.item_index),    
+    ])
+    {
+        Ok(query) => {
+            match query.all().await {
+                Ok(_) => (),
+                Err(e) => return Err(e.into()),
+            }
+        },
+        Err(e) => return Err(e.into()),
+    }
+
+    // uses timestamp filter
+    match db_generic_search_query_db(&Table::Actions, 5, &new_action.timestamp,"".to_string(), "".to_string(), &db).await {
+        Ok(results) => 
+        {
+            if results.actions.is_empty(){
+                return Err("Unable to retrieve action after insertion into table. This is a logic error, please report!".to_string().into());
+            }
+            return Ok(results.fso_items[0].item_id)
+        },
+        Err(e) => return Err(e.into()),
+    }
+
+}
+
 pub async fn db_insert_item(new_item : &NewItem, db : &D1Database) -> Result<i64>{
     match db.prepare("UPDATE fso_items SET table_index = table_index + 1 WHERE table_id = ?1 AND table_index >= ?2").bind(&[JsValue::from(new_item.table_id), JsValue::from(new_item.table_index)]){
         Ok(_) => (),
@@ -1296,7 +1363,7 @@ pub async fn db_insert_item(new_item : &NewItem, db : &D1Database) -> Result<i64
         Ok(results) => 
         {
             if results.fso_items.is_empty(){
-                return Err("".to_string().into());
+                return Err("Unable to retrieve id after insertion into items table! Must be a logic error, please report!".to_string().into());
             }
             return Ok(results.fso_items[0].item_id)
         },
