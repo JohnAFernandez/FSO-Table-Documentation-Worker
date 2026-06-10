@@ -1222,40 +1222,35 @@ pub async fn insert_item(mut req: Request, ctx: RouteContext<()>) -> worker::Res
                             match db_fso::db_generic_search_query_db(&db_fso::Table::Users,2,&username,&"".to_string(), &"".to_string(), &db).await {
                                 Ok (results) => {
                                     if !results.users.is_empty(){
-                                        let id = i32::cast_from(results.users[0].id);
-                                        //id: i32, user: i32, action: String, approving_user: i32, the_timestsamp: String, is_approved: bool, the_route: String
-                                        let action = db_fso::ActionsInternal::new_action_internal(id, req.text().await.unwrap(),id, Utc::now().format(DB_TIME_FORMAT).to_string(),true,"Add item via API".to_string()).await;
-            
-            
+                                        let id2 = i32::cast_from(results.users[0].id);
+                                        
+                                        let action = db_fso::ActionsInternal::new_action_internal(id2, 
+                                            format!("{{\"item_text\":\"{}\",\"documentation\":\"{}\",\"major_version\":\"{}\",\"parent_id\":{},\"table_id\":{},\"deprecation_id\":{},\"restriction_id\":4,\"info_type\":\"{}\",\"default_value\":\"{}\",\"table_index\":{}}}",new_item.item_text,new_item.documentation,new_item.major_version,new_item.parent_id,new_item.table_id,new_item.deprecation_id,new_item.restriction_id,new_item.table_id,new_item.table_index),
+                                            id2, 
+                                            Utc::now().format(DB_TIME_FORMAT).to_string(), 
+                                            true, 
+                                            "Add item via API".to_string()).await;
+
                                         match db_fso::db_insert_action(&action, &db).await {
-                                            Ok=> (),
-                                            Err(e)=> (),
+                                            Ok(_)=> return send_success(&format!("{{\"id\":\"{}\"}}", id), &"".to_string()).await,
+
+                                            Err(e) => err_specific_and_add_report("{\"Error\":\"Internal Database Function Error encountered while recording changes, please report! | IEC00168\"}".to_string(),&(e.to_string() + " | IEC00168"), 500, &ctx).await,
                                         }
-
+                                        
+                                    } else {
+                                        return err_specific("{\"Partial Error\":\"Internal Database Function Error encountered while recording changes, please report! | IEC00167\"}".to_string()).await;
                                     }
-                                },
-                                Err(e) => (),
-    
-                                Err(e) => (),
+                                },    
+                                Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error encountered while recording changes, please report! | IEC00166\"}".to_string(),&(e.to_string() + " | IEC00166"), 500, &ctx).await,
                             }
-
-                            return send_success(&format!("{{\"id\":\"{}\"}}", id), &"".to_string()).await;
                         }
                             
                         Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00164\"}".to_string(),&(e.to_string() + " | IEC00164"), 500, &ctx).await,
 
-
-
                     }
-
-
-
-
                 },
                 Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00058\"}".to_string(),&(e.to_string() + " | IEC00058"), 500, &ctx).await,
             }
-
-
         }, 
         Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00059\"}".to_string(),&(e.to_string() + " | IEC00059"), 500, &ctx).await
     }
@@ -1280,77 +1275,142 @@ pub async fn update_item(mut req: Request, ctx: RouteContext<()>) -> worker::Res
 
                     match req.json::<db_fso::FsoItemsPatch>().await {
                         Ok(item) => {
+                            let mut item_update_action_string : String = "{".to_string();
+                            let mut item_update_error_string : String = "".to_string();
+
                             if item.item_id < 1 {
                                 return err_specific("{\"Error\":\"Invalid item id, cannot update.\"}".to_string()).await;
                             }
 
-                            if item.default_value != "~!!NO UPDATE!!~"{
+                            if item.default_value != "~!!!!*"{
                                 match db_fso::db_generic_update_query(&db_fso::Table::FsoItems, 0, &item.default_value, &item.item_id.to_string(),  &ctx).await {
-                                    Ok(_) => (),
-                                    Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00060\"}".to_string(),&(e.to_string() + " | IEC00060"), 500, &ctx).await,
+                                    Ok(_) => item_update_action_string += &format!("\"default_value\":\"{}\"", item.default_value),
+                                    Err(e) => {
+                                        item_update_error_string += &"Could not update default value due to: ".to_string();
+                                        item_update_error_string += &e.to_string();
+                                        item_update_error_string += &" ".to_string();
+                                    },
                                 }    
                             }
 
-                            if item.deprecation_id != "~!!NO UPDATE!!~" {
+                            if item.deprecation_id != "~!!!!*" {
                                 match db_fso::db_generic_update_query(&db_fso::Table::FsoItems, 1, &item.deprecation_id, &item.item_id.to_string(),  &ctx).await {
-                                    Ok(_) => (),
-                                    Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00061\"}".to_string(),&(e.to_string() + " | IEC00061"), 500, &ctx).await,
+                                    Ok(_) => item_update_action_string += &format!("\"deprecation_id\":\"{}\"", item.deprecation_id),
+                                    Err(e) => {
+                                        item_update_error_string += &"Could not update default value due to: ".to_string();
+                                        item_update_error_string += &e.to_string();
+                                        item_update_error_string += &" ".to_string();
+                                    },
                                 }
                             }
 
-                            if item.documentation != "~!!NO UPDATE!!~"{
+                            if item.documentation != "~!!!!*"{
                                 match db_fso::db_generic_update_query(&db_fso::Table::FsoItems, 2, &item.documentation, &item.item_id.to_string(),  &ctx).await {
-                                    Ok(_) => (),
-                                    Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00062\"}".to_string(),&(e.to_string() + " | IEC00062"), 500, &ctx).await,
+                                    Ok(_) => item_update_action_string += &format!("\"documentation\":\"{}\"", item.documentation),
+                                    Err(e) => {
+                                        item_update_error_string += &"Could not update default value due to: ".to_string();
+                                        item_update_error_string += &e.to_string();
+                                        item_update_error_string += &" ".to_string();
+                                    },
                                 }
                             }
 
-                            if item.info_type != "~!!NO UPDATE!!~"{
+                            if item.info_type != "~!!!!*"{
                                 match db_fso::db_generic_update_query(&db_fso::Table::FsoItems, 3, &item.info_type, &item.item_id.to_string(),  &ctx).await {
-                                    Ok(_) => (),
-                                    Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00063\"}".to_string(),&(e.to_string() + " | IEC00063"), 500, &ctx).await,
+                                    Ok(_) => item_update_action_string += &format!("\"info_type\":\"{}\"", item.info_type),
+                                    Err(e) => {
+                                        item_update_error_string += &"Could not update default value due to: ".to_string();
+                                        item_update_error_string += &e.to_string();
+                                        item_update_error_string += &" ".to_string();
+                                    },
                                 }
                             }
 
-                            if item.item_text != "~!!NO UPDATE!!~"{
+                            if item.item_text != "~!!!!*"{
                                 match db_fso::db_generic_update_query(&db_fso::Table::FsoItems, 4, &item.item_text, &item.item_id.to_string(),  &ctx).await {
-                                    Ok(_) => (),
-                                    Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00064\"}".to_string(),&(e.to_string() + " | IEC00064"), 500, &ctx).await,
+                                    Ok(_) => item_update_action_string += &format!("\"item_text\":\"{}\"", item.item_text),
+                                    Err(e) => {
+                                        item_update_error_string += &"Could not update default value due to: ".to_string();
+                                        item_update_error_string += &e.to_string();
+                                        item_update_error_string += &" ".to_string();
+                                    },
                                 }
                             }
 
-                            if item.major_version != "~!!NO UPDATE!!~"{
+                            if item.major_version != "~!!!!*"{
                                 match db_fso::db_generic_update_query(&db_fso::Table::FsoItems, 5, &item.major_version, &item.item_id.to_string(),  &ctx).await {
-                                    Ok(_) => (),
-                                    Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00065\"}".to_string(),&(e.to_string() + " | IEC00065"), 500, &ctx).await,
+                                    Ok(_) => item_update_action_string += &format!("\"major_version\":\"{}\"", item.major_version),
+                                    Err(e) => {
+                                        item_update_error_string += &"Could not update default value due to: ".to_string();
+                                        item_update_error_string += &e.to_string();
+                                        item_update_error_string += &" ".to_string();
+                                    },
                                 }
                             }
                             
-                            if item.parent_id != "~!!NO UPDATE!!~" {
+                            if item.parent_id != "~!!!!*" {
                                 match db_fso::db_generic_update_query(&db_fso::Table::FsoItems, 6, &item.parent_id, &item.item_id.to_string(),  &ctx).await {
-                                    Ok(_) => (),
-                                    Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00066\"}".to_string(),&(e.to_string() + " | IEC00066"), 500, &ctx).await,
+                                    Ok(_) => item_update_action_string += &format!("\"parent_id\":\"{}\"", item.parent_id),
+                                    Err(e) => {
+                                        item_update_error_string += &"Could not update default value due to: ".to_string();
+                                        item_update_error_string += &e.to_string();
+                                        item_update_error_string += &" ".to_string();
+                                    },
                                 }
                             }
 
-                            if item.restriction_id != "~!!NO UPDATE!!~" {
+                            if item.restriction_id != "~!!!!*" {
                                 match db_fso::db_generic_update_query(&db_fso::Table::FsoItems, 7, &item.restriction_id, &item.item_id.to_string(),  &ctx).await {
-                                    Ok(_) => (),
-                                    Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00067\"}".to_string(),&(e.to_string() + " | IEC00067"), 500, &ctx).await,
+                                    Ok(_) => item_update_action_string += &format!("\"restriction_id\":\"{}\"", item.restriction_id),
+                                    Err(e) => {
+                                        item_update_error_string += &"Could not update default value due to: ".to_string();
+                                        item_update_error_string += &e.to_string();
+                                        item_update_error_string += &" ".to_string();
+                                    }
                                 }
                             }
 
-                            if item.table_id != "~!!NO UPDATE!!~" {
+                            if item.table_id != "~!!!!*" {
                                 match db_fso::db_generic_update_query(&db_fso::Table::FsoItems, 8, &item.table_id.to_string(), &item.item_id.to_string(),  &ctx).await {
-                                    Ok(_) => (),
-                                    Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00068\"}".to_string(),&(e.to_string() + " | IEC00068"), 500, &ctx).await,
+                                    Ok(_) => item_update_action_string += &format!("\"table_id\":\"{}\"", item.table_id),
+                                    Err(e) => {
+                                        item_update_error_string += &"Could not update default value due to: ".to_string();
+                                        item_update_error_string += &e.to_string();
+                                        item_update_error_string += &" ".to_string();
+                                    }
                                 }
                             }
 
-                            return send_success(&"{\"Response\": \"Success!\"}".to_string(), &"".to_string()).await
+                            match db_fso::db_generic_search_query_db(&db_fso::Table::Users,2,&username,&"".to_string(), &"".to_string(), &db).await {
+                                Ok (results) => {
+                                    if !results.users.is_empty(){
+                                        let id2 = i32::cast_from(results.users[0].id);
+
+                                        let action = db_fso::ActionsInternal::new_action_internal(id2, 
+                                            item_update_action_string,
+                                            id2, 
+                                            Utc::now().format(DB_TIME_FORMAT).to_string(), 
+                                            true, 
+                                            "Update item via API attempt".to_string()).await;
+
+                                        match db_fso::db_insert_action(&action, &db).await {
+                                            Ok(_)=> (),
+                                            Err(e)=> item_update_error_string += &("Error encountered while added history to database: ".to_owned() + &e.to_string()),
+                                        }
+
+                                    }
+                                },
+                                Err(e) => item_update_error_string += &("Internal Database Function Error encountered while recording changes, please report!\"}".to_string() + &e.to_string()),
+                            }
+
+                            if item_update_error_string.is_empty() {
+                                return send_success(&"{\"Response\": \"Success!\"}".to_string(), &"".to_string()).await
+                            } else {
+                                return err_specific("{\"Error\":\"".to_string() + "\n Make sure that the request json has all fields, even if not updating.  If not updating a field mark as a string with \"~!!!!*\".\",\"Error List\":\"" + &item_update_error_string + "\"}").await;
+                            }
 
                         },
-                        Err(e) => return err_specific("{\"Error\":\"".to_string() + &e.to_string() + "\nMake sure that the request json has an item_id, behavior, and description, even if not updating.  If not updating a field (id cannot be updated) mark a string type with \"~!!NO UPDATE!!~\". Use -2 or more negative number for ids for no update.  Echo back other values for no update.\"}").await,
+                        Err(e) => return err_specific("{\"Error\":\"".to_string() + &e.to_string() + "\nMake sure that the request json has an item_id, behavior, and description, even if not updating.  If not updating a field (id cannot be updated) mark a string type with \"~!!!!*\". Use -2 or more negative number for ids for no update.  Echo back other values for no update.\"}").await,
                     }
                 },
                 Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00069\"}".to_string(),&(e.to_string() + " | IEC00069"), 500, &ctx).await,

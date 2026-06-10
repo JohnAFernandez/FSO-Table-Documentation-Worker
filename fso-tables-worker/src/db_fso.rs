@@ -2,7 +2,7 @@ use worker::*;
 use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc, TimeDelta};
 use crate::{UserDetails, DB_NAME, err_specific, JsValue, DB_TIME_FORMAT, NewItem};
-use is_number::{is_float, is_integer};
+use is_number::{is_integer};
 use serde_json::from_str;
 
 #[derive(PartialEq, PartialOrd)]
@@ -209,12 +209,20 @@ pub struct ActionsInternal {
 
 impl ActionsInternal {
     pub async fn new_action_internal(user: i32, action_string: String, approving_user: i32, the_timestsamp: String, is_approved: bool, the_route: String) -> ActionsInternal{
+        let approved_proxy: i32;
+
+        if is_approved {
+            approved_proxy = 1;
+        } else {
+            approved_proxy = 0;
+        }
+
         ActionsInternal{
             user_id: user,
             action: action_string,
             approved_by_user: approving_user,
             timestamp: the_timestsamp,
-            approved: match is_approved { true => 1, false => 0},
+            approved: approved_proxy,
             route: the_route,
         }
     }
@@ -1296,40 +1304,25 @@ pub async fn db_user_stats_get(_: Request, _ctx: RouteContext<()>) -> worker::Re
     }            
 }
 
-pub async fn db_insert_action(new_action: &ActionsInternal, db : &D1Database) -> Result<i32> {
-    let processed_timestamp = 
-
+pub async fn db_insert_action(new_action: &ActionsInternal, db : &D1Database) -> Result<()> {
     match db.prepare(ACTIONS_INSERT_QUERY).bind(&[
-        JsValue::from(&new_action.user_id),    
+        JsValue::from(new_action.user_id),    
         JsValue::from(&new_action.action),    
-        JsValue::from(&new_action.approved_by_user),    
+        JsValue::from(new_action.approved_by_user),    
         JsValue::from(&new_action.timestamp),    
         JsValue::from(&new_action.route),    
-        JsValue::from(&new_action.user_id),    
-        JsValue::from(&new_action.approved),    
+        JsValue::from(new_action.user_id),    
+        JsValue::from(new_action.approved),    
     ])
     {
         Ok(query) => {
             match query.all().await {
-                Ok(_) => (),
+                Ok(_) => return Ok(()),
                 Err(e) => return Err(e.into()),
             }
         },
         Err(e) => return Err(e.into()),
-    }
-
-    // uses timestamp filter
-    match db_generic_search_query_db(&Table::Actions, 5, &new_action.timestamp,&"".to_string(), &"".to_string(), &db).await {
-        Ok(results) => 
-        {
-            if results.actions.is_empty(){
-                return Err("Unable to retrieve action after insertion into table. This is a logic error, please report!".to_string().into());
-            }
-            return Ok(results.actions[0].action_id);
-        },
-        Err(e) => return Err(e.into()),
-    }
-
+    };
 }
 
 pub async fn db_insert_item(new_item : &NewItem, db : &D1Database) -> Result<i64>{
