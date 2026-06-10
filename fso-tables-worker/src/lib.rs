@@ -1056,14 +1056,14 @@ pub async fn update_parse_type(mut req: Request, ctx: RouteContext<()>) -> worke
                                 return err_specific("{\"Error\":\"Invalid behavior id, cannot update.\"}".to_string()).await;
                             }
 
-                            if parse_behavior.behavior != "~!!NO UPDATE!!~"{
+                            if parse_behavior.behavior != "~!*$%"{
                                 match db_fso::db_generic_update_query(&db_fso::Table::ParseBehaviors, 0, &parse_behavior.behavior, &parse_behavior.behavior_id.to_string(),  &ctx).await {
                                     Ok(_) => (),
                                     Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00048\"}".to_string(),&(e.to_string() + " | IEC00048"), 500, &ctx).await,
                                 }    
                             }
 
-                            if parse_behavior.description != "~!!NO UPDATE!!~"{
+                            if parse_behavior.description != "~!*$%"{
                                 match db_fso::db_generic_update_query(&db_fso::Table::ParseBehaviors, 1, &parse_behavior.description, &parse_behavior.behavior_id.to_string(),  &ctx).await {
                                     Ok(_) => (),
                                     Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00049\"}".to_string(),&(e.to_string() + " | IEC00049"), 500, &ctx).await,
@@ -1073,7 +1073,7 @@ pub async fn update_parse_type(mut req: Request, ctx: RouteContext<()>) -> worke
                             return send_success(&"{\"Response\": \"Success!\"}".to_string(), &"".to_string()).await
 
                         },
-                        Err(e) => return err_specific("{\"Error\":\"".to_string() + &e.to_string() + "\n Make sure that the request json has a behavior_id, behavior, and description, even if not updating.  If not updating a field (parse_id cannot be updated) mark a string type with \"~!!NO UPDATE!!~\". Use -2 or a more negative number for ids. Echo back other values.\"}").await,
+                        Err(e) => return err_specific("{\"Error\":\"".to_string() + &e.to_string() + "\n Make sure that the request json has a behavior_id, behavior, and description, even if not updating.  If not updating a field (parse_id cannot be updated) mark that field with \'~!*$%\'.\"}").await,
                     }
                 },
                 Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00050\"}".to_string(),&(e.to_string() + " | IEC00050"), 500, &ctx).await,
@@ -1282,7 +1282,7 @@ pub async fn update_item(mut req: Request, ctx: RouteContext<()>) -> worker::Res
                                 return err_specific("{\"Error\":\"Invalid item id, cannot update.\"}".to_string()).await;
                             }
 
-                            if item.default_value != "~!!!!*"{
+                            if item.default_value != "~!*$%"{
                                 match db_fso::db_generic_update_query(&db_fso::Table::FsoItems, 0, &item.default_value, &item.item_id.to_string(),  &ctx).await {
                                     Ok(_) => item_update_action_string += &format!("\"default_value\":\"{}\"", item.default_value),
                                     Err(e) => {
@@ -1293,7 +1293,7 @@ pub async fn update_item(mut req: Request, ctx: RouteContext<()>) -> worker::Res
                                 }    
                             }
 
-                            if item.deprecation_id != "~!!!!*" {
+                            if item.deprecation_id != "~!*$%" {
                                 match db_fso::db_generic_update_query(&db_fso::Table::FsoItems, 1, &item.deprecation_id, &item.item_id.to_string(),  &ctx).await {
                                     Ok(_) => item_update_action_string += &format!("\"deprecation_id\":\"{}\"", item.deprecation_id),
                                     Err(e) => {
@@ -1304,7 +1304,7 @@ pub async fn update_item(mut req: Request, ctx: RouteContext<()>) -> worker::Res
                                 }
                             }
 
-                            if item.documentation != "~!!!!*"{
+                            if item.documentation != "~!*$%"{
                                 match db_fso::db_generic_update_query(&db_fso::Table::FsoItems, 2, &item.documentation, &item.item_id.to_string(),  &ctx).await {
                                     Ok(_) => item_update_action_string += &format!("\"documentation\":\"{}\"", item.documentation),
                                     Err(e) => {
@@ -1315,7 +1315,7 @@ pub async fn update_item(mut req: Request, ctx: RouteContext<()>) -> worker::Res
                                 }
                             }
 
-                            if item.info_type != "~!!!!*"{
+                            if item.info_type != "~!*$%"{
                                 match db_fso::db_generic_update_query(&db_fso::Table::FsoItems, 3, &item.info_type, &item.item_id.to_string(),  &ctx).await {
                                     Ok(_) => item_update_action_string += &format!("\"info_type\":\"{}\"", item.info_type),
                                     Err(e) => {
@@ -1326,7 +1326,7 @@ pub async fn update_item(mut req: Request, ctx: RouteContext<()>) -> worker::Res
                                 }
                             }
 
-                            if item.item_text != "~!!!!*"{
+                            if item.item_text != "~!*$%"{
                                 match db_fso::db_generic_update_query(&db_fso::Table::FsoItems, 4, &item.item_text, &item.item_id.to_string(),  &ctx).await {
                                     Ok(_) => item_update_action_string += &format!("\"item_text\":\"{}\"", item.item_text),
                                     Err(e) => {
@@ -1337,7 +1337,7 @@ pub async fn update_item(mut req: Request, ctx: RouteContext<()>) -> worker::Res
                                 }
                             }
 
-                            if item.major_version != "~!!!!*"{
+                            if item.major_version != "~!*$%"{
                                 match db_fso::db_generic_update_query(&db_fso::Table::FsoItems, 5, &item.major_version, &item.item_id.to_string(),  &ctx).await {
                                     Ok(_) => item_update_action_string += &format!("\"major_version\":\"{}\"", item.major_version),
                                     Err(e) => {
@@ -1348,7 +1348,7 @@ pub async fn update_item(mut req: Request, ctx: RouteContext<()>) -> worker::Res
                                 }
                             }
                             
-                            if item.parent_id != "~!!!!*" {
+                            if item.parent_id != "~!*$%" {
                                 match db_fso::db_generic_update_query(&db_fso::Table::FsoItems, 6, &item.parent_id, &item.item_id.to_string(),  &ctx).await {
                                     Ok(_) => item_update_action_string += &format!("\"parent_id\":\"{}\"", item.parent_id),
                                     Err(e) => {
@@ -1359,7 +1359,7 @@ pub async fn update_item(mut req: Request, ctx: RouteContext<()>) -> worker::Res
                                 }
                             }
 
-                            if item.restriction_id != "~!!!!*" {
+                            if item.restriction_id != "~!*$%" {
                                 match db_fso::db_generic_update_query(&db_fso::Table::FsoItems, 7, &item.restriction_id, &item.item_id.to_string(),  &ctx).await {
                                     Ok(_) => item_update_action_string += &format!("\"restriction_id\":\"{}\"", item.restriction_id),
                                     Err(e) => {
@@ -1370,7 +1370,7 @@ pub async fn update_item(mut req: Request, ctx: RouteContext<()>) -> worker::Res
                                 }
                             }
 
-                            if item.table_id != "~!!!!*" {
+                            if item.table_id != "~!*$%" {
                                 match db_fso::db_generic_update_query(&db_fso::Table::FsoItems, 8, &item.table_id.to_string(), &item.item_id.to_string(),  &ctx).await {
                                     Ok(_) => item_update_action_string += &format!("\"table_id\":\"{}\"", item.table_id),
                                     Err(e) => {
@@ -1406,11 +1406,11 @@ pub async fn update_item(mut req: Request, ctx: RouteContext<()>) -> worker::Res
                             if item_update_error_string.is_empty() {
                                 return send_success(&"{\"Response\": \"Success!\"}".to_string(), &"".to_string()).await
                             } else {
-                                return err_specific("{\"Error\":\"".to_string() + "\n Make sure that the request json has all fields, even if not updating.  If not updating a field mark as a string with \"~!!!!*\".\",\"Error List\":\"" + &item_update_error_string + "\"}").await;
+                                return err_specific("{\"Error\":\"".to_string() + "\n Make sure that the request json has all fields, even if not updating.  If not updating a field, mark with the string \'~!*$%\'.\",\"Error List\":\"" + &item_update_error_string + "\"}").await;
                             }
 
                         },
-                        Err(e) => return err_specific("{\"Error\":\"".to_string() + &e.to_string() + "\nMake sure that the request json has an item_id, behavior, and description, even if not updating.  If not updating a field (id cannot be updated) mark a string type with \"~!!!!*\". Use -2 or more negative number for ids for no update.  Echo back other values for no update.\"}").await,
+                        Err(e) => return err_specific("{\"Error\":\"".to_string() + &e.to_string() + "\nMake sure that the request json has an item_id, behavior, and description, even if not updating.  If not updating a field (id cannot be updated) mark with the string \'~!*$%\'.\"}").await,
                     }
                 },
                 Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00069\"}".to_string(),&(e.to_string() + " | IEC00069"), 500, &ctx).await,
@@ -1540,7 +1540,7 @@ pub async fn update_alias(mut req: Request, ctx: RouteContext<()>) -> worker::Re
                                 return err_specific("{\"Error\":\"Invalid table alias id, cannot update.\"}".to_string()).await;
                             }
 
-                            if table_alias.filename != "~!!NO UPDATE!!~"{
+                            if table_alias.filename != "~!*$%"{
                                 match db_fso::db_generic_update_query(&db_fso::Table::TableAliases, 0, &table_alias.filename, &table_alias.alias_id.to_string(),  &ctx).await {
                                     Ok(_) => (),
                                     Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00078\"}".to_string(),&(e.to_string() + " | IEC00078"), 500, &ctx).await,
@@ -1557,7 +1557,7 @@ pub async fn update_alias(mut req: Request, ctx: RouteContext<()>) -> worker::Re
                             return Response::ok("Success!")
 
                         },
-                        Err(e) => return err_specific("{\"Error\":\"".to_string() + &e.to_string() + "\nMake sure that the request json has an alias_id, filename, and table_id, even if not updating.  If not updating a field (parse_id cannot be updated) mark a string type with \"~!!NO UPDATE!!~\". Use -2 or a more negative number for ids. Echo back other values.\"}").await,
+                        Err(e) => return err_specific("{\"Error\":\"".to_string() + &e.to_string() + "\nMake sure that the request json has an alias_id, filename, and table_id, even if not updating.  If not updating a field (alias_id cannot be updated) mark with string \'~!*$%\'.\"}").await,
                     }
                 },
                 Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00080\"}".to_string(),&(e.to_string() + " | IEC00080"), 500, &ctx).await,
@@ -1684,7 +1684,7 @@ pub async fn update_restriction(mut req: Request, ctx: RouteContext<()>) -> work
                             return send_success(&"{\"Response\": \"Success!\"}".to_string(), &"".to_string()).await
 
                         },
-                        Err(e) => return err_specific("{\"Error\":\"".to_string() + &e.to_string() + "\nMake sure that the request json has a restriction_id, illegal_value_float, illegal_value_int, max_string_length, max_value, min_value, and description, even if not updating.  If not updating a field (parse_id cannot be updated) mark a string type with \"~!!NO UPDATE!!~\". Use -2 or a more negative number for ids. Echo back other values.\"}").await,
+                        Err(e) => return err_specific("{\"Error\":\"".to_string() + &e.to_string() + "\nMake sure that the request json has a restriction_id, illegal_value_float, illegal_value_int, max_string_length, max_value, min_value, and description, even if not updating.  If not updating a field (parse_id cannot be updated) mark with string \'~!*$%\'.\"}").await,
                     }
                 },
                 Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00092\"}".to_string(),&(e.to_string() + " | IEC00092"), 500, &ctx).await,
@@ -1781,14 +1781,14 @@ pub async fn update_deprecation(mut req: Request, ctx: RouteContext<()>) -> work
                                 return err_specific("{\"Error\":\"Invalid deprecation id, cannot update.\"}".to_string()).await;
                             }
 
-                            if deprecation.date != "~!!NO UPDATE!!~"{
+                            if deprecation.date != "~!*$%"{
                                 match db_fso::db_generic_update_query(&db_fso::Table::Deprecations, 0, &deprecation.date, &deprecation.deprecation_id.to_string(),  &ctx).await {
                                     Ok(_) => (),
                                     Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00099\"}".to_string(),&(e.to_string() + " | IEC00099"), 500, &ctx).await,
                                 }    
                             }
 
-                            if deprecation.version != "~!!NO UPDATE!!~"{
+                            if deprecation.version != "~!*$%"{
                                 match db_fso::db_generic_update_query(&db_fso::Table::Deprecations, 1, &deprecation.version, &deprecation.deprecation_id.to_string(),  &ctx).await {
                                     Ok(_) => (),
                                     Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00100\"}".to_string(),&(e.to_string() + " | IEC00100"), 500, &ctx).await,
@@ -1798,7 +1798,7 @@ pub async fn update_deprecation(mut req: Request, ctx: RouteContext<()>) -> work
                             return send_success(&"{\"Response\": \"Success!\"}".to_string(), &"".to_string()).await
 
                         },
-                        Err(e) => return err_specific("{\"Error\":\"".to_string() + &e.to_string() + "\nMake sure that the request json has a deprecation_id, date, and version, even if not updating.  If not updating a field (deprecation_id cannot be updated) mark a string type with \"~!!NO UPDATE!!~\". Use -2 or a more negative number for ids. Echo back other values.\"}").await,
+                        Err(e) => return err_specific("{\"Error\":\"".to_string() + &e.to_string() + "\nMake sure that the request json has a deprecation_id, date, and version, even if not updating.  If not updating a field (deprecation_id cannot be updated) mark with this string \'~!*$%\'.\"}").await,
                     }
                 },
                 Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00101\"}".to_string(),&(e.to_string() + " | IEC00101"), 500, &ctx).await,
@@ -1882,9 +1882,6 @@ pub async fn add_bug_report(mut req: Request, ctx: RouteContext<()>) -> worker::
         
                 }, 
                 Err(e) => err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00107\"}".to_string(),&(e.to_string() + " | IEC00107"), 500, &ctx).await,
-
-
-
 
             }
         },
@@ -2113,14 +2110,14 @@ pub async fn update_bug_report(mut req: Request, ctx: RouteContext<()>) -> worke
 
             match req.json::<BugReportInfo>().await {
                 Ok(bug_info) => {
-                    if bug_info.bug_type != "~!!NO UPDATE!!~"{
+                    if bug_info.bug_type != "~!*$%"{
                         match db_fso::db_generic_update_query(&db_fso::Table::BugReports, 1, &bug_info.bug_type, &bug_id.to_string(),  &ctx).await {
                             Ok(_) => (),
                             Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00122\"}".to_string(),&(e.to_string() + " | IEC00122"), 500, &ctx).await,
                         }    
                     }
 
-                    if bug_info.description != "~!!NO UPDATE!!~"{
+                    if bug_info.description != "~!*$%"{
                         match db_fso::db_generic_update_query(&db_fso::Table::BugReports, 2, &bug_info.description, &bug_id.to_string(),  &ctx).await {
                             Ok(_) => (),
                             Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00123\"}".to_string(),&(e.to_string() + " | IEC00123"), 500, &ctx).await,
@@ -2130,7 +2127,7 @@ pub async fn update_bug_report(mut req: Request, ctx: RouteContext<()>) -> worke
                     return send_success(&"{\"Response\":\"Bug report successfully updated!\"}".to_string(), &"".to_string()).await
 
                 },
-                Err(e) => return err_specific("{\"Error\":\"".to_string() + &e.to_string() + "\nMake sure that the request json has an bug_type, and description, even if not updating.  If not updating a field (parse_id cannot be updated) mark a string type with \"~!!NO UPDATE!!~\". Use -2 or a more negative number for ids. Echo back other values.\"}").await,
+                Err(e) => return err_specific("{\"Error\":\"".to_string() + &e.to_string() + "\nMake sure that the request json has a bug_type and description, even if not updating.  If not updating a field (parse_id cannot be updated) mark with string \'~!*$%\'}").await,
             }
 
         },
@@ -2514,7 +2511,7 @@ pub async fn err_specific_and_add_report(mut external: String, internal: &String
         Ok(_) => {},
         Err(e)=> {
             
-            let error_record_result = format!(",\"Addendum\": \"Also, the internal error tracker could not save this error report because of \\\"{}\\\".  Please let Cyborg know.\"", e.to_string());
+            let error_record_result = format!(",\"Addendum\": \"Also, the internal error tracker could not save this error report because of \\\'{}\\\'.  Please report!\"", e.to_string());
             let _a = external.pop();
             external += &error_record_result;
         },
