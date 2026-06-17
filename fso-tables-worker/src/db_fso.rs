@@ -64,7 +64,7 @@ const TABLE_ALIASES_DELETE_QUERY: &str = "DELETE FROM table_aliases ";
 // Some (maybe most) of these will end up being unused as specialized functions are already written.  
 const ACTIONS_INSERT_QUERY: &str = "INSERT INTO actions (user_id, action, approved_by_user, timestamp, route, item_index, approved) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)";
 //const BUG_REPORT_INSERT_QUERY: &str = "INSERT INTO bug_reports ( user_id, bug_type, description, status, timestamp) VALUES (?1, ?2, ?3, ?4, ?5)";    
-//const DEPRECATIONS_INSERT_QUERY: &str = "INSERT INTO deprecations (date, version) VALUES (?1, ?2)"; 
+//const DEPRECATIONS_INSERT_QUERY: &str = "INSERT INTO deprecations (version, description, partial) VALUES (?1, ?2, ?3)"; 
 //const EMAIL_VALIDATIONS_INSERT_QUERY: &str = "INSERT INTO email_validations (username) VALUES (?1)";
 const ERROR_REPORT_INSERT_QUERY: &str = "INSERT INTO error_reports (error, timestamp) VALUES (?1, ?2);";
 const FSO_ITEMS_INSERT_QUERY: &str = "INSERT INTO fso_items (item_text, documentation, major_version, parent_id, table_id, deprecation_id, restriction_id, info_type, table_index, default_value) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)";
@@ -83,8 +83,10 @@ const BUG_REPORT_PATCH_BUGTYPE_QUERY: &str = "UPDATE bug_reports SET bug_type = 
 const BUG_REPORT_PATCH_DESCRIPTION_QUERY: &str = "UPDATE bug_reports SET description = ?1 ";
 const BUG_REPORT_PATCH_STATUS_QUERY: &str = "UPDATE bug_reports SET status = ?1 ";
 
-const DEPRECATIONS_PATCH_DATE_QUERY: &str = "UPDATE deprecations SET date = ?1 ";
 const DEPRECATIONS_PATCH_VERSION_QUERY: &str = "UPDATE deprecations SET version = ?1 ";
+const DEPRECATIONS_PATCH_DESCRIPTION_QUERY: &str = "UPDATE deprecations SET description = ?1 ";
+const DEPRECATIONS_PATCH_PARTIAL_QUERY: &str = "UPDATE deprecations SET partial = ?1";
+
 
 //No email validations updates if something is wrong with one of those it has to be done on the database side
 
@@ -253,8 +255,9 @@ pub struct BugReport {
 #[derive(Serialize, Deserialize)]
 pub struct Deprecations {
     pub deprecation_id: i64,
-    pub date: String,
     pub version: String,
+    pub description: String,
+    pub partial: i32,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -815,8 +818,9 @@ pub async fn db_generic_update_query(table: &Table, mode: usize , key1: &String,
                 Table::Deprecations => {
 
                     match mode {
-                        0 => query += DEPRECATIONS_PATCH_DATE_QUERY,
-                        1 => query += DEPRECATIONS_PATCH_VERSION_QUERY,
+                        0 => query += DEPRECATIONS_PATCH_VERSION_QUERY,
+                        1 => query += DEPRECATIONS_PATCH_DESCRIPTION_QUERY,
+                        2 => query += DEPRECATIONS_PATCH_PARTIAL_QUERY,
                         _ => return Err("Internal Server Error: Out of range mode in Deprecations generic update query.".into()),
                     }
 
