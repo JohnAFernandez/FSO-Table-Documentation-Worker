@@ -261,6 +261,14 @@ pub struct Deprecations {
 }
 
 #[derive(Serialize, Deserialize)]
+pub struct DeprecationIn {
+    pub deprecation_id: i64,
+    pub version: String,
+    pub description: String,
+    pub partial: String,
+}
+
+#[derive(Serialize, Deserialize)]
 pub struct EmailValidations {
     validation_id: i64,
     username: String,
@@ -838,8 +846,8 @@ pub async fn db_generic_update_query(table: &Table, mode: usize , key1: &String,
 
                     match mode {
                         // Sorry the order was arbitrary
-                        // 0 Default Value, Deprecation ID, Documentation, Info_type, Item Text, 5 Major Version, Parent ID, Restriction ID, Table ID, 9 Table Index
-                        0 | 9 | 5 => { 
+                        // 0 Default Value,   5 Major Version, 
+                        0 | 5 => { 
                             // no validation needed, even empty strings are ok 
                             match db.prepare(query.clone()).bind(&[JsValue::from(key1), JsValue::from(key2)]){
                                 Ok(prepped_query)=> {
@@ -852,7 +860,8 @@ pub async fn db_generic_update_query(table: &Table, mode: usize , key1: &String,
                             }
                         }, 
                         
-                        1 | 6 | 7 | 8 => {
+                        // 1 Deprecation ID, 6 Parent ID, 7 Restriction ID, 8 Table ID, 9 Table Index
+                        1 | 6 | 7 | 8 | 9 => {
                             if !is_integer(&key1){
                                 return Err(format!("Cannot set an ID to {} since it is a non-integer.", key1).into());
                             };
@@ -870,6 +879,7 @@ pub async fn db_generic_update_query(table: &Table, mode: usize , key1: &String,
 
                         },
 
+                        // 2 Documentation, 3 Info_type, 4 Item Text
                         2 | 3 | 4 => {
                             if key1.is_empty(){
                                 return Err("Neither documentation, item text, nor info_type can be empty.".into());
@@ -886,9 +896,10 @@ pub async fn db_generic_update_query(table: &Table, mode: usize , key1: &String,
                             }
 
                         },
-
+                        
 //                        4 => (), // please change to validate that the Info type is within the correct set in the future 
 //                        5 => (), // please change to verify that major version is in the included set.
+
                         _ => return Err("Internal Server Error: Out of range mode in FSO_ITEMS generic update query.".into()),
                     }
 

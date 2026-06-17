@@ -1381,6 +1381,17 @@ pub async fn update_item(mut req: Request, ctx: RouteContext<()>) -> worker::Res
                                 }
                             }
 
+                            if item.table_index != "~!*$%" {
+                                match db_fso::db_generic_update_query(&db_fso::Table::FsoItems, 9, &item.table_id.to_string(), &item.item_id.to_string(),  &ctx).await {
+                                    Ok(_) => item_update_action_string += &format!("\"table_id\":\"{}\"", item.table_id),
+                                    Err(e) => {
+                                        item_update_error_string += &"Could not update default value due to: ".to_string();
+                                        item_update_error_string += &e.to_string();
+                                        item_update_error_string += &" ".to_string();
+                                    }
+                                }
+                            }
+
                             match db_fso::db_generic_search_query_db(&db_fso::Table::Users,2,&username,&"".to_string(), &"".to_string(), &db).await {
                                 Ok (results) => {
                                     if !results.users.is_empty(){
@@ -1775,23 +1786,30 @@ pub async fn update_deprecation(mut req: Request, ctx: RouteContext<()>) -> work
                         _=> (),
                     }         
 
-                    match req.json::<db_fso::Deprecations>().await {
+                    match req.json::<db_fso::DeprecationIn>().await {
                         Ok(deprecation) => {
                             if deprecation.deprecation_id < 0 {
                                 return err_specific("{\"Error\":\"Invalid deprecation id, cannot update.\"}".to_string()).await;
                             }
 
-                            if deprecation.date != "~!*$%"{
-                                match db_fso::db_generic_update_query(&db_fso::Table::Deprecations, 0, &deprecation.date, &deprecation.deprecation_id.to_string(),  &ctx).await {
+                            if deprecation.version != "~!*$%"{
+                                match db_fso::db_generic_update_query(&db_fso::Table::Deprecations, 0, &deprecation.version, &deprecation.deprecation_id.to_string(),  &ctx).await {
                                     Ok(_) => (),
                                     Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00099\"}".to_string(),&(e.to_string() + " | IEC00099"), 500, &ctx).await,
                                 }    
                             }
 
-                            if deprecation.version != "~!*$%"{
-                                match db_fso::db_generic_update_query(&db_fso::Table::Deprecations, 1, &deprecation.version, &deprecation.deprecation_id.to_string(),  &ctx).await {
+                            if deprecation.description != "~!*$%"{
+                                match db_fso::db_generic_update_query(&db_fso::Table::Deprecations, 1, &deprecation.description, &deprecation.deprecation_id.to_string(),  &ctx).await {
                                     Ok(_) => (),
                                     Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00100\"}".to_string(),&(e.to_string() + " | IEC00100"), 500, &ctx).await,
+                                }
+                            }
+
+                            if deprecation.partial != "~!*$%"{
+                                match db_fso::db_generic_update_query(&db_fso::Table::Deprecations, 1, &deprecation.partial.to_string(), &deprecation.deprecation_id.to_string(),  &ctx).await {
+                                    Ok(_) => (),
+                                    Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00100\"}".to_string(),&(e.to_string() + " | IEC00101"), 500, &ctx).await,
                                 }
                             }
 
