@@ -463,6 +463,7 @@ pub async fn db_generic_search_query_ctx(table: &Table, mode: i8 , key1: &String
 /// 
 pub async fn db_generic_search_query_db(table: &Table, mode: i8 , key1: &String, key2: &String, key3: &String, db: &D1Database) -> Result<FsoTablesQueryResults> {
     let mut query = "".to_string();
+    let mut integer_key= false;
 
     match table {
         Table::Actions => {
@@ -470,10 +471,18 @@ pub async fn db_generic_search_query_db(table: &Table, mode: i8 , key1: &String,
 
             match mode {
                 0 => (),
-                1 => query += BINDABLE_ACTIONS_FILTER_ID,
-                2 => query += ACTIONS_FILTER_USER_ID,
-                3 => query += ACTIONS_FILTER_APPROVED,
-                4 => query += &(ACTIONS_FILTER_USER_APPROVED_A.to_owned() + key2 + ACTIONS_FILTER_USER_APPROVED_B), 
+                1 => { query += BINDABLE_ACTIONS_FILTER_ID;
+                    integer_key = true;
+                }
+                2 => { query += ACTIONS_FILTER_USER_ID;
+                    integer_key = true;
+                }
+                3 => {query += ACTIONS_FILTER_APPROVED;
+                    integer_key = true;
+                },
+                4 => {query += &(ACTIONS_FILTER_USER_APPROVED_A.to_owned() + key2 + ACTIONS_FILTER_USER_APPROVED_B);
+                    integer_key= true;
+                }, 
                 5 => query += ACTIONS_FILTER_TIMESTAMP,
                 _ => return Err(format!("Internal Server Error: Out of range mode <{}> in Actions generic query.", mode).to_string().into()),
             }
@@ -483,8 +492,12 @@ pub async fn db_generic_search_query_db(table: &Table, mode: i8 , key1: &String,
 
             match mode {
                 0 => (),
-                1 => query += BUG_REPORT_FILTER,
-                2 => query += BUG_REPORT_STATUS_FILTER,
+                1 => {query += BUG_REPORT_FILTER;
+                    integer_key = true;
+                },
+                2 => {query += BUG_REPORT_STATUS_FILTER;
+                    integer_key = true;
+                },
                 _ => return Err(format!("Internal Server Error: Out of range mode <{}> in Bug Report generic query.", mode).to_string().into()),
             }
         }
@@ -493,8 +506,10 @@ pub async fn db_generic_search_query_db(table: &Table, mode: i8 , key1: &String,
 
             match mode {
                 0 => (),
-                1 => query += DEPRECATIONS_FILTER,
-                _ => return Err(format!("Internal Server Error: Out of range mode <{}> in Deprecations generic query.", mode).to_string().into()),
+                1 => { query += DEPRECATIONS_FILTER;
+                    integer_key = true;
+                },
+                    _ => return Err(format!("Internal Server Error: Out of range mode <{}> in Deprecations generic query.", mode).to_string().into()),
             }
 
         },
@@ -538,7 +553,9 @@ pub async fn db_generic_search_query_db(table: &Table, mode: i8 , key1: &String,
 
             match mode {
                 0 => (),
-                1 => query += FSO_ITEMS_TABLE_FILTER,
+                1 => { query += FSO_ITEMS_TABLE_FILTER;
+                    integer_key = true;
+                },
                 2 => { 
                     // To simplify have this separated here.
                     query += FSO_ITEMS_TABLE_AND_NAME_FILTER;    
@@ -571,7 +588,9 @@ pub async fn db_generic_search_query_db(table: &Table, mode: i8 , key1: &String,
 
             match mode {
                 0 => (),
-                1 => query += FSO_TABLES_FILTER,
+                1 => { query += FSO_TABLES_FILTER;
+                    integer_key = true;
+                },
                 _ => return Err(format!("Internal Server Error: Out of range mode <{}> in FSO_Tables generic query.", mode).to_string().into()),
             }
 
@@ -581,7 +600,9 @@ pub async fn db_generic_search_query_db(table: &Table, mode: i8 , key1: &String,
 
             match mode {
                 0 => (),
-                1 => query += PARSE_BEHAVIORS_FILTER,
+                1 => { query += PARSE_BEHAVIORS_FILTER;
+                    integer_key = true;
+                },
                 _ => return Err(format!("Internal Server Error: Out of range mode <{}> in Parse Behaviors generic query.", mode).to_string().into()),
             }
 
@@ -591,8 +612,10 @@ pub async fn db_generic_search_query_db(table: &Table, mode: i8 , key1: &String,
 
             match mode {
                 0 => (),
-                1 => query += RESTRICTIONS_FILTER,
-                _ => return Err(format!("Internal Server Error: Out of range mode <{}> in Restrictions generic query.", mode).to_string().into()),
+                1 => { query += RESTRICTIONS_FILTER;
+                    integer_key = true;
+                },
+                    _ => return Err(format!("Internal Server Error: Out of range mode <{}> in Restrictions generic query.", mode).to_string().into()),
             }
 
         },
@@ -611,7 +634,9 @@ pub async fn db_generic_search_query_db(table: &Table, mode: i8 , key1: &String,
 
             match mode {
                 0 => (),
-                1 => query += TABLE_ALIASES_FILTER,
+                1 => { query += TABLE_ALIASES_FILTER;
+                    integer_key = true;
+                },
                 _ => return Err(format!("Internal Server Error: Out of range mode <{}> in Table Aliases generic query.", mode).to_string().into()),
             }
 
@@ -621,7 +646,9 @@ pub async fn db_generic_search_query_db(table: &Table, mode: i8 , key1: &String,
 
             match mode {
                 0 => (),
-                1 => query += USERS_USER_ID_FILTER,
+                1 => { query += USERS_USER_ID_FILTER;
+                    integer_key = true;
+                },
                 2 => query += USERS_USERNAME_FILTER,
                 _ => return Err(format!("Internal Server Error: Out of range mode <{}> in Usernames generic query.", mode).to_string().into()),
             }
@@ -635,12 +662,24 @@ pub async fn db_generic_search_query_db(table: &Table, mode: i8 , key1: &String,
     if mode == 0 {
         bound_query = db.prepare(query.clone());
     } else {
-        match db.prepare(query.clone()).bind(&[key1.into()]){
-            Ok(prepped_query)=> bound_query = prepped_query,
-            Err(e) => return Err((db_prepare_query_error(e, query).await).into()),
+        if integer_key == true{
+            match from_str::<i32>(key1) {
+                Ok(key_as_int) => {
+                    match db.prepare(query.clone()).bind(&[key_as_int.into()]){
+                        Ok(prepped_query)=> bound_query = prepped_query,
+                        Err(e) => return Err((db_prepare_query_error(e, query).await).into()),
+                    }
+                },
+                Err(e) => return Err(format!("Query:\" {} \" yielded an error since {} is not an integer. See: {}.", query, key1, e.to_string()).into()),
+            }
+
+        } else {
+            match db.prepare(query.clone()).bind(&[key1.into()]){
+                Ok(prepped_query)=> bound_query = prepped_query,
+                Err(e) => return Err((db_prepare_query_error(e, query).await).into()),
+            }
         }
     }
-
 
     match table {
         Table::Actions => {

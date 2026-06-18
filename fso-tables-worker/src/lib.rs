@@ -3,7 +3,7 @@ use std::io::Read;
 use db_fso::{db_generic_search_query_db, db_generic_search_query_ctx};
 use serde::{Deserialize, Serialize};
 use worker::*;
-use email_address::*;
+use email_address::{EmailAddress};
 use regex::Regex;
 use argon2::{
     password_hash::{
@@ -180,8 +180,8 @@ async fn fetch(req: Request, env: Env, _ctx: Context,) -> worker::Result<Respons
         //.post_async("/api/tables/deprecations", post_deprecation) // Requires login
         .patch_async("/api/tables/deprecations", update_deprecation).put_async("/api/tables/deprecations", update_deprecation) // Requires login
         .delete_async("/api/tables/deprecations/:id", delete_deprecation) // Admin only
-        //.get_async("/api/tables/actions/history", get_completed_history) // Requires login
-        //.get_async("/api/tables/actions/history/:id", get_completed_user_history) // Requires login
+        .get_async("/api/tables/actions/history/user/", get_complete_user_history) // Requires login
+        //.get_async("/api/tables/actions/history/item/:id", get_completed_user_history)
         //.get_async("/api/tables/actions/approvals", get_approval_requests) // Requires login
         //.get_async("/api/tables/actions/approvals/:id", get_approval_requests_user) // Requires login, for seeing just mine, or admin seeing specific other user
         //.get_async("/api/tables/actions/rejections", get_rejected_requests) // Requires login
@@ -466,6 +466,35 @@ pub async fn user_get_details(req: Request, ctx: RouteContext<()>) -> worker::Re
     }
 }
 
+pub async fn get_complete_user_history(req: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
+    match ctx.env.d1(DB_NAME) {
+        Ok(db) => {
+            let session_result = header_session_is_valid(&req, &db, &ctx).await;
+            if !session_result.0 {
+                return send_failure(&ERROR_NOT_LOGGED_IN.to_string(), 403).await
+            }
+
+            let username = session_result.1;
+
+            match db_fso::db_generic_search_query_db(&db_fso::Table::Users, 2, &username, &"".to_string(), &"".to_string(), &db).await {
+                Ok(results) => {
+                    if results.users.is_empty() {
+                        return err_specific_and_add_report("{\"Error\":\"Could not find user in database after already checking login credentials. Please report! | IEC00169\"}".to_string(),&("{\"Error\":\"Could not find user in database after already checking login credentials. Please report! | IEC00169\"}".to_string() + " | IEC00169"), 500, &ctx).await;
+                    }
+
+                    match db_fso::db_generic_search_query_db(&db_fso::Table::Actions,2, &results.users[0].id.to_string(),&"".to_string(),&"".to_string(), &db).await {
+                        Ok(res) =>{
+                            return Ok(Response::from_json(&res.actions).unwrap().with_headers(add_mandatory_headers(&"".to_string()).await));
+                        } 
+                        Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00170\"}".to_string(),&(e.to_string() + " | IEC00170"), 500, &ctx).await,
+                    }    
+                },
+                Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00171\"}".to_string(),&(e.to_string() + " | IEC00171"), 500, &ctx).await,
+            }     
+        },
+        Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00172\"}".to_string(),&(e.to_string() + " | IEC00172"), 500, &ctx).await,
+    }
+}
 
 pub async fn deactivate_user(mut req: Request, ctx: RouteContext<()>) -> worker::Result<Response> {    
     match ctx.env.d1(DB_NAME) {
@@ -1224,12 +1253,19 @@ pub async fn insert_item(mut req: Request, ctx: RouteContext<()>) -> worker::Res
                                     if !results.users.is_empty(){
                                         let id2 = i32::cast_from(results.users[0].id);
                                         
+                                        let mut table = "<Could not Find>".to_string();
+
+                                        match db_fso::db_generic_search_query_db(&db_fso::Table::FsoTables, 1, &new_item.table_id.to_string(), &"".to_string(), &"".to_string(), &db).await {
+                                            Ok(results2) => { if  !results2.fso_tables.is_empty() { table = results2.fso_tables[0].name.clone() }},
+                                            Err(_) => (),
+                                        }
+
                                         let action = db_fso::ActionsInternal::new_action_internal(id2, 
                                             format!("{{\"item_text\":\"{}\",\"documentation\":\"{}\",\"major_version\":\"{}\",\"parent_id\":{},\"table_id\":{},\"deprecation_id\":{},\"restriction_id\":4,\"info_type\":\"{}\",\"default_value\":\"{}\",\"table_index\":{}}}",new_item.item_text,new_item.documentation,new_item.major_version,new_item.parent_id,new_item.table_id,new_item.deprecation_id,new_item.restriction_id,new_item.table_id,new_item.table_index),
                                             id2, 
                                             Utc::now().format(DB_TIME_FORMAT).to_string(), 
                                             true, 
-                                            "Add item via API".to_string()).await;
+                                            format!("Added item \"{}\" to the {}", new_item.item_text, table).to_string()).await;
 
                                         match db_fso::db_insert_action(&action, &db).await {
                                             Ok(_)=> return send_success(&format!("{{\"id\":\"{}\"}}", id), &"".to_string()).await,
