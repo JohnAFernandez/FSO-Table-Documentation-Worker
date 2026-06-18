@@ -38,6 +38,7 @@ impl FullEmailAddress {
     }
 }
 
+#[allow(non_snake_case)]
 #[derive(Serialize)]
 struct EmailMessage {
     sender: FullEmailAddress, 

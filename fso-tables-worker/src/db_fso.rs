@@ -32,7 +32,7 @@ pub enum Table {
     FsoTables,
     ParseBehaviors,
     Restrictions,
-    Sessions,
+//    Sessions,
     TableAliases,
     Users,
 }
@@ -57,7 +57,7 @@ const FSO_ITEMS_DELETE_QUERY: &str = "DELETE FROM fso_items";
 //const FSO_TABLES_DELETE_QUERY: &str = "DELETE FROM fso_tables ";    
 const PARSE_BEHAVIORS_DELETE_QUERY: &str = "DELETE FROM parse_behaviors ";    
 const RESTRICTIONS_DELETE_QUERY: &str = "DELETE FROM restrictions ";    
-const SESSIONS_DELETE_QUERY: &str = "DELETE FROM sessions ";    
+//const SESSIONS_DELETE_QUERY: &str = "DELETE FROM sessions ";    
 const TABLE_ALIASES_DELETE_QUERY: &str = "DELETE FROM table_aliases ";    
 //const USERS_DELETE_QUERY: &str = "DELETE FROM users ";
 
@@ -114,7 +114,7 @@ const RESTRICTIONS_PATCH_MAX_STRING_LENGTH_QUERY: &str = "UPDATE restrictions SE
 const RESTRICTIONS_PATCH_ILLEGAL_VALUE_INT_QUERY: &str = "UPDATE restrictions SET illegal_value_int = ?1 ";
 const RESTRICTIONS_PATCH_ILLEGAL_VALUE_FLOAT_QUERY: &str = "UPDATE restrictions SET illegal_value_float = ?1 ";
 
-const SESSIONS_PATCH_EXPIRATION_QUERY: &str =  "UPDATE sessions SET expiration = ?1 ";  
+//const SESSIONS_PATCH_EXPIRATION_QUERY: &str =  "UPDATE sessions SET expiration = ?1 ";  
 
 const TABLE_ALIASES_PATCH_TABLE_ID_QUERY: &str = "UPDATE table_aliases SET table_id = ?1 ";
 const TABLE_ALIASES_PATCH_FILENAME_QUERY: &str = "UPDATE table_aliases SET filename = ?1 ";
@@ -155,8 +155,8 @@ const RESTRICTIONS_FILTER_BINDABLE: &str = "WHERE restriction_id = ?2;";
 // This may need more effort, but I wanted to try the rest first.  Also need to restrict mode zero on this one.
 const SESSIONS_FILTER_A: &str = "WHERE key = \"";
 const SESSIONS_FILTER_B: &str = "\" AND user = ?;";
-const SESSIONS_FILTER_USER_BINDABLE: &str = "WHERE user = ?2;";
-const SESSIONS_USER_ONLY_FILTER: &str = "WHERE user = ?;";
+//const SESSIONS_FILTER_USER_BINDABLE: &str = "WHERE user = ?2;";
+//const SESSIONS_USER_ONLY_FILTER: &str = "WHERE user = ?;";
 
 const TABLE_ALIASES_FILTER: &str = "WHERE alias_id = ?;";
 const TABLE_ALIASES_FILTER_BINDABLE: &str = "WHERE alias_id = ?2;";
@@ -619,7 +619,7 @@ pub async fn db_generic_search_query_db(table: &Table, mode: i8 , key1: &String,
             }
 
         },
-        Table::Sessions => {
+/*         Table::Sessions => {
             query += SESSIONS_QUERY; 
 
             match mode {
@@ -628,7 +628,7 @@ pub async fn db_generic_search_query_db(table: &Table, mode: i8 , key1: &String,
                 _ => return Err(format!("Internal Server Error: Out of range mode <{}> in Sessions generic query.", mode).to_string().into()),
             }
 
-        },
+        },*/
         Table::TableAliases => {
             query += TABLE_ALIASES_QUERY; 
 
@@ -796,7 +796,7 @@ pub async fn db_generic_search_query_db(table: &Table, mode: i8 , key1: &String,
                 Err(e)=> return Err(e),
             }
         },
-        Table::Sessions => {
+/*         Table::Sessions => {
             match bound_query.all().await {
                 Ok(results) =>{
                     match results.results::<Session>() {
@@ -809,7 +809,7 @@ pub async fn db_generic_search_query_db(table: &Table, mode: i8 , key1: &String,
                 },
                 Err(e)=> return Err(e),
             }
-        },
+        },*/
         Table::TableAliases => {
             match bound_query.all().await {
                 Ok(results) =>{
@@ -969,7 +969,7 @@ pub async fn db_generic_update_query(table: &Table, mode: usize , key1: &String,
 
                     query += RESTRICTIONS_FILTER_BINDABLE;
 
-                },
+                },/* 
                 Table::Sessions => {
                     match mode {
                         0 => query += SESSIONS_PATCH_EXPIRATION_QUERY,
@@ -977,7 +977,7 @@ pub async fn db_generic_update_query(table: &Table, mode: usize , key1: &String,
                     }
 
                     query += SESSIONS_FILTER_USER_BINDABLE;
-                },
+                },*/
                 Table::TableAliases => {
                     match mode {
                         0 => query += TABLE_ALIASES_PATCH_FILENAME_QUERY,
@@ -1037,10 +1037,10 @@ pub async fn db_generic_delete(table: Table, id: &String, ctx: &RouteContext<()>
                 },
                 Table::Restrictions => {
                     query = RESTRICTIONS_DELETE_QUERY.to_owned() + RESTRICTIONS_FILTER;                    
-                },
+                },/*
                 Table::Sessions => {
                     query = SESSIONS_DELETE_QUERY.to_owned() + SESSIONS_USER_ONLY_FILTER;                    
-                },
+                },*/
                 Table::TableAliases => {
                     query = TABLE_ALIASES_DELETE_QUERY.to_owned() + TABLE_ALIASES_FILTER;                    
                 },
