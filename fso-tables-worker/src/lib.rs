@@ -1,6 +1,5 @@
 use std::io::Read;
 
-use db_fso::{db_generic_search_query_db, db_generic_search_query_ctx};
 use serde::{Deserialize, Serialize};
 use worker::*;
 use email_address::{EmailAddress};
@@ -18,10 +17,10 @@ use chrono::{Utc, TimeDelta};
 use casting::{CastFrom};
 use serde_json::from_str;
 
-mod db_fso;
-mod email_fns;
+mod db_fso; use db_fso::*;
+mod email_fns; use email_fns::{EmailSubmission, FullEmailAddress, EmailMessage};
 mod secrets;
-use email_fns::{EmailSubmission, FullEmailAddress, EmailMessage};
+
 
 
 
@@ -48,7 +47,7 @@ async fn fetch(req: Request, env: Env, _ctx: Context,) -> worker::Result<Respons
         .get_async("/api/", root_get)
         .options_async("/api/", send_cors)        
         // No Post, put, patch, or delete for overarching category
-        .get_async("/api/users", db_fso::db_user_stats_get)
+        .get_async("/api/users", db_user_stats_get)
         .options_async("/api/users", send_cors)
         .post_async("/api/users/register", user_register_new)
         .options_async("/api/users/register", send_cors)
@@ -103,7 +102,7 @@ async fn fetch(req: Request, env: Env, _ctx: Context,) -> worker::Result<Respons
         .delete_async("/api/tables/restrictions/:id", delete_restriction) // Admin only
         .get_async("/api/tables/deprecations", get_deprecations).options_async("/api/tables/deprecations", send_cors)
         .get_async("/api/tables/deprecations/:id", get_deprecation).options_async("/api/tables/deprecations/:id", send_cors)
-        //.post_async("/api/tables/deprecations", post_deprecation) // Requires login
+        .post_async("/api/tables/deprecations", post_deprecation).options_async("api/tables/deprecations", send_cors) // Requires login
         .patch_async("/api/tables/deprecations", update_deprecation).put_async("/api/tables/deprecations", update_deprecation) // Requires login
         .delete_async("/api/tables/deprecations/:id", delete_deprecation) // Admin only
         .get_async("/api/tables/actions/history/user/", get_complete_user_history) // Requires login
@@ -132,7 +131,7 @@ async fn fetch(req: Request, env: Env, _ctx: Context,) -> worker::Result<Respons
 
 pub async fn test_all(_req: Request, _ctx: RouteContext<()>) -> worker::Result<Response> {
     
-    let mut _return_object = db_fso::FsoTablesQueryResults::new_results().await;
+    let mut _return_object = FsoTablesQueryResults::new_results().await;
 
     return send_success(&"Test API is deactivated as tests were successful.".to_string(), &"".to_string()).await;
 }
@@ -158,7 +157,7 @@ pub async fn user_register_new(mut req: Request, ctx: RouteContext<()>) -> worke
     let db = ctx.env.d1(DB_NAME);
     match &db{
         Ok(db1) => {
-            match db_fso::db_user_able_to_register(&email.email, &db1).await {
+            match db_user_able_to_register(&email.email, &db1).await {
                 Ok(exists) => if !exists {
                     return err_specific("{\"Error\":\"User already exists\"}".to_string()).await;
                 },
@@ -166,7 +165,7 @@ pub async fn user_register_new(mut req: Request, ctx: RouteContext<()>) -> worke
             };
             let salt: String;
 
-            match db_fso::db_user_is_incompletely_registered(&email.email, &db1).await {
+            match db_user_is_incompletely_registered(&email.email, &db1).await {
                 Ok(incomplete) => {
                     // no record of the user attempting to register before
                     if !incomplete {
@@ -185,7 +184,7 @@ pub async fn user_register_new(mut req: Request, ctx: RouteContext<()>) -> worke
 
                     } else {
                         // the user has attempted to register before
-                        match db_fso::db_get_user_salt(&email.email, &ctx).await {
+                        match db_get_user_salt(&email.email, &ctx).await {
                             Ok(existing_salt) => salt = existing_salt,
                             Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00162\"}".to_string(),&(e.to_string() + " | IEC00162"), 500, &ctx).await,
                         }
@@ -266,7 +265,7 @@ pub async fn user_confirm_email(mut req: Request, ctx: RouteContext<()>) -> work
             match ctx.param("email"){
                 Some(username) => {
                     let hashed: String;
-                    let salt_result = db_fso::db_get_user_salt(username, &ctx).await;
+                    let salt_result = db_get_user_salt(username, &ctx).await;
 
                     if salt_result.is_err() {
                         return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00138\"}".to_string(), &(salt_result.unwrap_err().to_string() + " | IEC00138").to_string(), 500, &ctx).await;
@@ -279,7 +278,7 @@ pub async fn user_confirm_email(mut req: Request, ctx: RouteContext<()>) -> work
                         Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00008\"}".to_string(),&(e.to_string() + " | IEC00008"), 500, &ctx).await,
                     }
 
-                    match db_generic_search_query_ctx(&db_fso::Table::EmailValidations, 2, &username, &hashed, &"".to_string(), &ctx).await{
+                    match db_generic_search_query_ctx(&Table::EmailValidations, 2, &username, &hashed, &"".to_string(), &ctx).await{
                         Ok(email_result) => {
 
 
@@ -289,7 +288,7 @@ pub async fn user_confirm_email(mut req: Request, ctx: RouteContext<()>) -> work
 
 
                             // double check that we haven't already validated this email.
-                            match db_generic_search_query_ctx(&db_fso::Table::Users, 2, username, &"".to_string(), &"".to_string(), &ctx).await {
+                            match db_generic_search_query_ctx(&Table::Users, 2, username, &"".to_string(), &"".to_string(), &ctx).await {
                                 Ok(user_results) => 
                                 if user_results.users.is_empty() {
                                     return err_specific("{\"Error\":\"No matching user found.\"}".to_string()).await
@@ -312,12 +311,12 @@ pub async fn user_confirm_email(mut req: Request, ctx: RouteContext<()>) -> work
                                                     Some(password) => {
                                                         match hash_string(&salt, &password).await {
                                                             Ok(hashed_password) => {
-                                                                match db_fso::db_set_new_pass(&username, &hashed_password, &ctx).await {
+                                                                match db_set_new_pass(&username, &hashed_password, &ctx).await {
                                                                     Ok(_) => (),
                                                                     Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00010\"}".to_string(),&(e.to_string() + " | IEC00010"), 500, &ctx).await,
                                                                 }
 
-                                                                match db_fso::db_generic_delete(db_fso::Table::EmailValidations, &username, &ctx).await {
+                                                                match db_generic_delete(Table::EmailValidations, &username, &ctx).await {
                                                                     Ok(_) => (),
                                                                     Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00011\"}".to_string(),&(e.to_string() + " | IEC00011"), 500, &ctx).await,
                                                                 }
@@ -333,12 +332,12 @@ pub async fn user_confirm_email(mut req: Request, ctx: RouteContext<()>) -> work
                                             Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00013\"}".to_string(),&(e.to_string() + " | IEC00013"), 500, &ctx).await,
                                         }                                        
                                     } else {
-                                        match db_fso::db_generic_delete(db_fso::Table::EmailValidations, &username, &ctx).await {
+                                        match db_generic_delete(Table::EmailValidations, &username, &ctx).await {
                                             Ok(_) => (),
                                             Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00014\"}".to_string(),&(e.to_string() + " | IEC00014"), 500, &ctx).await,
                                         }
 
-                                        match db_fso::db_set_email_confirmed(&username, &ctx).await {
+                                        match db_set_email_confirmed(&username, &ctx).await {
                                             Ok(_) => return create_session_and_send(&username, &salt, &ctx).await,
                                             Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00015\"}".to_string(),&(e.to_string() + " | IEC00015"), 500, &ctx).await,
                                         }
@@ -378,7 +377,7 @@ pub async fn user_get_details(req: Request, ctx: RouteContext<()>) -> worker::Re
 
             let username = session_result.1;
 
-            match db_fso::db_get_user_details(&username, &db).await {
+            match db_get_user_details(&username, &db).await {
                 Ok(res) => return Ok(Response::from_json(&res).unwrap().with_headers(add_mandatory_headers(&"".to_string()).await)),
                 Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00017\"}".to_string(),&(e.to_string() + " | IEC00017"), 500, &ctx).await,
             }    
@@ -398,7 +397,7 @@ pub async fn get_complete_user_history(req: Request, ctx: RouteContext<()>) -> w
 
             let username = session_result.1;
 
-            match db_fso::db_generic_search_query_db(&db_fso::Table::Users, 2, &username, &"".to_string(), &"".to_string(), &db).await {
+            match db_generic_search_query_db(&Table::Users, 2, &username, &"".to_string(), &"".to_string(), &db).await {
                 Ok(results) => {
                     if results.users.is_empty() {
                         return err_specific_and_add_report("{\"Error\":\"Could not find user in database after already checking login credentials. Please report! | IEC00169\"}".to_string(),&("{\"Error\":\"Could not find user in database after already checking login credentials. Please report! | IEC00169\"}".to_string() + " | IEC00169"), 500, &ctx).await;
@@ -406,7 +405,7 @@ pub async fn get_complete_user_history(req: Request, ctx: RouteContext<()>) -> w
 
 //                    return err_specific_and_add_report("{\"Report\":\"Got past search 1, going to search 2.\"}".to_string(), &"{\"Report\":\"Got past search 1, going to search 2.\"}".to_string(), 500, &ctx).await;
 
-                    match db_fso::db_generic_search_query_db(&db_fso::Table::Actions,2, &results.users[0].id.to_string(),&"".to_string(),&"".to_string(), &db).await {
+                    match db_generic_search_query_db(&Table::Actions,2, &results.users[0].id.to_string(),&"".to_string(),&"".to_string(), &db).await {
                         Ok(res) =>{
                             return Ok(Response::from_json(&res.actions).unwrap().with_headers(add_mandatory_headers(&"".to_string()).await));
                         } 
@@ -430,16 +429,16 @@ pub async fn deactivate_user(mut req: Request, ctx: RouteContext<()>) -> worker:
 
             let username = session_result.1;
             
-            if !db_fso::db_user_is_active(&username, &db).await {
+            if !db_user_is_active(&username, &db).await {
                 return send_failure(&ERROR_USER_NOT_ACTIVE.to_string(), 403).await
             }
 
-            match db_fso::db_get_user_role(&username, &db).await {                 
+            match db_get_user_role(&username, &db).await {                 
                 Ok(authorizer_role) => {
 
                     match req.json::<EmailSubmission>().await {                                                        
                         Ok(target_user) =>{
-                            match db_fso::db_has_active_user(&target_user.email, &db).await {
+                            match db_has_active_user(&target_user.email, &db).await {
                                 Ok(exists) => if !exists {
                                     return err_specific("{\"Error\":\"User does not exist or may already be deactivated.\"}".to_string()).await;
                                 },
@@ -448,9 +447,9 @@ pub async fn deactivate_user(mut req: Request, ctx: RouteContext<()>) -> worker:
                 
                             // Owners can only be deactivated by someone working directly with the database.
                             // But otherwise, you *can* deactivate yourself.
-                            if target_user.email == username && authorizer_role != db_fso::UserRole::OWNER {
+                            if target_user.email == username && authorizer_role != UserRole::OWNER {
                                 
-                                match db_fso::db_deactivate_user(&username, &db).await {
+                                match db_deactivate_user(&username, &db).await {
                                     Ok(_) => return send_success(&"{\"Response\": \"User Deactivated\"}".to_string(), &"".to_string()).await,
                                     Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00020\"}".to_string(),&(e.to_string() + " | IEC00020"), 500, &ctx).await,
                                 }
@@ -459,15 +458,15 @@ pub async fn deactivate_user(mut req: Request, ctx: RouteContext<()>) -> worker:
 
                             // these two types are not allowed to deactivate other users
                             match authorizer_role {
-                                db_fso::UserRole::MAINTAINER => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
-                                db_fso::UserRole::VIEWER => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
+                                UserRole::MAINTAINER => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
+                                UserRole::VIEWER => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
                                 _=> (),
                             }         
                                                                                     
-                            match db_fso::db_get_user_role(&target_user.email, &db).await { 
+                            match db_get_user_role(&target_user.email, &db).await { 
                                 Ok(target_user_role) => {
                                     if authorizer_role < target_user_role{
-                                        match db_fso::db_deactivate_user(&target_user.email, &db).await {
+                                        match db_deactivate_user(&target_user.email, &db).await {
                                             Ok(_) => return send_success(&"{\"Response\": \"User Deactivated\"}".to_string(), &"".to_string()).await,
                                             Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00021\"}".to_string(),&(e.to_string() + " | IEC00021"), 500, &ctx).await,
                                         }
@@ -501,7 +500,7 @@ pub async fn activate_user(mut req: Request, ctx: RouteContext<()>) -> worker::R
 
             match req.json::<EmailSubmission>().await {                                                        
                 Ok(target_user) =>{
-                    match db_fso::db_email_taken(&target_user.email, &db).await {
+                    match db_email_taken(&target_user.email, &db).await {
                         Ok(exists) => if !exists {
                             return err_specific("{\"Error\":\"User to be activated does not exist.\"}".to_string()).await;
                         },
@@ -509,16 +508,16 @@ pub async fn activate_user(mut req: Request, ctx: RouteContext<()>) -> worker::R
                     };
 
                     // make no changes if this user already exists
-                    if db_fso::db_user_is_active(&target_user.email, &db).await {
+                    if db_user_is_active(&target_user.email, &db).await {
                         return send_success(&"{\"Response\": \"User is already Active\"}".to_string(), &"".to_string()).await
                     }
 
                     // We need to see if the activating user is active, otherwise we should ignore
-                    if !db_fso::db_user_is_active(&username, &db).await {
+                    if !db_user_is_active(&username, &db).await {
                         // Owners can only be deactivated by someone working directly with the database.
                         // But otherwise, you *can* deactivate yourself.
                         if target_user.email == username{
-                            match db_fso::db_activate_user(&target_user.email, &db).await {
+                            match db_activate_user(&target_user.email, &db).await {
                                 Ok(_) => (),
                                 Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00026\"}".to_string(),&(e.to_string() + " | IEC00026"), 500, &ctx).await,
                             }
@@ -528,25 +527,25 @@ pub async fn activate_user(mut req: Request, ctx: RouteContext<()>) -> worker::R
                     }
                     // NOTE! IF WE GET HERE THE USER IS ACTIVE! AND WE NEED TO DEACTIVATE ON EVERY FAILURE!
     
-                    match db_fso::db_get_user_role(&username, &db).await {                 
+                    match db_get_user_role(&username, &db).await {                 
                         Ok(authorizer_role) => {
     
                         // these two types are not allowed to deactivate other users, and the owner can only be activated
                         // directly.
                         match authorizer_role {
-                            db_fso::UserRole::OWNER => {
-                                let _ = db_fso::db_deactivate_user(&target_user.email, &db).await;
+                            UserRole::OWNER => {
+                                let _ = db_deactivate_user(&target_user.email, &db).await;
                                 return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await
                             }
-                            db_fso::UserRole::MAINTAINER => {
+                            UserRole::MAINTAINER => {
                                 if target_user.email != username{
-                                    let _ = db_fso::db_deactivate_user(&target_user.email, &db).await;
+                                    let _ = db_deactivate_user(&target_user.email, &db).await;
                                     return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await    
                                 }
                             },
-                            db_fso::UserRole::VIEWER => { 
+                            UserRole::VIEWER => { 
                                 if target_user.email != username{
-                                    let _ = db_fso::db_deactivate_user(&target_user.email, &db).await;
+                                    let _ = db_deactivate_user(&target_user.email, &db).await;
                                     return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await
                                 }
                             },
@@ -554,12 +553,12 @@ pub async fn activate_user(mut req: Request, ctx: RouteContext<()>) -> worker::R
                         }         
                     
                         // activate the user
-                        match db_fso::db_get_user_role(&target_user.email, &db).await {
+                        match db_get_user_role(&target_user.email, &db).await {
                             Ok(role) => {
                                 // only allow returning accounts to be maintainers in case a bad actor decides to 
                                 // try to act via a deactivated Admin
-                                if role < db_fso::UserRole::MAINTAINER{
-                                    match db_fso::db_force_role(&target_user.email, &db, db_fso::UserRole::MAINTAINER).await {
+                                if role < UserRole::MAINTAINER{
+                                    match db_force_role(&target_user.email, &db, UserRole::MAINTAINER).await {
                                         Ok(_) => return send_success(&"{\"Response\": \"User Activated\"}".to_string(), &"".to_string()).await,
                                         Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00027\"}".to_string(),&(e.to_string() + " | IEC00027"), 500, &ctx).await,
                                     }
@@ -568,13 +567,13 @@ pub async fn activate_user(mut req: Request, ctx: RouteContext<()>) -> worker::R
                                 }
                             },
                             Err(e) => {
-                                let _ = db_fso::db_deactivate_user(&target_user.email, &db).await;
+                                let _ = db_deactivate_user(&target_user.email, &db).await;
                                 return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00028\"}".to_string(),&(e.to_string() + " | IEC00028"), 500, &ctx).await
                             }
                         }
                         },
                         Err(e) => {
-                            let _ = db_fso::db_deactivate_user(&target_user.email, &db).await;
+                            let _ = db_deactivate_user(&target_user.email, &db).await;
                             return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00029\"}".to_string(),&(e.to_string() + " | IEC00029"), 500, &ctx).await
                         }
                     }    
@@ -598,12 +597,12 @@ pub async fn user_login(mut req: Request, ctx: RouteContext<()>) -> worker::Resu
         Ok(db) => {
             match req.json::<LoginRequest>().await{
                 Ok(login) => {
-                    match db_fso::db_email_taken(&login.email, &db).await {
+                    match db_email_taken(&login.email, &db).await {
                         Ok(b) => if !b { return send_failure(&"{\"Error\":\"Incorrect credentials! Please resubmit.\"}".to_string(), 403).await },
                         Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00031\"}".to_string(),&(e.to_string() + " | IEC00031"), 500, &ctx).await,
                     }
 
-                    let salt_result = db_fso::db_get_user_salt(&login.email, &ctx).await;
+                    let salt_result = db_get_user_salt(&login.email, &ctx).await;
 
                     if salt_result.is_err() {
                         return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00139\"}".to_string(),&(salt_result.unwrap_err().to_string() + " | IEC00139"), 500, &ctx).await;
@@ -613,7 +612,7 @@ pub async fn user_login(mut req: Request, ctx: RouteContext<()>) -> worker::Resu
 
                     match hash_string(&salt, &login.password).await {
                         Ok(hash) => {
-                            if db_fso::db_check_password(&login.email, &hash, &db).await {
+                            if db_check_password(&login.email, &hash, &db).await {
                                 return create_session_and_send(&login.email, &salt, &ctx).await;
                             } else {
                                 return send_failure(&"{\"Error\":\"Incorrect credentials! Please resubmit.\"}".to_string(), 403).await;
@@ -674,7 +673,7 @@ pub async fn user_change_password(mut req: Request, ctx: RouteContext<()>) -> wo
 
             let username = session_result.1;
             
-            let salt_result = db_fso::db_get_user_salt(&username, &ctx).await;
+            let salt_result = db_get_user_salt(&username, &ctx).await;
 
             if salt_result.is_err() {
                 return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00160\"}".to_string(),&(salt_result.unwrap_err().to_string() + " | IEC00160"), 500, &ctx).await;
@@ -686,7 +685,7 @@ pub async fn user_change_password(mut req: Request, ctx: RouteContext<()>) -> wo
                 Ok(password) => {
                     match hash_string(&salt, &password.old_password).await {
                         Ok(old_password_hash) => {                       
-                            if !db_fso::db_check_password(&username, &old_password_hash, &db).await {
+                            if !db_check_password(&username, &old_password_hash, &db).await {
                                 return err_specific("{\"Error\":\"Old password does not match.\"}".to_string()).await;
                             }
                         }
@@ -698,7 +697,7 @@ pub async fn user_change_password(mut req: Request, ctx: RouteContext<()>) -> wo
                         Err(e) => return err_specific(format!("{{\"Error\":\"{}\"}}", e.to_string())).await,
                     }                                       
 
-                    let salt_result = db_fso::db_get_user_salt(&username, &ctx).await;
+                    let salt_result = db_get_user_salt(&username, &ctx).await;
 
                     if salt_result.is_err() {
                         return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00140\"}".to_string(),&(salt_result.unwrap_err().to_string() + " | IEC00140"), 500, &ctx).await;
@@ -708,7 +707,7 @@ pub async fn user_change_password(mut req: Request, ctx: RouteContext<()>) -> wo
 
                     match hash_string(&salt, &password.password).await {                             
                         Ok(hash) => { 
-                            match db_fso::db_set_new_pass(&username, &hash, &ctx).await {
+                            match db_set_new_pass(&username, &hash, &ctx).await {
                                 Ok(_) => return send_success(&"{\"Response\": \"Password Changed!\"}".to_string(), &"".to_string()).await,
                                 Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00035\"}".to_string(),&(e.to_string() + " | IEC00035"), 500, &ctx).await,
                             }
@@ -754,7 +753,7 @@ pub async fn user_reset_password(mut req: Request, ctx: RouteContext<()>) -> wor
                 return err_specific(ERROR_BAD_REQUEST.to_string()).await;
             }
         
-            match db_fso::db_is_user_banned_or_nonexistant(&successful_email, &db).await {
+            match db_is_user_banned_or_nonexistant(&successful_email, &db).await {
                 Ok(exists) => if !exists {
                     return err_specific("{\"Error\":\"User is not fully registered or banned\"}".to_string()).await;
                 },
@@ -763,7 +762,7 @@ pub async fn user_reset_password(mut req: Request, ctx: RouteContext<()>) -> wor
 
             let code = create_random_code().await;
 
-            let salt_result = db_fso::db_get_user_salt(&successful_email, &ctx).await;
+            let salt_result = db_get_user_salt(&successful_email, &ctx).await;
 
             if salt_result.is_err() {
                 return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00153\"}".to_string(),&(salt_result.unwrap_err().to_string() + " | IEC00153"), 500, &ctx).await;
@@ -773,7 +772,7 @@ pub async fn user_reset_password(mut req: Request, ctx: RouteContext<()>) -> wor
 
             match hash_string(&salt, &code).await {
                 Ok(hashed_code) => {
-                    match db_fso::db_add_code_reset(&successful_email, &hashed_code, &ctx).await{
+                    match db_add_code_reset(&successful_email, &hashed_code, &ctx).await{
                         Ok(_) => (),
                         Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00152\"}".to_string(),&(e.to_string() + " | IEC00152"), 500, &ctx).await,
                     }        
@@ -806,7 +805,7 @@ pub async fn user_reset_password_confirmed(mut req: Request, ctx: RouteContext<(
     let good_request = request.unwrap();
     let username = &good_request.username;
 
-    let salt_result = db_fso::db_get_user_salt(&username, &ctx).await;
+    let salt_result = db_get_user_salt(&username, &ctx).await;
     if salt_result.is_err() {
         return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00154\"}".to_string(),&(salt_result.unwrap_err().to_string() + " | IEC00154"), 500, &ctx).await;
     }
@@ -816,7 +815,7 @@ pub async fn user_reset_password_confirmed(mut req: Request, ctx: RouteContext<(
 
     match hash_string(&good_salt, &code).await {                             
         Ok(hashed_code) => {
-            match db_fso::db_check_code(&username, &hashed_code, &ctx).await{
+            match db_check_code(&username, &hashed_code, &ctx).await{
                 Ok(_) => (),
                 Err(e) => return err_specific(e.to_string()).await,
             }        
@@ -833,7 +832,7 @@ pub async fn user_reset_password_confirmed(mut req: Request, ctx: RouteContext<(
 
     match hash_string(&good_salt, &password).await {                             
         Ok(hash) => { 
-            match db_fso::db_set_new_pass(&username, &hash, &ctx).await {
+            match db_set_new_pass(&username, &hash, &ctx).await {
                 Ok(_) => return send_success(&"{\"Response\": \"Password Changed!\"}".to_string(), &"".to_string()).await,
                 Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00146\"}".to_string(),&(e.to_string() + " | IEC00146"), 500, &ctx).await,
             }
@@ -853,16 +852,16 @@ pub async fn user_upgrade_user_permissions(mut req: Request, ctx: RouteContext<(
 
             let username = session_result.1;
 
-            if !db_fso::db_user_is_active(&username, &db).await {
+            if !db_user_is_active(&username, &db).await {
                 return send_failure(&ERROR_USER_NOT_ACTIVE.to_string(), 403).await
             }
 
-            match db_fso::db_get_user_role(&username, &db).await {                 
+            match db_get_user_role(&username, &db).await {                 
                 Ok(authorizer_role) => {
 
                     match req.json::<EmailSubmission>().await {                                                        
                         Ok(target_user) =>{
-                            match db_fso::db_has_active_user(&target_user.email, &db).await {
+                            match db_has_active_user(&target_user.email, &db).await {
                                 Ok(exists) => if !exists {
                                     return err_specific("{\"Error\":\"User does not exist or may be deactivated.\"}".to_string()).await;
                                 },
@@ -876,16 +875,16 @@ pub async fn user_upgrade_user_permissions(mut req: Request, ctx: RouteContext<(
 
                             // these two types are not allowed to deactivate other users
                             match authorizer_role {
-                                db_fso::UserRole::MAINTAINER => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
-                                db_fso::UserRole::VIEWER => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
+                                UserRole::MAINTAINER => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
+                                UserRole::VIEWER => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
                                 _=> (),
                             }         
 
                             // TODO! Extra check needed?                                                                                        
-                            match db_fso::db_get_user_role(&target_user.email, &db).await { 
+                            match db_get_user_role(&target_user.email, &db).await { 
                                 Ok(target_user_role) => {
                                     // We cannot upgrade Admins here.  Only when directly accessing the database.
-                                    if authorizer_role < target_user_role && target_user_role > db_fso::UserRole::ADMIN {
+                                    if authorizer_role < target_user_role && target_user_role > UserRole::ADMIN {
                                         //db_upgrade_user(&target_user.email, &db).await;
                                         return send_success(&"{\"Response\": \"User Upgraded\"]".to_string(), &"".to_string()).await;
                                     } else {
@@ -916,16 +915,16 @@ pub async fn user_downgrade_user_permissions(mut req: Request, ctx: RouteContext
 
             let username = session_result.1;
 
-            if !db_fso::db_user_is_active(&username, &db).await {
+            if !db_user_is_active(&username, &db).await {
                 return send_failure(&ERROR_USER_NOT_ACTIVE.to_string(), 403).await
             }
 
-            match db_fso::db_get_user_role(&username, &db).await {                 
+            match db_get_user_role(&username, &db).await {                 
                 Ok(authorizer_role) => {
 
                     match req.json::<EmailSubmission>().await {                                                        
                         Ok(target_user) =>{
-                            match db_fso::db_has_active_user(&target_user.email, &db).await {
+                            match db_has_active_user(&target_user.email, &db).await {
                                 Ok(exists) => if !exists {
                                     return err_specific("{\"Error\":\"User does not exist or may be deactivated.\"}".to_string()).await;
                                 },
@@ -939,16 +938,16 @@ pub async fn user_downgrade_user_permissions(mut req: Request, ctx: RouteContext
 
                             // these two types are not allowed to deactivate other users
                             match authorizer_role {
-                                db_fso::UserRole::MAINTAINER => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
-                                db_fso::UserRole::VIEWER => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
+                                UserRole::MAINTAINER => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
+                                UserRole::VIEWER => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
                                 _=> (),
                             }         
 
                             // TODO! Do we need extra checks here?                                                                                        
-                            match db_fso::db_get_user_role(&target_user.email, &db).await { 
+                            match db_get_user_role(&target_user.email, &db).await { 
                                 Ok(target_user_role) => {
                                     // We cannot downgrade viewers.  Deactivating them is a different code path
-                                    if authorizer_role < target_user_role && target_user_role < db_fso::UserRole::VIEWER {
+                                    if authorizer_role < target_user_role && target_user_role < UserRole::VIEWER {
                                         //db_downgrade_user(&target_user.email, &db).await;
                                         return worker::Response::ok("{\"Response\":\"User Upgraded\"}");
                                     } else {
@@ -969,7 +968,7 @@ pub async fn user_downgrade_user_permissions(mut req: Request, ctx: RouteContext
 }
 
 pub async fn get_parse_types(_: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
-    match db_generic_search_query_ctx(&db_fso::Table::ParseBehaviors, 0, &"".to_string(), &"".to_string(), &"".to_string(), &ctx).await {
+    match db_generic_search_query_ctx(&Table::ParseBehaviors, 0, &"".to_string(), &"".to_string(), &"".to_string(), &ctx).await {
         Ok(results) => return Ok(Response::from_json(&results.parse_behaviors).unwrap().with_headers(add_mandatory_headers(&"".to_string()).await)),
         Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00046\"}".to_string(),&(e.to_string() + " | IEC00046"), 500, &ctx).await,
     }
@@ -977,7 +976,7 @@ pub async fn get_parse_types(_: Request, ctx: RouteContext<()>) -> worker::Resul
 
 pub async fn get_parse_type(_: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
     match ctx.param("id"){
-        Some(parameter) => match db_generic_search_query_ctx(&db_fso::Table::ParseBehaviors, 1, parameter, &"".to_string(), &"".to_string(), &ctx).await {
+        Some(parameter) => match db_generic_search_query_ctx(&Table::ParseBehaviors, 1, parameter, &"".to_string(), &"".to_string(), &ctx).await {
             Ok(results) => return Ok(Response::from_json(&results.parse_behaviors).unwrap().with_headers(add_mandatory_headers(&"".to_string()).await)),
             Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00047\"}".to_string(),&(e.to_string() + " | IEC00047"), 500, &ctx).await,
         },
@@ -996,28 +995,28 @@ pub async fn update_parse_type(mut req: Request, ctx: RouteContext<()>) -> worke
 
             let username = session_result.1;
 
-            match db_fso::db_get_user_role(&username, &db).await {                 
+            match db_get_user_role(&username, &db).await {                 
                 Ok(authorizer_role) => {
                     match authorizer_role {
-                        db_fso::UserRole::VIEWER => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
+                        UserRole::VIEWER => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
                         _=> (),
                     }         
 
-                    match req.json::<db_fso::ParseBehavior>().await {
+                    match req.json::<ParseBehavior>().await {
                         Ok(parse_behavior) => {
                             if parse_behavior.behavior_id < 1 {
                                 return err_specific("{\"Error\":\"Invalid behavior id, cannot update.\"}".to_string()).await;
                             }
 
                             if parse_behavior.behavior != "~!*$%"{
-                                match db_fso::db_generic_update_query(&db_fso::Table::ParseBehaviors, 0, &parse_behavior.behavior, &parse_behavior.behavior_id.to_string(),  &ctx).await {
+                                match db_generic_update_query(&Table::ParseBehaviors, 0, &parse_behavior.behavior, &parse_behavior.behavior_id.to_string(),  &ctx).await {
                                     Ok(_) => (),
                                     Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00048\"}".to_string(),&(e.to_string() + " | IEC00048"), 500, &ctx).await,
                                 }    
                             }
 
                             if parse_behavior.description != "~!*$%"{
-                                match db_fso::db_generic_update_query(&db_fso::Table::ParseBehaviors, 1, &parse_behavior.description, &parse_behavior.behavior_id.to_string(),  &ctx).await {
+                                match db_generic_update_query(&Table::ParseBehaviors, 1, &parse_behavior.description, &parse_behavior.behavior_id.to_string(),  &ctx).await {
                                     Ok(_) => (),
                                     Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00049\"}".to_string(),&(e.to_string() + " | IEC00049"), 500, &ctx).await,
                                 }
@@ -1047,11 +1046,11 @@ pub async fn delete_parse_type(req: Request, ctx: RouteContext<()>) -> worker::R
 
             let username = session_result.1;
 
-            match db_fso::db_get_user_role(&username, &db).await {                 
+            match db_get_user_role(&username, &db).await {                 
                 Ok(authorizer_role) => {
                     match authorizer_role {
-                        db_fso::UserRole::VIEWER => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
-                        db_fso::UserRole::MAINTAINER => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
+                        UserRole::VIEWER => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
+                        UserRole::MAINTAINER => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
                         _=> {},
                     }         
                 },
@@ -1062,7 +1061,7 @@ pub async fn delete_parse_type(req: Request, ctx: RouteContext<()>) -> worker::R
                 Some(id) => {
                     match id.parse::<i64>(){
                         Ok(_) =>{
-                            match db_fso::db_generic_delete(db_fso::Table::ParseBehaviors, id, &ctx).await {
+                            match db_generic_delete(Table::ParseBehaviors, id, &ctx).await {
                                 Ok(_) => return send_success(&"{\"Response\": \"Success!\"}".to_string(), &"".to_string()).await,
                                 Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00053\"}".to_string(),&(e.to_string() + " | IEC00053"), 500, &ctx).await,
                             }
@@ -1080,7 +1079,7 @@ pub async fn delete_parse_type(req: Request, ctx: RouteContext<()>) -> worker::R
 }
 
 pub async fn get_items(_: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
-    match db_generic_search_query_ctx(&db_fso::Table::FsoItems, 0, &"".to_string(), &"".to_string(), &"".to_string(), &ctx).await {
+    match db_generic_search_query_ctx(&Table::FsoItems, 0, &"".to_string(), &"".to_string(), &"".to_string(), &ctx).await {
         Ok(result) => {
             return Ok(Response::from_json(&result.fso_items).unwrap().with_headers(add_mandatory_headers(&"".to_string()).await));
         },
@@ -1092,7 +1091,7 @@ pub async fn get_items(_: Request, ctx: RouteContext<()>) -> worker::Result<Resp
 
 pub async fn get_item(_: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
     match ctx.param("id"){
-        Some(parameter) => match db_generic_search_query_ctx(&db_fso::Table::FsoItems, 1, parameter, &"".to_string(), &"".to_string(), &ctx).await {
+        Some(parameter) => match db_generic_search_query_ctx(&Table::FsoItems, 1, parameter, &"".to_string(), &"".to_string(), &ctx).await {
             Ok(results) => return Ok(Response::from_json(&results.fso_items).unwrap().with_headers(add_mandatory_headers(&"".to_string()).await)),
             Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00056\"}".to_string(),&(e.to_string() + " | IEC00056"), 500, &ctx).await,
         },
@@ -1127,10 +1126,10 @@ pub async fn insert_item(mut req: Request, ctx: RouteContext<()>) -> worker::Res
 
             let username = session_result.1;
 
-            match db_fso::db_get_user_role(&username, &db).await {                 
+            match db_get_user_role(&username, &db).await {                 
                 Ok(authorizer_role) => {
                     match authorizer_role {
-                        db_fso::UserRole::VIEWER => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
+                        UserRole::VIEWER => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
                         _=> (),
                     }  
                 },
@@ -1169,22 +1168,22 @@ pub async fn insert_item(mut req: Request, ctx: RouteContext<()>) -> worker::Res
                         return err_specific("{\"Error\":\"Info type must be specified.  Items without an input type can use MARKER or NOTE.\"}".to_string()).await
                     }
 
-                    match db_fso::db_insert_item(&new_item, &db).await {
+                    match db_insert_item(&new_item, &db).await {
                         Ok(id) => {                        
                             // Record the success in the change table
-                            match db_fso::db_generic_search_query_db(&db_fso::Table::Users,2,&username,&"".to_string(), &"".to_string(), &db).await {
+                            match db_generic_search_query_db(&Table::Users,2,&username,&"".to_string(), &"".to_string(), &db).await {
                                 Ok (results) => {
                                     if !results.users.is_empty(){
                                         let id2 = i32::cast_from(results.users[0].id);
                                         
                                         let mut table = "<Could not Find>".to_string();
 
-                                        match db_fso::db_generic_search_query_db(&db_fso::Table::FsoTables, 1, &new_item.table_id.to_string(), &"".to_string(), &"".to_string(), &db).await {
+                                        match db_generic_search_query_db(&Table::FsoTables, 1, &new_item.table_id.to_string(), &"".to_string(), &"".to_string(), &db).await {
                                             Ok(results2) => { if  !results2.fso_tables.is_empty() { table = results2.fso_tables[0].name.clone();}},
                                             Err(_) => (),
                                         }
 
-                                        let action = db_fso::ActionsInternal::new_action_internal(id2, 
+                                        let action = ActionsInternal::new_action_internal(id2, 
                                             format!("{{\"item_text\":\"{}\",\"documentation\":\"{}\",\"major_version\":\"{}\",\"parent_id\":{},\"table_id\":{},\"deprecation_id\":{},\"restriction_id\":4,\"info_type\":\"{}\",\"default_value\":\"{}\",\"table_index\":{}}}",new_item.item_text,new_item.documentation,new_item.major_version,new_item.parent_id,new_item.table_id,new_item.deprecation_id,new_item.restriction_id,new_item.table_id,new_item.table_index),
                                             id2, 
                                             get_current_time_i64(), 
@@ -1193,7 +1192,7 @@ pub async fn insert_item(mut req: Request, ctx: RouteContext<()>) -> worker::Res
                                             id,
                                         ).await;
 
-                                        match db_fso::db_insert_action(&action, &db).await {
+                                        match db_insert_action(&action, &db).await {
                                             Ok(_)=> return send_success(&format!("{{\"id\":\"{}\"}}", id), &"".to_string()).await,
 
                                             Err(e) => err_specific_and_add_report("{\"Error\":\"Internal Database Function Error encountered while recording changes, please report! | IEC00168\"}".to_string(),&(e.to_string() + " | IEC00168"), 500, &ctx).await,
@@ -1228,14 +1227,14 @@ pub async fn update_item(mut req: Request, ctx: RouteContext<()>) -> worker::Res
 
             let username = session_result.1;
 
-            match db_fso::db_get_user_role(&username, &db).await {                 
+            match db_get_user_role(&username, &db).await {                 
                 Ok(authorizer_role) => {
                     match authorizer_role {
-                        db_fso::UserRole::VIEWER => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
+                        UserRole::VIEWER => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
                         _=> (),
                     }         
 
-                    match req.json::<db_fso::FsoItemsPatch>().await {
+                    match req.json::<FsoItemsPatch>().await {
                         Ok(item) => {
                             let mut item_update_action_string : String = "{".to_string();
                             let mut item_update_error_string : String = "".to_string();
@@ -1245,7 +1244,7 @@ pub async fn update_item(mut req: Request, ctx: RouteContext<()>) -> worker::Res
                             }
 
                             if item.default_value != "~!*$%"{
-                                match db_fso::db_generic_update_query(&db_fso::Table::FsoItems, 0, &item.default_value, &item.item_id.to_string(),  &ctx).await {
+                                match db_generic_update_query(&Table::FsoItems, 0, &item.default_value, &item.item_id.to_string(),  &ctx).await {
                                     Ok(_) => item_update_action_string += &format!("\"default_value\":\"{}\"", item.default_value),
                                     Err(e) => {
                                         item_update_error_string += &"Could not update default value due to: ".to_string();
@@ -1256,7 +1255,7 @@ pub async fn update_item(mut req: Request, ctx: RouteContext<()>) -> worker::Res
                             }
 
                             if item.deprecation_id != "~!*$%" {
-                                match db_fso::db_generic_update_query(&db_fso::Table::FsoItems, 1, &item.deprecation_id, &item.item_id.to_string(),  &ctx).await {
+                                match db_generic_update_query(&Table::FsoItems, 1, &item.deprecation_id, &item.item_id.to_string(),  &ctx).await {
                                     Ok(_) => item_update_action_string += &format!("\"deprecation_id\":\"{}\"", item.deprecation_id),
                                     Err(e) => {
                                         item_update_error_string += &"Could not update default value due to: ".to_string();
@@ -1267,7 +1266,7 @@ pub async fn update_item(mut req: Request, ctx: RouteContext<()>) -> worker::Res
                             }
 
                             if item.documentation != "~!*$%"{
-                                match db_fso::db_generic_update_query(&db_fso::Table::FsoItems, 2, &item.documentation, &item.item_id.to_string(),  &ctx).await {
+                                match db_generic_update_query(&Table::FsoItems, 2, &item.documentation, &item.item_id.to_string(),  &ctx).await {
                                     Ok(_) => item_update_action_string += &format!("\"documentation\":\"{}\"", item.documentation),
                                     Err(e) => {
                                         item_update_error_string += &"Could not update default value due to: ".to_string();
@@ -1278,7 +1277,7 @@ pub async fn update_item(mut req: Request, ctx: RouteContext<()>) -> worker::Res
                             }
 
                             if item.info_type != "~!*$%"{
-                                match db_fso::db_generic_update_query(&db_fso::Table::FsoItems, 3, &item.info_type, &item.item_id.to_string(),  &ctx).await {
+                                match db_generic_update_query(&Table::FsoItems, 3, &item.info_type, &item.item_id.to_string(),  &ctx).await {
                                     Ok(_) => item_update_action_string += &format!("\"info_type\":\"{}\"", item.info_type),
                                     Err(e) => {
                                         item_update_error_string += &"Could not update default value due to: ".to_string();
@@ -1289,7 +1288,7 @@ pub async fn update_item(mut req: Request, ctx: RouteContext<()>) -> worker::Res
                             }
 
                             if item.item_text != "~!*$%"{
-                                match db_fso::db_generic_update_query(&db_fso::Table::FsoItems, 4, &item.item_text, &item.item_id.to_string(),  &ctx).await {
+                                match db_generic_update_query(&Table::FsoItems, 4, &item.item_text, &item.item_id.to_string(),  &ctx).await {
                                     Ok(_) => item_update_action_string += &format!("\"item_text\":\"{}\"", item.item_text),
                                     Err(e) => {
                                         item_update_error_string += &"Could not update default value due to: ".to_string();
@@ -1300,7 +1299,7 @@ pub async fn update_item(mut req: Request, ctx: RouteContext<()>) -> worker::Res
                             }
 
                             if item.major_version != "~!*$%"{
-                                match db_fso::db_generic_update_query(&db_fso::Table::FsoItems, 5, &item.major_version, &item.item_id.to_string(),  &ctx).await {
+                                match db_generic_update_query(&Table::FsoItems, 5, &item.major_version, &item.item_id.to_string(),  &ctx).await {
                                     Ok(_) => item_update_action_string += &format!("\"major_version\":\"{}\"", item.major_version),
                                     Err(e) => {
                                         item_update_error_string += &"Could not update default value due to: ".to_string();
@@ -1311,7 +1310,7 @@ pub async fn update_item(mut req: Request, ctx: RouteContext<()>) -> worker::Res
                             }
                             
                             if item.parent_id != "~!*$%" {
-                                match db_fso::db_generic_update_query(&db_fso::Table::FsoItems, 6, &item.parent_id, &item.item_id.to_string(),  &ctx).await {
+                                match db_generic_update_query(&Table::FsoItems, 6, &item.parent_id, &item.item_id.to_string(),  &ctx).await {
                                     Ok(_) => item_update_action_string += &format!("\"parent_id\":\"{}\"", item.parent_id),
                                     Err(e) => {
                                         item_update_error_string += &"Could not update default value due to: ".to_string();
@@ -1322,7 +1321,7 @@ pub async fn update_item(mut req: Request, ctx: RouteContext<()>) -> worker::Res
                             }
 
                             if item.restriction_id != "~!*$%" {
-                                match db_fso::db_generic_update_query(&db_fso::Table::FsoItems, 7, &item.restriction_id, &item.item_id.to_string(),  &ctx).await {
+                                match db_generic_update_query(&Table::FsoItems, 7, &item.restriction_id, &item.item_id.to_string(),  &ctx).await {
                                     Ok(_) => item_update_action_string += &format!("\"restriction_id\":\"{}\"", item.restriction_id),
                                     Err(e) => {
                                         item_update_error_string += &"Could not update default value due to: ".to_string();
@@ -1333,7 +1332,7 @@ pub async fn update_item(mut req: Request, ctx: RouteContext<()>) -> worker::Res
                             }
 
                             if item.table_id != "~!*$%" {
-                                match db_fso::db_generic_update_query(&db_fso::Table::FsoItems, 8, &item.table_id.to_string(), &item.item_id.to_string(),  &ctx).await {
+                                match db_generic_update_query(&Table::FsoItems, 8, &item.table_id.to_string(), &item.item_id.to_string(),  &ctx).await {
                                     Ok(_) => item_update_action_string += &format!("\"table_id\":\"{}\"", item.table_id),
                                     Err(e) => {
                                         item_update_error_string += &"Could not update default value due to: ".to_string();
@@ -1344,7 +1343,7 @@ pub async fn update_item(mut req: Request, ctx: RouteContext<()>) -> worker::Res
                             }
 
                             if item.table_index != "~!*$%" {
-                                match db_fso::db_generic_update_query(&db_fso::Table::FsoItems, 9, &item.table_id.to_string(), &item.item_id.to_string(),  &ctx).await {
+                                match db_generic_update_query(&Table::FsoItems, 9, &item.table_id.to_string(), &item.item_id.to_string(),  &ctx).await {
                                     Ok(_) => item_update_action_string += &format!("\"table_id\":\"{}\"", item.table_id),
                                     Err(e) => {
                                         item_update_error_string += &"Could not update default value due to: ".to_string();
@@ -1354,12 +1353,12 @@ pub async fn update_item(mut req: Request, ctx: RouteContext<()>) -> worker::Res
                                 }
                             }
 
-                            match db_fso::db_generic_search_query_db(&db_fso::Table::Users,2,&username,&"".to_string(), &"".to_string(), &db).await {
+                            match db_generic_search_query_db(&Table::Users,2,&username,&"".to_string(), &"".to_string(), &db).await {
                                 Ok (results) => {
                                     if !results.users.is_empty(){
                                         let id2 = i32::cast_from(results.users[0].id);
 
-                                        let action = db_fso::ActionsInternal::new_action_internal(
+                                        let action = ActionsInternal::new_action_internal(
                                             id2, 
                                             item_update_action_string,
                                             id2, 
@@ -1368,7 +1367,7 @@ pub async fn update_item(mut req: Request, ctx: RouteContext<()>) -> worker::Res
                                             "Update item via API attempt".to_string(),
                                             item.item_id).await;
 
-                                        match db_fso::db_insert_action(&action, &db).await {
+                                        match db_insert_action(&action, &db).await {
                                             Ok(_)=> (),
                                             Err(e)=> item_update_error_string += &("Error encountered while added history to database: ".to_owned() + &e.to_string()),
                                         }
@@ -1406,11 +1405,11 @@ pub async fn delete_item(req: Request, ctx: RouteContext<()>) -> worker::Result<
 
             let username = session_result.1;
 
-            match db_fso::db_get_user_role(&username, &db).await {                 
+            match db_get_user_role(&username, &db).await {                 
                 Ok(authorizer_role) => {
                     match authorizer_role {
-                        db_fso::UserRole::VIEWER => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
-                        db_fso::UserRole::MAINTAINER => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
+                        UserRole::VIEWER => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
+                        UserRole::MAINTAINER => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
                         _=> {},
                     }         
                 },
@@ -1421,7 +1420,7 @@ pub async fn delete_item(req: Request, ctx: RouteContext<()>) -> worker::Result<
                 Some(id) => {
                     match id.parse::<i64>(){
                         Ok(_) =>{
-                            match db_fso::db_generic_delete(db_fso::Table::FsoItems, id, &ctx).await {
+                            match db_generic_delete(Table::FsoItems, id, &ctx).await {
                                 Ok(_) => return send_success(&"{\"Response\": \"Success!\"}".to_string(), &"".to_string()).await,
                                 Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00072\"}".to_string(),&(e.to_string() + " | IEC00072"), 500, &ctx).await,
                             }
@@ -1439,7 +1438,7 @@ pub async fn delete_item(req: Request, ctx: RouteContext<()>) -> worker::Result<
 }
 
 pub async fn get_tables(_: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
-    match db_generic_search_query_ctx(&db_fso::Table::FsoTables, 0, &"".to_string(), &"".to_string(), &"".to_string(), &ctx).await {
+    match db_generic_search_query_ctx(&Table::FsoTables, 0, &"".to_string(), &"".to_string(), &"".to_string(), &ctx).await {
         Ok(result) => {
             return Ok(Response::from_json(&result.fso_tables).unwrap().with_headers(add_mandatory_headers(&"".to_string()).await));
         },
@@ -1451,7 +1450,7 @@ pub async fn get_tables(_: Request, ctx: RouteContext<()>) -> worker::Result<Res
 
 pub async fn get_table(_: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
     match ctx.param("id"){
-        Some(parameter) => match db_generic_search_query_ctx(&db_fso::Table::FsoTables, 1, parameter, &"".to_string(),&"".to_string(),  &ctx).await {
+        Some(parameter) => match db_generic_search_query_ctx(&Table::FsoTables, 1, parameter, &"".to_string(),&"".to_string(),  &ctx).await {
             Ok(results) => return Ok(Response::from_json(&results.fso_tables).unwrap().with_headers(add_mandatory_headers(&"".to_string()).await)),
             Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00075\"}".to_string(),&(e.to_string() + " | IEC00075"), 500, &ctx).await,
         },
@@ -1462,7 +1461,7 @@ pub async fn get_table(_: Request, ctx: RouteContext<()>) -> worker::Result<Resp
 pub async fn get_tables_items(_: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
     match ctx.param("id"){
         Some(parameter) => {
-            match db_generic_search_query_ctx(&db_fso::Table::FsoItems, 1, parameter, &"".to_string(), &"".to_string(), &ctx).await {
+            match db_generic_search_query_ctx(&Table::FsoItems, 1, parameter, &"".to_string(), &"".to_string(), &ctx).await {
                 Ok(results) => return Ok(Response::from_json(&results.fso_items).unwrap().with_headers(add_mandatory_headers(&"".to_string()).await)),
                 Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00163\"}".to_string(),&(e.to_string() + " | IEC00163"), 500, &ctx).await,
             }
@@ -1472,7 +1471,7 @@ pub async fn get_tables_items(_: Request, ctx: RouteContext<()>) -> worker::Resu
 }
 
 pub async fn get_aliases(_: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
-    match db_generic_search_query_ctx(&db_fso::Table::TableAliases, 0, &"".to_string(), &"".to_string(), &"".to_string(), &ctx).await {
+    match db_generic_search_query_ctx(&Table::TableAliases, 0, &"".to_string(), &"".to_string(), &"".to_string(), &ctx).await {
         Ok(result) => {
             return Ok(Response::from_json(&result.table_aliases).unwrap().with_headers(add_mandatory_headers(&"".to_string()).await));
         },
@@ -1484,7 +1483,7 @@ pub async fn get_aliases(_: Request, ctx: RouteContext<()>) -> worker::Result<Re
 
 pub async fn get_alias(_: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
     match ctx.param("id"){
-        Some(parameter) => match db_generic_search_query_ctx(&db_fso::Table::TableAliases, 1, parameter, &"".to_string(), &"".to_string(), &ctx).await {
+        Some(parameter) => match db_generic_search_query_ctx(&Table::TableAliases, 1, parameter, &"".to_string(), &"".to_string(), &ctx).await {
             Ok(results) => return Ok(Response::from_json(&results.table_aliases).unwrap().with_headers(add_mandatory_headers(&"".to_string()).await)),
             Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00077\"}".to_string(),&(e.to_string() + " | IEC00077"), 500, &ctx).await,
         },
@@ -1502,28 +1501,28 @@ pub async fn update_alias(mut req: Request, ctx: RouteContext<()>) -> worker::Re
 
             let username = session_result.1;
 
-            match db_fso::db_get_user_role(&username, &db).await {                 
+            match db_get_user_role(&username, &db).await {                 
                 Ok(authorizer_role) => {
                     match authorizer_role {
-                        db_fso::UserRole::VIEWER => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
+                        UserRole::VIEWER => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
                         _=> (),
                     }         
 
-                    match req.json::<db_fso::TableAlias>().await {
+                    match req.json::<TableAlias>().await {
                         Ok(table_alias) => {
                             if table_alias.alias_id < 0 {
                                 return err_specific("{\"Error\":\"Invalid table alias id, cannot update.\"}".to_string()).await;
                             }
 
                             if table_alias.filename != "~!*$%"{
-                                match db_fso::db_generic_update_query(&db_fso::Table::TableAliases, 0, &table_alias.filename, &table_alias.alias_id.to_string(),  &ctx).await {
+                                match db_generic_update_query(&Table::TableAliases, 0, &table_alias.filename, &table_alias.alias_id.to_string(),  &ctx).await {
                                     Ok(_) => (),
                                     Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00078\"}".to_string(),&(e.to_string() + " | IEC00078"), 500, &ctx).await,
                                 }    
                             }
 
                             if table_alias.table_id > -2{
-                                match db_fso::db_generic_update_query(&db_fso::Table::TableAliases, 1, &table_alias.table_id.to_string(), &table_alias.alias_id.to_string(),  &ctx).await {
+                                match db_generic_update_query(&Table::TableAliases, 1, &table_alias.table_id.to_string(), &table_alias.alias_id.to_string(),  &ctx).await {
                                     Ok(_) => (),
                                     Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00079\"}".to_string(),&(e.to_string() + " | IEC00079"), 500, &ctx).await,
                                 }
@@ -1553,11 +1552,11 @@ pub async fn delete_alias(req: Request, ctx: RouteContext<()>) -> worker::Result
 
             let username = session_result.1;
 
-            match db_fso::db_get_user_role(&username, &db).await {                 
+            match db_get_user_role(&username, &db).await {                 
                 Ok(authorizer_role) => {
                     match authorizer_role {
-                        db_fso::UserRole::VIEWER => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
-                        db_fso::UserRole::MAINTAINER => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
+                        UserRole::VIEWER => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
+                        UserRole::MAINTAINER => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
                         _=> {},
                     }         
                 },
@@ -1568,7 +1567,7 @@ pub async fn delete_alias(req: Request, ctx: RouteContext<()>) -> worker::Result
                 Some(id) => {
                     match id.parse::<i64>(){
                         Ok(_) =>{
-                            match db_fso::db_generic_delete(db_fso::Table::TableAliases, id, &ctx).await {
+                            match db_generic_delete(Table::TableAliases, id, &ctx).await {
                                 Ok(_) => return send_success(&"{\"Response\": \"Success!\"}".to_string(), &"".to_string()).await,
                                 Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00083\"}".to_string(),&(e.to_string() + " | IEC00083"), 500, &ctx).await,
                             }
@@ -1586,7 +1585,7 @@ pub async fn delete_alias(req: Request, ctx: RouteContext<()>) -> worker::Result
 }
 
 pub async fn get_restrictions(_: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
-    match db_generic_search_query_ctx(&db_fso::Table::Restrictions, 0, &"".to_string(), &"".to_string(), &"".to_string(), &ctx).await {
+    match db_generic_search_query_ctx(&Table::Restrictions, 0, &"".to_string(), &"".to_string(), &"".to_string(), &ctx).await {
         Ok(result) => {
             return Ok(Response::from_json(&result.restrictions).unwrap().with_headers(add_mandatory_headers(&"".to_string()).await));
         },
@@ -1598,7 +1597,7 @@ pub async fn get_restrictions(_: Request, ctx: RouteContext<()>) -> worker::Resu
 
 pub async fn get_restriction(_: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
     match ctx.param("id"){
-        Some(parameter) => match db_generic_search_query_ctx(&db_fso::Table::Restrictions, 1, parameter, &"".to_string(), &"".to_string(), &ctx).await {
+        Some(parameter) => match db_generic_search_query_ctx(&Table::Restrictions, 1, parameter, &"".to_string(), &"".to_string(), &ctx).await {
             Ok(results) => return Ok(Response::from_json(&results.restrictions).unwrap().with_headers(add_mandatory_headers(&"".to_string()).await)),
             Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00086\"}".to_string(),&(e.to_string() + " | IEC00086"), 500, &ctx).await,
         },
@@ -1616,42 +1615,42 @@ pub async fn update_restriction(mut req: Request, ctx: RouteContext<()>) -> work
 
             let username = session_result.1;
 
-            match db_fso::db_get_user_role(&username, &db).await {                 
+            match db_get_user_role(&username, &db).await {                 
                 Ok(authorizer_role) => {
                     match authorizer_role {
-                        db_fso::UserRole::VIEWER => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
+                        UserRole::VIEWER => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
                         _=> (),
                     }         
 
-                    match req.json::<db_fso::Restrictions>().await {
+                    match req.json::<Restrictions>().await {
                         Ok(restriction) => {
                             if restriction.restriction_id < 0 {
                                 return err_specific("{\"Error\":\"Invalid restriction id, cannot update.\"}".to_string()).await;
                             }
 
-                            match db_fso::db_generic_update_query(&db_fso::Table::Restrictions, 0, &restriction.illegal_value_float.to_string(), &restriction.restriction_id.to_string(),  &ctx).await {
+                            match db_generic_update_query(&Table::Restrictions, 0, &restriction.illegal_value_float.to_string(), &restriction.restriction_id.to_string(),  &ctx).await {
                                 Ok(_) => (),
                                 Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00087\"}".to_string(),&(e.to_string() + " | IEC00087"), 500, &ctx).await,
                             }    
 
-                            match db_fso::db_generic_update_query(&db_fso::Table::Restrictions, 1, &restriction.illegal_value_int.to_string(), &restriction.restriction_id.to_string(),  &ctx).await {
+                            match db_generic_update_query(&Table::Restrictions, 1, &restriction.illegal_value_int.to_string(), &restriction.restriction_id.to_string(),  &ctx).await {
                                 Ok(_) => (),
                                 Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00088\"}".to_string(),&(e.to_string() + " | IEC00088"), 500, &ctx).await,
                             }
                             
                             if restriction.max_string_length > -2 {
-                                match db_fso::db_generic_update_query(&db_fso::Table::Restrictions, 2, &restriction.max_string_length.to_string(), &restriction.restriction_id.to_string(),  &ctx).await {
+                                match db_generic_update_query(&Table::Restrictions, 2, &restriction.max_string_length.to_string(), &restriction.restriction_id.to_string(),  &ctx).await {
                                     Ok(_) => (),
                                     Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00089\"}".to_string(),&(e.to_string() + " | IEC00089"), 500, &ctx).await,
                                 }    
                             }
 
-                            match db_fso::db_generic_update_query(&db_fso::Table::Restrictions, 3, &restriction.max_value.to_string(), &restriction.restriction_id.to_string(),  &ctx).await {
+                            match db_generic_update_query(&Table::Restrictions, 3, &restriction.max_value.to_string(), &restriction.restriction_id.to_string(),  &ctx).await {
                                 Ok(_) => (),
                                 Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00090\"}".to_string(),&(e.to_string() + " | IEC00090"), 500, &ctx).await,
                             }    
 
-                            match db_fso::db_generic_update_query(&db_fso::Table::Restrictions, 4, &restriction.min_value.to_string(), &restriction.restriction_id.to_string(),  &ctx).await {
+                            match db_generic_update_query(&Table::Restrictions, 4, &restriction.min_value.to_string(), &restriction.restriction_id.to_string(),  &ctx).await {
                                 Ok(_) => (),
                                 Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00091\"}".to_string(),&(e.to_string() + " | IEC00091"), 500, &ctx).await,
                             }    
@@ -1680,11 +1679,11 @@ pub async fn delete_restriction(req: Request, ctx: RouteContext<()>) -> worker::
 
             let username = session_result.1;
 
-            match db_fso::db_get_user_role(&username, &db).await {                 
+            match db_get_user_role(&username, &db).await {                 
                 Ok(authorizer_role) => {
                     match authorizer_role {
-                        db_fso::UserRole::VIEWER => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
-                        db_fso::UserRole::MAINTAINER => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
+                        UserRole::VIEWER => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
+                        UserRole::MAINTAINER => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
                         _=> {},
                     }         
                 },
@@ -1695,7 +1694,7 @@ pub async fn delete_restriction(req: Request, ctx: RouteContext<()>) -> worker::
                 Some(id) => {
                     match id.parse::<i64>(){
                         Ok(_) =>{
-                            match db_fso::db_generic_delete(db_fso::Table::Restrictions, id, &ctx).await {
+                            match db_generic_delete(Table::Restrictions, id, &ctx).await {
                                 Ok(_) => return send_success(&"{\"Response\": \"Success!\"}".to_string(), &"".to_string()).await,
                                 Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00095\"}".to_string(),&(e.to_string() + " | IEC00095"), 500, &ctx).await,
                             }
@@ -1713,7 +1712,7 @@ pub async fn delete_restriction(req: Request, ctx: RouteContext<()>) -> worker::
 }
 
 pub async fn get_deprecations(_: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
-    match db_generic_search_query_ctx(&db_fso::Table::Deprecations, 0, &"".to_string(), &"".to_string(), &"".to_string(), &ctx).await {
+    match db_generic_search_query_ctx(&Table::Deprecations, 0, &"".to_string(), &"".to_string(), &"".to_string(), &ctx).await {
         Ok(result) => {
             return Ok(Response::from_json(&result.deprecations).unwrap().with_headers(add_mandatory_headers(&"".to_string()).await));
         },
@@ -1725,11 +1724,55 @@ pub async fn get_deprecations(_: Request, ctx: RouteContext<()>) -> worker::Resu
 
 pub async fn get_deprecation(_: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
     match ctx.param("id"){
-        Some(parameter) => match db_generic_search_query_ctx(&db_fso::Table::Deprecations, 1, parameter, &"".to_string(), &"".to_string(), &ctx).await {
+        Some(parameter) => match db_generic_search_query_ctx(&Table::Deprecations, 1, parameter, &"".to_string(), &"".to_string(), &ctx).await {
             Ok(results) => return Ok(Response::from_json(&results.deprecations).unwrap().with_headers(add_mandatory_headers(&"".to_string()).await)),
             Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00098\"}".to_string(),&(e.to_string() + " | IEC00098"), 500, &ctx).await,
         },
         None => return err_specific("{\"Error\":\"Internal Server Error, route parameter mismatch!\"}".to_string()).await,
+    }
+}
+
+pub async fn post_deprecation(mut req: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
+    match ctx.env.d1(DB_NAME) {
+        Ok(db) => {
+            let session_result = header_session_is_valid(&req, &db, &ctx).await;
+            if !session_result.0 {
+                return send_failure(&ERROR_NOT_LOGGED_IN.to_string(), 403).await
+            }
+
+            let username = session_result.1;
+
+            match db_get_user_role(&username, &db).await {                 
+                Ok(authorizer_role) => {
+                    match authorizer_role {
+                        UserRole::VIEWER => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
+                        _=> (),
+                    }         
+                
+                    match req.json::<DeprecationNew>().await {
+                        Ok(new_deprecation) => {
+                            match db_generic_search_query_db(&Table::FsoItems, 1, &new_deprecation.item_id.to_string(), &"".to_string(), &"".to_string(), &db).await{
+                                Ok(verification_result) => {
+                                    if verification_result.fso_items.is_empty() {
+                                        return err_specific("Item specified does not exist.".to_string()).await;
+                                    }
+                                },
+                                Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00176\"}".to_string(),&(e.to_string() + " | IEC00176"), 500, &ctx).await,
+                            }
+
+                            match db_insert_deprecation(&new_deprecation, &db).await {
+                                Ok(new_id)=> return send_success(&format!("{{\"id\":\"{}\"}}", new_id), &"".to_string()).await,
+                                Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00177\"}".to_string(),&(e.to_string() + " | IEC00177"), 500, &ctx).await,
+                            }
+                        },
+                        Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00175\"}".to_string(),&(e.to_string() + " | IEC00175"), 500, &ctx).await,
+                    }
+                
+                },
+                Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00174\"}".to_string(),&(e.to_string() + " | IEC00174"), 500, &ctx).await,
+            }
+        },
+        Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00173\"}".to_string(),&(e.to_string() + " | IEC00173"), 500, &ctx).await,
     }
 }
 
@@ -1743,35 +1786,35 @@ pub async fn update_deprecation(mut req: Request, ctx: RouteContext<()>) -> work
 
             let username = session_result.1;
 
-            match db_fso::db_get_user_role(&username, &db).await {                 
+            match db_get_user_role(&username, &db).await {                 
                 Ok(authorizer_role) => {
                     match authorizer_role {
-                        db_fso::UserRole::VIEWER => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
+                        UserRole::VIEWER => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
                         _=> (),
                     }         
 
-                    match req.json::<db_fso::DeprecationIn>().await {
+                    match req.json::<DeprecationIn>().await {
                         Ok(deprecation) => {
                             if deprecation.deprecation_id < 0 {
                                 return err_specific("{\"Error\":\"Invalid deprecation id, cannot update.\"}".to_string()).await;
                             }
 
                             if deprecation.version != "~!*$%"{
-                                match db_fso::db_generic_update_query(&db_fso::Table::Deprecations, 0, &deprecation.version, &deprecation.deprecation_id.to_string(),  &ctx).await {
+                                match db_generic_update_query(&Table::Deprecations, 0, &deprecation.version, &deprecation.deprecation_id.to_string(),  &ctx).await {
                                     Ok(_) => (),
                                     Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00099\"}".to_string(),&(e.to_string() + " | IEC00099"), 500, &ctx).await,
                                 }    
                             }
 
                             if deprecation.description != "~!*$%"{
-                                match db_fso::db_generic_update_query(&db_fso::Table::Deprecations, 1, &deprecation.description, &deprecation.deprecation_id.to_string(),  &ctx).await {
+                                match db_generic_update_query(&Table::Deprecations, 1, &deprecation.description, &deprecation.deprecation_id.to_string(),  &ctx).await {
                                     Ok(_) => (),
                                     Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00100\"}".to_string(),&(e.to_string() + " | IEC00100"), 500, &ctx).await,
                                 }
                             }
 
                             if deprecation.partial != "~!*$%"{
-                                match db_fso::db_generic_update_query(&db_fso::Table::Deprecations, 1, &deprecation.partial.to_string(), &deprecation.deprecation_id.to_string(),  &ctx).await {
+                                match db_generic_update_query(&Table::Deprecations, 1, &deprecation.partial.to_string(), &deprecation.deprecation_id.to_string(),  &ctx).await {
                                     Ok(_) => (),
                                     Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00100\"}".to_string(),&(e.to_string() + " | IEC00101"), 500, &ctx).await,
                                 }
@@ -1801,11 +1844,11 @@ pub async fn delete_deprecation(req: Request, ctx: RouteContext<()>) -> worker::
 
             let username = session_result.1;
 
-            match db_fso::db_get_user_role(&username, &db).await {                 
+            match db_get_user_role(&username, &db).await {                 
                 Ok(authorizer_role) => {
                     match authorizer_role {
-                        db_fso::UserRole::VIEWER => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
-                        db_fso::UserRole::MAINTAINER => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
+                        UserRole::VIEWER => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
+                        UserRole::MAINTAINER => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
                         _=> {},
                     }         
                 },
@@ -1816,7 +1859,7 @@ pub async fn delete_deprecation(req: Request, ctx: RouteContext<()>) -> worker::
                 Some(id) => {
                     match id.parse::<i64>(){
                         Ok(_) =>{
-                            match db_fso::db_generic_delete(db_fso::Table::ParseBehaviors, id, &ctx).await {
+                            match db_generic_delete(Table::ParseBehaviors, id, &ctx).await {
                                 Ok(_) => return send_success(&"{\"Response\": \"Success!\"}".to_string(), &"".to_string()).await,
                                 Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00104\"}".to_string(),&(e.to_string() + " | IEC00104"), 500, &ctx).await,
                             }
@@ -1856,7 +1899,7 @@ pub async fn add_bug_report(mut req: Request, ctx: RouteContext<()>) -> worker::
                         username = session_result.1;
                     }
 
-                    match db_fso::db_insert_bug_report(&username, &report.bug_type, &report.description, &ctx).await {
+                    match db_insert_bug_report(&username, &report.bug_type, &report.description, &ctx).await {
                         Ok(_) => send_success(&"{\"Response\": \"Success!\"}".to_string(), &"".to_string()).await,
                         Err(e) => err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00106\"}".to_string(),&(e.to_string() + " | IEC00106"), 500, &ctx).await,
                     }
@@ -1880,11 +1923,11 @@ pub async fn resolve_bug_report(req: Request, ctx: RouteContext<()>) -> worker::
 
             let username = session_result.1;
 
-            match db_fso::db_get_user_role(&username, &db).await {                 
+            match db_get_user_role(&username, &db).await {                 
                 Ok(authorizer_role) => {
                     match authorizer_role {
-                        db_fso::UserRole::VIEWER => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
-                        db_fso::UserRole::MAINTAINER => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
+                        UserRole::VIEWER => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
+                        UserRole::MAINTAINER => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
                         _=> (),
                     }         
                     match ctx.param("id"){
@@ -1895,7 +1938,7 @@ pub async fn resolve_bug_report(req: Request, ctx: RouteContext<()>) -> worker::
                                         return err_specific("{\"Error\":\"Invalid bug report id, cannot update.\"}".to_string()).await;
                                     }
 
-                                    match db_fso::db_generic_update_query(&db_fso::Table::BugReports, 0, &"3".to_string(), &id,  &ctx).await {
+                                    match db_generic_update_query(&Table::BugReports, 0, &"3".to_string(), &id,  &ctx).await {
                                         Ok(_) => (),
                                         Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00109\"}".to_string(),&(e.to_string() + " | IEC00109"), 500, &ctx).await,
                                     }
@@ -1926,11 +1969,11 @@ pub async fn unresolve_bug_report(req: Request, ctx: RouteContext<()>) -> worker
 
             let username = session_result.1;
 
-            match db_fso::db_get_user_role(&username, &db).await {                 
+            match db_get_user_role(&username, &db).await {                 
                 Ok(authorizer_role) => {
                     match authorizer_role {
-                        db_fso::UserRole::VIEWER => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
-                        db_fso::UserRole::MAINTAINER => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
+                        UserRole::VIEWER => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
+                        UserRole::MAINTAINER => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
                         _=> (),
                     }         
 
@@ -1942,7 +1985,7 @@ pub async fn unresolve_bug_report(req: Request, ctx: RouteContext<()>) -> worker
                                             return err_specific("{\"Error\":\"Invalid bug report id, cannot update.\"}".to_string()).await;
                                     }
 
-                                    match db_fso::db_generic_update_query(&db_fso::Table::BugReports, 0, &"0".to_string(), &id.to_string(),  &ctx).await {
+                                    match db_generic_update_query(&Table::BugReports, 0, &"0".to_string(), &id.to_string(),  &ctx).await {
                                         Ok(_) => (),
                                         Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00112\"}".to_string(),&(e.to_string() + " | IEC00112"), 500, &ctx).await,
                                     }
@@ -1974,11 +2017,11 @@ pub async fn acknowledge_bug_report(req: Request, ctx: RouteContext<()>) -> work
 
             let username = session_result.1;
 
-            match db_fso::db_get_user_role(&username, &db).await {                 
+            match db_get_user_role(&username, &db).await {                 
                 Ok(authorizer_role) => {
                     match authorizer_role {
-                        db_fso::UserRole::OWNER => (),
-                        db_fso::UserRole::ADMIN => (),
+                        UserRole::OWNER => (),
+                        UserRole::ADMIN => (),
                         _=> return err_specific("{\"Error\":\"Only administrators can acknowledge bug reports\"}".to_string()).await,
                     }         
                 },
@@ -1993,7 +2036,7 @@ pub async fn acknowledge_bug_report(req: Request, ctx: RouteContext<()>) -> work
                                 return err_specific("{\"Error\":\"Invalid bug report id, cannot update.\"}".to_string()).await;
                             }
         
-                            match db_generic_search_query_db(&db_fso::Table::BugReports, 0, &id, &"".to_string(), &"".to_string(), &db).await {
+                            match db_generic_search_query_db(&Table::BugReports, 0, &id, &"".to_string(), &"".to_string(), &db).await {
                                 Ok(bug_report_result) => {
                                     if bug_report_result.bug_reports.is_empty() {
                                         return err_specific("{\"Error\":\"Could not find a matching bug report.\"}".to_string()).await;
@@ -2003,7 +2046,7 @@ pub async fn acknowledge_bug_report(req: Request, ctx: RouteContext<()>) -> work
                                 Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00116\"}".to_string(),&(e.to_string() + " | IEC00116"), 500, &ctx).await,
                             }
         
-                            match db_fso::db_generic_update_query(&db_fso::Table::BugReports, 0, &"1".to_string(), &id.to_string(),  &ctx).await {
+                            match db_generic_update_query(&Table::BugReports, 0, &"1".to_string(), &id.to_string(),  &ctx).await {
                                 Ok(_) => (),
                                 Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00117\"}".to_string(),&(e.to_string() + " | IEC00117"), 500, &ctx).await,
                             }
@@ -2042,11 +2085,11 @@ pub async fn update_bug_report(mut req: Request, ctx: RouteContext<()>) -> worke
             let username = session_result.1;
             let mut administrator = false;
 
-            match db_fso::db_get_user_role(&username, &db).await {                 
+            match db_get_user_role(&username, &db).await {                 
                 Ok(authorizer_role) => {
                     match authorizer_role {
-                        db_fso::UserRole::OWNER => administrator = true,
-                        db_fso::UserRole::ADMIN => administrator = true,
+                        UserRole::OWNER => administrator = true,
+                        UserRole::ADMIN => administrator = true,
                         _=> (),
                     }         
                 },                
@@ -2068,13 +2111,13 @@ pub async fn update_bug_report(mut req: Request, ctx: RouteContext<()>) -> worke
             }
 
             if !administrator {
-                match db_generic_search_query_db(&db_fso::Table::Users, 2, &username, &"".to_string(), &"".to_string(), &db).await {
+                match db_generic_search_query_db(&Table::Users, 2, &username, &"".to_string(), &"".to_string(), &db).await {
                     Ok(user_result) => {
                         if user_result.users.is_empty(){
                             return err_specific("{\"Error\":\"Could not find a matching user for the username logged in somehow. You should probably submit a new bug report.\"}".to_string()).await
                         }
 
-                        match db_generic_search_query_db(&db_fso::Table::BugReports, 1, &bug_id.to_string(), &"".to_string(), &"".to_string(), &db).await {
+                        match db_generic_search_query_db(&Table::BugReports, 1, &bug_id.to_string(), &"".to_string(), &"".to_string(), &db).await {
                             Ok(bug_report_result) => {
                                 if user_result.users[0].id != bug_report_result.bug_reports[0].user_id {
                                     return err_specific("{\"Error\":\"Only the reporter of a bug or an administrator can edit the contents of a bug report.\"}".to_string()).await
@@ -2092,14 +2135,14 @@ pub async fn update_bug_report(mut req: Request, ctx: RouteContext<()>) -> worke
             match req.json::<BugReportInfo>().await {
                 Ok(bug_info) => {
                     if bug_info.bug_type != "~!*$%"{
-                        match db_fso::db_generic_update_query(&db_fso::Table::BugReports, 1, &bug_info.bug_type, &bug_id.to_string(),  &ctx).await {
+                        match db_generic_update_query(&Table::BugReports, 1, &bug_info.bug_type, &bug_id.to_string(),  &ctx).await {
                             Ok(_) => (),
                             Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00122\"}".to_string(),&(e.to_string() + " | IEC00122"), 500, &ctx).await,
                         }    
                     }
 
                     if bug_info.description != "~!*$%"{
-                        match db_fso::db_generic_update_query(&db_fso::Table::BugReports, 2, &bug_info.description, &bug_id.to_string(),  &ctx).await {
+                        match db_generic_update_query(&Table::BugReports, 2, &bug_info.description, &bug_id.to_string(),  &ctx).await {
                             Ok(_) => (),
                             Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00123\"}".to_string(),&(e.to_string() + " | IEC00123"), 500, &ctx).await,
                         }
@@ -2209,7 +2252,7 @@ pub async fn create_session_and_send(email: &String, salt: &String, ctx: &RouteC
     }
 
     // We give the user two hours to do what they need to do.
-    match db_fso::db_session_add(&hashed_string, &email, &(Utc::now() + TimeDelta::days(7)).format(DB_TIME_FORMAT).to_string(), ctx).await {
+    match db_session_add(&hashed_string, &email, &(Utc::now() + TimeDelta::days(7)).format(DB_TIME_FORMAT).to_string(), ctx).await {
         // remember! double {{ }} needed to escape here, even on the right side.
         Ok(_) => return send_success(&"".to_string(), &login_token).await,
         Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00134\"}".to_string(),&(e.to_string() + " | IEC00134"), 500, &ctx).await,
@@ -2315,7 +2358,7 @@ pub async fn header_session_is_valid(req: &Request, db: &D1Database, ctx: &Route
                 return return_tuple;
             }
             
-            let salt_result = db_fso::db_get_user_salt(&return_tuple.1, ctx).await;
+            let salt_result = db_get_user_salt(&return_tuple.1, ctx).await;
 
             if salt_result.is_err() {
                 return_tuple.1 = salt_result.unwrap_err().to_string();
@@ -2326,7 +2369,7 @@ pub async fn header_session_is_valid(req: &Request, db: &D1Database, ctx: &Route
 
             let hashed_token = hash_string(&salt, &token).await.unwrap();
 
-            match db_fso::db_check_token(&return_tuple.1, &hashed_token, Utc::now().format(DB_TIME_FORMAT).to_string(), &db).await {
+            match db_check_token(&return_tuple.1, &hashed_token, Utc::now().format(DB_TIME_FORMAT).to_string(), &db).await {
                 Ok(result) => return_tuple.0 = result,
                 Err(e) => return_tuple.1 = e.to_string(),
             }
@@ -2488,7 +2531,7 @@ pub async fn err_specific(e: String) -> worker::Result<Response> {
 
 pub async fn err_specific_and_add_report(mut external: String, internal: &String, code: u16, ctx: &RouteContext<()>) -> worker::Result<Response> {
     
-    match db_fso::db_insert_error_record(&internal, ctx).await {
+    match db_insert_error_record(&internal, ctx).await {
         Ok(_) => {},
         Err(e)=> {
             
