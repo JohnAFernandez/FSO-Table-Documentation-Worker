@@ -76,11 +76,12 @@ async fn fetch(req: Request, env: Env, _ctx: Context,) -> worker::Result<Respons
         .options_async("/api/tables/parse-types", send_cors)
         .get_async("/api/tables/parse-types/:id", get_parse_type)
         .options_async("/api/tables/parse-types/:id", send_cors)
+        // TODO this may never get done, I'm not sure
         //.post_async("/api/tables/parse-types", post_parse_behavior)
         .patch_async("/api/tables/parse-types", update_parse_type).put_async("/api/tables/parse-types", update_parse_type)
         .delete_async("/api/tables/parse-types/:id", delete_parse_type) // Admin only
-        // tables just need to be done manually on my end, because we don't have many tables *and* it's less effort than just populating.
-        // UPDATE! I finished adding them to the database
+        // table info was done manually on my end, because we don't have many tables *and* it's less effort than creating UI editing.
+        // TODO: stretch goal will allow UI to update table description, deprecation and aliases
         .get_async("/api/tables", get_tables).options_async("/api/tables", send_cors)
         .get_async("/api/tables/items", get_items).options_async("/api/tables/items", send_cors)
         .get_async("/api/tables/items/:id", get_item)
@@ -107,10 +108,8 @@ async fn fetch(req: Request, env: Env, _ctx: Context,) -> worker::Result<Respons
         .delete_async("/api/tables/deprecations/:id", delete_deprecation) // Admin only
         .get_async("/api/tables/actions/history/user/", get_complete_user_history) // Requires login
         //.get_async("/api/tables/actions/history/item/:id", get_item_history)
-        //.get_async("/api/tables/actions/approvals", get_approval_requests) // Requires login
+        //.get_async("/api/tables/actions/approvals/all", get_approval_requests) // Requires login
         //.get_async("/api/tables/actions/approvals/:id", get_approval_requests_user) // Requires login, for seeing just mine, or admin seeing specific other user
-        //.get_async("/api/tables/actions/rejections", get_rejected_requests) // Requires login
-        //.get_async("/api/tables/actions/rejections/:id": get_rejcted_requests_user) // Requires login
         //.post_async("/api/tables/actions/:id:/approve", approve_request) // Requires login and admin
         //.post_async("/api/tables/actions/:id:/reject", reject_request) // Requries login and admin
         .post_async("/api/bugreport", add_bug_report).options_async("/api/bugreport", send_cors)
@@ -119,7 +118,7 @@ async fn fetch(req: Request, env: Env, _ctx: Context,) -> worker::Result<Respons
         .patch_async("/api/bugreport/:id/unresolve", unresolve_bug_report).options_async("/api/bugreport/:id/unresolve", send_cors)
         .patch_async("/api/bugreport/:id/edit", update_bug_report).options_async("/api/bugreport/:id/edit", send_cors)
         .get_async("/api/test", test_all) // This might eventually be a "CI" test, but for now it just displays a message.
-        .or_else_any_method_async("/api/", send_cors) // TODO, this does not work.
+        .or_else_any_method_async("", send_cors) // TODO, this does not work.
         .run(req, env)
         .await
 
@@ -976,9 +975,17 @@ pub async fn get_parse_types(_: Request, ctx: RouteContext<()>) -> worker::Resul
 
 pub async fn get_parse_type(_: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
     match ctx.param("id"){
-        Some(parameter) => match db_generic_search_query_ctx(&Table::ParseBehaviors, 1, parameter, &"".to_string(), &"".to_string(), &ctx).await {
-            Ok(results) => return Ok(Response::from_json(&results.parse_behaviors).unwrap().with_headers(add_mandatory_headers(&"".to_string()).await)),
-            Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00047\"}".to_string(),&(e.to_string() + " | IEC00047"), 500, &ctx).await,
+        Some(parameter) => {
+            let id = parameter.parse::<i32>();
+
+            if id.is_err() || id.unwrap() < 0 {
+                return err_specific_and_add_report("{\"Error\":\"Get parse type with ID failed to parse ID correctly, or a negative index was found. | IEC00184\"}".to_string(),&("Get parse type with ID failed to parse ID correctly.".to_string() + " | IEC00184"), 500, &ctx).await;
+            }
+
+            match db_generic_search_query_ctx(&Table::ParseBehaviors, 1, parameter, &"".to_string(), &"".to_string(), &ctx).await {
+                Ok(results) => return Ok(Response::from_json(&results.parse_behaviors).unwrap().with_headers(add_mandatory_headers(&"".to_string()).await)),
+                Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00047\"}".to_string(),&(e.to_string() + " | IEC00047"), 500, &ctx).await,
+            }
         },
         None => return err_specific("{\"Error\":\"Internal Server Error, route parameter mismatch!\"}".to_string()).await,
     }
@@ -1091,9 +1098,17 @@ pub async fn get_items(_: Request, ctx: RouteContext<()>) -> worker::Result<Resp
 
 pub async fn get_item(_: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
     match ctx.param("id"){
-        Some(parameter) => match db_generic_search_query_ctx(&Table::FsoItems, 1, parameter, &"".to_string(), &"".to_string(), &ctx).await {
-            Ok(results) => return Ok(Response::from_json(&results.fso_items).unwrap().with_headers(add_mandatory_headers(&"".to_string()).await)),
-            Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00056\"}".to_string(),&(e.to_string() + " | IEC00056"), 500, &ctx).await,
+        Some(parameter) => {
+            let id = parameter.parse::<i32>();
+
+            if id.is_err() || id.unwrap() < 0 {
+                return err_specific_and_add_report("{\"Error\":\"Get item with ID failed to parse ID correctly, or a negative index was found. | IEC00183\"}".to_string(),&("Get item with ID failed to parse ID correctly.".to_string() + " | IEC00183"), 500, &ctx).await;
+            }
+
+            match db_generic_search_query_ctx(&Table::FsoItems, 1, parameter, &"".to_string(), &"".to_string(), &ctx).await {
+                Ok(results) => return Ok(Response::from_json(&results.fso_items).unwrap().with_headers(add_mandatory_headers(&"".to_string()).await)),
+                Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00056\"}".to_string(),&(e.to_string() + " | IEC00056"), 500, &ctx).await,
+            }
         },
         None => return err_specific("{\"Error\":\"Internal Server Error, route parameter mismatch!\"}".to_string()).await,
     }
@@ -1423,8 +1438,7 @@ pub async fn delete_item(req: Request, ctx: RouteContext<()>) -> worker::Result<
                             match db_generic_delete(Table::FsoItems, id, &ctx).await {
                                 Ok(_) => return send_success(&"{\"Response\": \"Success!\"}".to_string(), &"".to_string()).await,
                                 Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00072\"}".to_string(),&(e.to_string() + " | IEC00072"), 500, &ctx).await,
-                            }
-                            
+                            }                            
                         },
                         Err(_) => return err_specific("{\"Error\":\"Could not parse the item id as an integer, please resubmit!\"}".to_string()).await,
                     }
@@ -1450,9 +1464,17 @@ pub async fn get_tables(_: Request, ctx: RouteContext<()>) -> worker::Result<Res
 
 pub async fn get_table(_: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
     match ctx.param("id"){
-        Some(parameter) => match db_generic_search_query_ctx(&Table::FsoTables, 1, parameter, &"".to_string(),&"".to_string(),  &ctx).await {
-            Ok(results) => return Ok(Response::from_json(&results.fso_tables).unwrap().with_headers(add_mandatory_headers(&"".to_string()).await)),
-            Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00075\"}".to_string(),&(e.to_string() + " | IEC00075"), 500, &ctx).await,
+        Some(parameter) => {
+            let id = parameter.parse::<i32>();
+
+            if id.is_err() || id.unwrap() < 0 {
+                return err_specific_and_add_report("{\"Error\":\"Get table with ID failed to parse ID correctly, or a negative index was found. | IEC00182\"}".to_string(),&("Get table with ID failed to parse ID correctly.".to_string() + " | IEC00182"), 500, &ctx).await;
+            }
+
+            match db_generic_search_query_ctx(&Table::FsoTables, 1, parameter, &"".to_string(),&"".to_string(),  &ctx).await {
+                Ok(results) => return Ok(Response::from_json(&results.fso_tables).unwrap().with_headers(add_mandatory_headers(&"".to_string()).await)),
+                Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00075\"}".to_string(),&(e.to_string() + " | IEC00075"), 500, &ctx).await,
+            }
         },
         None => return err_specific("{\"Error\":\"Bad request, route parameter mismatch!\"}".to_string()).await,
     }
@@ -1461,6 +1483,12 @@ pub async fn get_table(_: Request, ctx: RouteContext<()>) -> worker::Result<Resp
 pub async fn get_tables_items(_: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
     match ctx.param("id"){
         Some(parameter) => {
+            let id = parameter.parse::<i32>();
+
+            if id.is_err() || id.unwrap() < 0 {
+                return err_specific_and_add_report("{\"Error\":\"Get table items with ID failed to parse ID correctly, or a negative index was found. | IEC00181\"}".to_string(),&("Get table items with ID failed to parse ID correctly.".to_string() + " | IEC00181"), 500, &ctx).await;
+            }
+
             match db_generic_search_query_ctx(&Table::FsoItems, 1, parameter, &"".to_string(), &"".to_string(), &ctx).await {
                 Ok(results) => return Ok(Response::from_json(&results.fso_items).unwrap().with_headers(add_mandatory_headers(&"".to_string()).await)),
                 Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00163\"}".to_string(),&(e.to_string() + " | IEC00163"), 500, &ctx).await,
@@ -1483,9 +1511,17 @@ pub async fn get_aliases(_: Request, ctx: RouteContext<()>) -> worker::Result<Re
 
 pub async fn get_alias(_: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
     match ctx.param("id"){
-        Some(parameter) => match db_generic_search_query_ctx(&Table::TableAliases, 1, parameter, &"".to_string(), &"".to_string(), &ctx).await {
-            Ok(results) => return Ok(Response::from_json(&results.table_aliases).unwrap().with_headers(add_mandatory_headers(&"".to_string()).await)),
-            Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00077\"}".to_string(),&(e.to_string() + " | IEC00077"), 500, &ctx).await,
+        Some(parameter) => {
+            let id = parameter.parse::<i32>();
+
+            if id.is_err() || id.unwrap() < 0 {
+                return err_specific_and_add_report("{\"Error\":\"Get alias with ID failed to parse ID correctly, or a negative index was found. | IEC00180\"}".to_string(),&("Get alias with ID failed to parse ID correctly.".to_string() + " | IEC00180"), 500, &ctx).await;
+            }
+
+            match db_generic_search_query_ctx(&Table::TableAliases, 1, parameter, &"".to_string(), &"".to_string(), &ctx).await {
+                Ok(results) => return Ok(Response::from_json(&results.table_aliases).unwrap().with_headers(add_mandatory_headers(&"".to_string()).await)),
+                Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00077\"}".to_string(),&(e.to_string() + " | IEC00077"), 500, &ctx).await,
+            }
         },
         None => return err_specific("{\"Error\":\"Internal Server Error, route parameter mismatch!\"}".to_string()).await,
     }
@@ -1597,9 +1633,17 @@ pub async fn get_restrictions(_: Request, ctx: RouteContext<()>) -> worker::Resu
 
 pub async fn get_restriction(_: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
     match ctx.param("id"){
-        Some(parameter) => match db_generic_search_query_ctx(&Table::Restrictions, 1, parameter, &"".to_string(), &"".to_string(), &ctx).await {
-            Ok(results) => return Ok(Response::from_json(&results.restrictions).unwrap().with_headers(add_mandatory_headers(&"".to_string()).await)),
-            Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00086\"}".to_string(),&(e.to_string() + " | IEC00086"), 500, &ctx).await,
+        Some(parameter) =>{
+            let id = parameter.parse::<i32>();
+
+            if id.is_err() || id.unwrap() < 0 {
+                return err_specific_and_add_report("{\"Error\":\"Get restriction with ID failed to parse ID correctly, or a negative index was found. | IEC00179\"}".to_string(),&("Get restriction with ID failed to parse ID correctly.".to_string() + " | IEC00179"), 500, &ctx).await;
+            }
+        
+            match db_generic_search_query_ctx(&Table::Restrictions, 1, parameter, &"".to_string(), &"".to_string(), &ctx).await {
+                Ok(results) => return Ok(Response::from_json(&results.restrictions).unwrap().with_headers(add_mandatory_headers(&"".to_string()).await)),
+                Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00086\"}".to_string(),&(e.to_string() + " | IEC00086"), 500, &ctx).await,
+            }
         },
         None => return err_specific("{\"Error\":\"Internal Server Error, route parameter mismatch!\"}".to_string()).await,
     }
@@ -1724,9 +1768,15 @@ pub async fn get_deprecations(_: Request, ctx: RouteContext<()>) -> worker::Resu
 
 pub async fn get_deprecation(_: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
     match ctx.param("id"){
-        Some(parameter) => match db_generic_search_query_ctx(&Table::Deprecations, 1, parameter, &"".to_string(), &"".to_string(), &ctx).await {
-            Ok(results) => return Ok(Response::from_json(&results.deprecations).unwrap().with_headers(add_mandatory_headers(&"".to_string()).await)),
-            Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00098\"}".to_string(),&(e.to_string() + " | IEC00098"), 500, &ctx).await,
+        Some(parameter) => {
+            if parameter.parse::<i32>().is_err() {
+                return err_specific_and_add_report("{\"Error\":\"Get behavior change via ID failed to parse ID correctly, or a negative index was found. | IEC00178\"}".to_string(),&("Get deprecation with ID failed to parse ID correctly.".to_string() + " | IEC00178"), 500, &ctx).await;
+            }
+
+            match db_generic_search_query_ctx(&Table::Deprecations, 1, parameter, &"".to_string(), &"".to_string(), &ctx).await {
+                Ok(results) => return Ok(Response::from_json(&results.deprecations).unwrap().with_headers(add_mandatory_headers(&"".to_string()).await)),
+                Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00098\"}".to_string(),&(e.to_string() + " | IEC00098"), 500, &ctx).await,
+            }
         },
         None => return err_specific("{\"Error\":\"Internal Server Error, route parameter mismatch!\"}".to_string()).await,
     }
@@ -1857,13 +1907,12 @@ pub async fn delete_deprecation(req: Request, ctx: RouteContext<()>) -> worker::
 
             match ctx.param("id"){
                 Some(id) => {
-                    match id.parse::<i64>(){
+                    match id.parse::<i32>(){
                         Ok(_) =>{
                             match db_generic_delete(Table::ParseBehaviors, id, &ctx).await {
                                 Ok(_) => return send_success(&"{\"Response\": \"Success!\"}".to_string(), &"".to_string()).await,
                                 Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00104\"}".to_string(),&(e.to_string() + " | IEC00104"), 500, &ctx).await,
-                            }
-                            
+                            }                            
                         },
                         Err(_) => return err_specific("{\"Error\":\"Could not parse the deprecation id as an integer, please resubmit!\"}".to_string()).await,
                     }
@@ -2096,13 +2145,11 @@ pub async fn update_bug_report(mut req: Request, ctx: RouteContext<()>) -> worke
                 Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00119\"}".to_string(),&(e.to_string() + " | IEC00119"), 500, &ctx).await,
             }
 
-            let bug_id: i64; 
+            let bug_id: i32; 
 
-            // MAJOR TODO!!! getting the id from the URL, we have not been checking that the id is numeric, so we need to go back and verify those are correct.
-            // Here is an example of it done correctly, below.
             match ctx.param("id"){
                 Some(id) => { 
-                    match id.parse::<i64>() {
+                    match id.parse::<i32>() {
                         Ok(parsed) => bug_id = parsed,
                         Err(_) => return err_specific("{\"Error\":\"Cannot parse the supplied bug report id.\"}".to_string()).await,
                     }
