@@ -68,8 +68,8 @@ const ACTIONS_INSERT_QUERY_2: &str = ", ?4, ?5, ?6)";
 //const BUG_REPORT_INSERT_QUERY: &str = "INSERT INTO bug_reports ( user_id, bug_type, description, status, timestamp) VALUES (?1, ?2, ?3, ?4, ";    
 //const BUG_REPORT_INSERT_QUERY_2: &str = ");";    
 
-//const DEPRECATIONS_INSERT_QUERY: &str = "INSERT INTO deprecations (version, description, partial) VALUES (?1, ?2, ?3)"; 
-//const EMAIL_VALIDATIONS_INSERT_QUERY: &str = "INSERT INTO email_validations (username) VALUES (?1)";
+const DEPRECATIONS_INSERT_QUERY: &str = "INSERT INTO deprecations (version, description, partial, item_id) VALUES (?1, ?2, ?3, ?4)"; 
+const EMAIL_VALIDATIONS_INSERT_QUERY: &str = "INSERT INTO email_validations (username) VALUES (?1)";
 const ERROR_REPORT_INSERT_QUERY: &str = "INSERT INTO error_reports (error, timestamp) VALUES (?1, ";
 const ERROR_REPORT_INSERT_QUERY_2: &str = ");";
 const FSO_ITEMS_INSERT_QUERY: &str = "INSERT INTO fso_items (item_text, documentation, major_version, parent_id, table_id, deprecation_id, restriction_id, info_type, table_index, default_value) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)";
@@ -264,6 +264,14 @@ pub struct BugReport {
 #[derive(Serialize, Deserialize)]
 pub struct Deprecations {
     pub deprecation_id: i32,
+    pub version: String,
+    pub description: String,
+    pub partial: i32,
+    pub item_id: i32,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct DeprecationNew {
     pub version: String,
     pub description: String,
     pub partial: i32,
@@ -929,8 +937,8 @@ pub async fn db_generic_update_query(table: &Table, mode: usize , key1: &String,
 
                         },
 
-                        // 2 Documentation, 3 Info_type, 4 Item Text
-                        2 | 3 | 4 => {
+                        // 1 Documentation, 2 Info_type, 3 Item Text
+                        1 | 2 | 3 => {
                             if key1.is_empty(){
                                 return Err("Neither documentation, item text, nor info_type can be empty.".into());
                             }
@@ -1387,6 +1395,35 @@ pub async fn db_insert_action(new_action: &ActionsInternal, db : &D1Database) ->
         },
         Err(e) => return Err(e.into()),
     };
+}
+
+pub async fn db_insert_deprecation(new_deprecation: &DeprecationNew, db : &D1Database) -> Result<i32> {
+
+    match db.prepare(DEPRECATIONS_INSERT_QUERY.to_owned()).bind(&[JsValue::from(&new_deprecation.version),JsValue::from(&new_deprecation.description),JsValue::from(new_deprecation.partial),JsValue::from(new_deprecation.item_id)]){
+        Ok(query) => {
+            match query.all().await {
+                Ok(_) => {
+                    match db.prepare(format!("SELECT deprecation_id from deprecations where version = ?1 and description = ?2 and partial = {} ORDER BY deprecation_id desc LIMIT 1;)", new_deprecation.partial)).bind(&[JsValue::from(&new_deprecation.version),JsValue::from(&new_deprecation.description)]) {
+                        Ok(query2) => {
+                            match query2.first::<i32>(Some("deprecation_id")).await{
+                                Ok(thing) => {
+                                    match thing {
+                                        Some(value) => return Ok(value),
+                                        None => return Err("Could not get id after inserting deprecation.".into()),
+                                    }
+                                },
+                                Err(e) => return Err(e.into()),
+                            }
+                        },
+                        Err(e) => return Err(e.into()),
+                    }
+
+                },
+                Err(e) => return Err(e.into()),
+            }
+        },
+        Err(e) => return Err(e.into()),
+    }
 }
 
 pub async fn db_insert_item(new_item : &NewItem, db : &D1Database) -> Result<i32>{
