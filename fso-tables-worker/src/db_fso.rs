@@ -76,7 +76,8 @@ const FSO_ITEMS_INSERT_QUERY: &str = "INSERT INTO fso_items (item_text, document
 //const FSO_TABLES_INSERT_QUERY: &str = "INSERT INTO fso_tables VALUES (?1, ?2)";    
 //const PARSE_BEHAVIORS_INSERT_QUERY: &str = "INSERT INTO parse_behaviors (behavior, description) VALUES (?1, ?2)";    
 //const RESTRICTIONS_INSERT_QUERY: &str = "INSERT INTO restrictions (min_value, max_value, max_string_length, illegal_value_int, illegal_value_float) VALUES (?1, ?2, ?3, ?4, ?5)";    
-//const SESSIONS_INSERT_QUERY: &str = "INSERT INTO sessions (user, expiration) VALUES (?1, ?2)";     
+//const SESSIONS_INSERT_QUERY: &str = "INSERT INTO sessions (user, expiration) VALUES (?1, ";
+//const SESSIONS_INSERT_QUERY_2: &str = " );";
 //const TABLE_ALIASES_INSERT_QUERY: &str = "INSERT INTO table_aliases (table_id, filename) VALUES (?1, ?2)";    
 //const USERS_INSERT_QUERY: &str = "INSERT INTO users ( username, role, active, email_confirmed, contribution_count, banned: i64) VALUES (?1, ?2, ?3, ?4, ?5, ?6)";
 
@@ -254,17 +255,17 @@ pub struct ActionsExternal {
 
 #[derive(Serialize, Deserialize)]
 pub struct BugReport {
-    pub id: i64,
-    pub user_id: i64,
+    pub id: i32,
+    pub user_id: i32,
     pub bug_type: String,
     pub description: String,
-    pub status: i64,
-    pub timestamp: String,
+    pub status: i32,
+    pub timestamp: i64,
 }
 
 #[derive(Serialize, Deserialize)]
 pub struct Deprecations {
-    pub deprecation_id: i64,
+    pub deprecation_id: i32,
     pub version: String,
     pub description: String,
     pub partial: i32,
@@ -272,7 +273,7 @@ pub struct Deprecations {
 
 #[derive(Serialize, Deserialize)]
 pub struct DeprecationIn {
-    pub deprecation_id: i64,
+    pub deprecation_id: i32,
     pub version: String,
     pub description: String,
     pub partial: String,
@@ -280,7 +281,7 @@ pub struct DeprecationIn {
 
 #[derive(Serialize, Deserialize)]
 pub struct EmailValidations {
-    validation_id: i64,
+    validation_id: i32,
     username: String,
     pub expires: i64,
 }
@@ -318,7 +319,7 @@ pub struct FsoItemsPatch {
 
 #[derive(Serialize, Deserialize)]
 pub struct FsoTables { 
-    pub table_id: i64,
+    pub table_id: i32,
     pub name: String,
     pub filename: String,
     pub modular_extension: String,
@@ -327,7 +328,7 @@ pub struct FsoTables {
 
 #[derive(Deserialize, Serialize)]
 pub struct ParseBehavior{
-    pub behavior_id	: i64,
+    pub behavior_id	: i32,
     pub behavior : String,
     pub description : String,
 }
@@ -337,8 +338,8 @@ pub struct Restrictions {
     pub restriction_id: i64,
     pub min_value: f32,
     pub max_value: f32,
-    pub max_string_length:  i64,
-    pub illegal_value_int:  i64,
+    pub max_string_length:  i32,
+    pub illegal_value_int:  i32,
     pub illegal_value_float:  f32,
 }
 
@@ -351,25 +352,25 @@ pub struct Session {
 
 #[derive(Deserialize, Serialize)]
 pub struct TableAlias {
-    pub alias_id: i64,
-    pub table_id: i64,
+    pub alias_id: i32,
+    pub table_id: i32,
     pub filename: String,
 }
 
 #[derive(Deserialize, Serialize)]
 pub struct Users {
-    pub id: i64,
+    pub id: i32,
     pub username: String,
-    pub role: i64,
-    pub active: i64,
-    pub email_confirmed: i64,
-    pub contribution_count: i64,
-    pub banned: i64,
+    pub role: i32,
+    pub active: i32,
+    pub email_confirmed: i32,
+    pub contribution_count: i32,
+    pub banned: i32,
 }
 
 #[derive(Serialize, Deserialize)]
 struct Enabled{
-    active: i64,
+    active: i32,
 }
 
 pub async fn db_prepare_query_error(e: Error, query: String) -> String {
