@@ -1,7 +1,7 @@
 use worker::*;
 use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc, TimeDelta};
-use crate::{UserDetails, DB_NAME, err_specific, JsValue, DB_TIME_FORMAT, NewItem};
+use crate::{UserDetails, DB_NAME, err_specific, JsValue, DB_TIME_FORMAT, NewItem, get_current_time_i64};
 use is_number::{is_integer};
 use serde_json::from_str;
 
@@ -62,11 +62,16 @@ const TABLE_ALIASES_DELETE_QUERY: &str = "DELETE FROM table_aliases ";
 //const USERS_DELETE_QUERY: &str = "DELETE FROM users ";
 
 // Some (maybe most) of these will end up being unused as specialized functions are already written.  
-const ACTIONS_INSERT_QUERY: &str = "INSERT INTO actions (user_id, action, approved_by_user, timestamp, route, item_index, approved) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)";
-//const BUG_REPORT_INSERT_QUERY: &str = "INSERT INTO bug_reports ( user_id, bug_type, description, status, timestamp) VALUES (?1, ?2, ?3, ?4, ?5)";    
+const ACTIONS_INSERT_QUERY: &str = "INSERT INTO actions (user_id, action, approved_by_user, timestamp, route, item_index, approved) VALUES (?1, ?2, ?3, ";
+const ACTIONS_INSERT_QUERY_2: &str = ", ?4, ?5, ?6)";
+
+//const BUG_REPORT_INSERT_QUERY: &str = "INSERT INTO bug_reports ( user_id, bug_type, description, status, timestamp) VALUES (?1, ?2, ?3, ?4, ";    
+//const BUG_REPORT_INSERT_QUERY_2: &str = ");";    
+
 //const DEPRECATIONS_INSERT_QUERY: &str = "INSERT INTO deprecations (version, description, partial) VALUES (?1, ?2, ?3)"; 
 //const EMAIL_VALIDATIONS_INSERT_QUERY: &str = "INSERT INTO email_validations (username) VALUES (?1)";
-const ERROR_REPORT_INSERT_QUERY: &str = "INSERT INTO error_reports (error, timestamp) VALUES (?1, ?2);";
+const ERROR_REPORT_INSERT_QUERY: &str = "INSERT INTO error_reports (error, timestamp) VALUES (?1, ";
+const ERROR_REPORT_INSERT_QUERY_2: &str = ");";
 const FSO_ITEMS_INSERT_QUERY: &str = "INSERT INTO fso_items (item_text, documentation, major_version, parent_id, table_id, deprecation_id, restriction_id, info_type, table_index, default_value) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)";
 //const FSO_TABLES_INSERT_QUERY: &str = "INSERT INTO fso_tables VALUES (?1, ?2)";    
 //const PARSE_BEHAVIORS_INSERT_QUERY: &str = "INSERT INTO parse_behaviors (behavior, description) VALUES (?1, ?2)";    
@@ -169,7 +174,7 @@ const ERROR_HELPER: &str = " discovered using the query: ";
 
 #[derive(Serialize, Deserialize)]
 pub struct FsoTablesQueryResults {
-    pub actions: Vec<ActionsExternal>,
+    pub actions: Vec<ActionsInternal>,
     pub bug_reports: Vec<BugReport>,
     pub deprecations: Vec<Deprecations>,
     pub email_validations: Vec<EmailValidations>,
@@ -200,17 +205,20 @@ impl FsoTablesQueryResults {
     }
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct ActionsInternal {
+    pub action_id: i32,
     pub user_id: i32,
-    pub action: String,
     pub approved_by_user: i32,
-    pub timestamp: String,
-    pub approved: i32,
+    pub timestamp: i64,
     pub route: String,
+    pub item_index: i32,
+    pub approved: i32,
+    pub action: String,
 }
 
 impl ActionsInternal {
-    pub async fn new_action_internal(user: i32, action_string: String, approving_user: i32, the_timestsamp: String, is_approved: bool, the_route: String) -> ActionsInternal{
+    pub async fn new_action_internal(user: i32, action_string: String, approving_user: i32, the_timestamp: i64, is_approved: bool, the_route: String, the_item_index: i32) -> ActionsInternal{
         let approved_proxy: i32;
 
         if is_approved {
@@ -220,12 +228,14 @@ impl ActionsInternal {
         }
 
         ActionsInternal{
+            action_id: -1,
             user_id: user,
             action: action_string,
             approved_by_user: approving_user,
-            timestamp: the_timestsamp,
+            timestamp: the_timestamp,
             approved: approved_proxy,
             route: the_route,
+            item_index: the_item_index,
         }
     }
 }
@@ -277,16 +287,16 @@ pub struct EmailValidations {
 
 #[derive(Serialize, Deserialize)]
 pub struct FsoItems { 
-    pub item_id: i64,
+    pub item_id: i32,
     pub item_text: String,
     pub documentation: String,
     pub major_version: String,
-    pub parent_id: i64,
-    pub table_id: i64,
-    pub deprecation_id: i64,
-    pub restriction_id: i64,
+    pub parent_id: i32,
+    pub table_id: i32,
+    pub deprecation_id: i32,
+    pub restriction_id: i32,
     pub info_type: String,
-    pub table_index: i64,
+    pub table_index: i32,
     pub default_value: String,
 }
 
@@ -656,9 +666,8 @@ pub async fn db_generic_search_query_db(table: &Table, mode: i8 , key1: &String,
         },
     }
 
-    let mut query_return = FsoTablesQueryResults::new_results().await;
-
     let bound_query : D1PreparedStatement;
+
     if mode == 0 {
         bound_query = db.prepare(query.clone());
     } else {
@@ -681,11 +690,13 @@ pub async fn db_generic_search_query_db(table: &Table, mode: i8 , key1: &String,
         }
     }
 
+    let mut query_return = FsoTablesQueryResults::new_results().await;
+
     match table {
         Table::Actions => {
             match bound_query.all().await {
                 Ok(results) =>{
-                    match results.results::<ActionsExternal>() {
+                    match results.results::<ActionsInternal>() {
                         Ok(result) => {
                             query_return.actions = result;
                             return Ok(query_return);
@@ -1359,11 +1370,10 @@ pub async fn db_user_stats_get(_: Request, _ctx: RouteContext<()>) -> worker::Re
 }
 
 pub async fn db_insert_action(new_action: &ActionsInternal, db : &D1Database) -> Result<()> {
-    match db.prepare(ACTIONS_INSERT_QUERY).bind(&[
+    match db.prepare(ACTIONS_INSERT_QUERY.to_string() + &new_action.timestamp.to_string() + ACTIONS_INSERT_QUERY_2 ).bind(&[
         JsValue::from(new_action.user_id),    
         JsValue::from(&new_action.action),    
         JsValue::from(new_action.approved_by_user),    
-        JsValue::from(&new_action.timestamp),    
         JsValue::from(&new_action.route),    
         JsValue::from(new_action.user_id),    
         JsValue::from(new_action.approved),    
@@ -1379,7 +1389,7 @@ pub async fn db_insert_action(new_action: &ActionsInternal, db : &D1Database) ->
     };
 }
 
-pub async fn db_insert_item(new_item : &NewItem, db : &D1Database) -> Result<i64>{
+pub async fn db_insert_item(new_item : &NewItem, db : &D1Database) -> Result<i32>{
     match db.prepare("UPDATE fso_items SET table_index = table_index + 1 WHERE table_id = ?1 AND table_index >= ?2").bind(&[JsValue::from(new_item.table_id), JsValue::from(new_item.table_index)]){
         Ok(_) => (),
         Err(e) => return Err(e.into()), 
@@ -1487,9 +1497,9 @@ pub async fn db_insert_bug_report(username: &String, bug_type: &String, descript
 pub async fn db_insert_error_record(error: &String,  ctx: &RouteContext<()>) -> Result<()> {
     match  ctx.env.d1(DB_NAME) {
         Ok(db) => {
-            let query = ERROR_REPORT_INSERT_QUERY;
+            let query = ERROR_REPORT_INSERT_QUERY.to_owned() + &get_current_time_i64().to_string() + ERROR_REPORT_INSERT_QUERY_2;
 
-            match db.prepare(query).bind(&[JsValue::from(error), JsValue::from(Utc::now().to_string())]) {
+            match db.prepare(query).bind(&[JsValue::from(error)]) {
                 Ok(statement) => {
                     match statement.run().await {
                         Ok(_) => return Ok(()),

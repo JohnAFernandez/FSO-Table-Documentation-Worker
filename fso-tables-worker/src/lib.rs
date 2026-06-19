@@ -18,6 +18,7 @@ use chrono::{Utc, TimeDelta};
 mod secrets;
 mod db_fso;
 use casting::{CastFrom};
+use serde_json::from_str;
 
 
 const DB_NAME: &str = "fso_table_database";    
@@ -25,6 +26,10 @@ const DB_ALLOWED_PASSWORD_CHARACTERS: &str = "[^0-9A-Za-z~!@#$%^&*()_\\-+={\\[}\
 const DB_MINIMUM_PASSWORD_LENGTH: usize = 10;
 const DB_SEMVER_CHARACTERS: &str = "[^0-9.]";
 pub const DB_TIME_FORMAT: &str = "%Y%m%d%H%M%S"; // Year month day Hour minute second with no spaces, allows direct < > comparisons
+
+pub fn get_current_time_i64() -> i64 {
+    from_str::<i64>(&Utc::now().format(DB_TIME_FORMAT).to_string()).unwrap()   
+}
 
 #[derive(Serialize)]
 struct FullEmailAddress {
@@ -182,7 +187,7 @@ async fn fetch(req: Request, env: Env, _ctx: Context,) -> worker::Result<Respons
         .patch_async("/api/tables/deprecations", update_deprecation).put_async("/api/tables/deprecations", update_deprecation) // Requires login
         .delete_async("/api/tables/deprecations/:id", delete_deprecation) // Admin only
         .get_async("/api/tables/actions/history/user/", get_complete_user_history) // Requires login
-        //.get_async("/api/tables/actions/history/item/:id", get_completed_user_history)
+        //.get_async("/api/tables/actions/history/item/:id", get_item_history)
         //.get_async("/api/tables/actions/approvals", get_approval_requests) // Requires login
         //.get_async("/api/tables/actions/approvals/:id", get_approval_requests_user) // Requires login, for seeing just mine, or admin seeing specific other user
         //.get_async("/api/tables/actions/rejections", get_rejected_requests) // Requires login
@@ -482,6 +487,8 @@ pub async fn get_complete_user_history(req: Request, ctx: RouteContext<()>) -> w
                     if results.users.is_empty() {
                         return err_specific_and_add_report("{\"Error\":\"Could not find user in database after already checking login credentials. Please report! | IEC00169\"}".to_string(),&("{\"Error\":\"Could not find user in database after already checking login credentials. Please report! | IEC00169\"}".to_string() + " | IEC00169"), 500, &ctx).await;
                     }
+
+//                    return err_specific_and_add_report("{\"Report\":\"Got past search 1, going to search 2.\"}".to_string(), &"{\"Report\":\"Got past search 1, going to search 2.\"}".to_string(), 500, &ctx).await;
 
                     match db_fso::db_generic_search_query_db(&db_fso::Table::Actions,2, &results.users[0].id.to_string(),&"".to_string(),&"".to_string(), &db).await {
                         Ok(res) =>{
@@ -1257,16 +1264,18 @@ pub async fn insert_item(mut req: Request, ctx: RouteContext<()>) -> worker::Res
                                         let mut table = "<Could not Find>".to_string();
 
                                         match db_fso::db_generic_search_query_db(&db_fso::Table::FsoTables, 1, &new_item.table_id.to_string(), &"".to_string(), &"".to_string(), &db).await {
-                                            Ok(results2) => { if  !results2.fso_tables.is_empty() { table = results2.fso_tables[0].name.clone() }},
+                                            Ok(results2) => { if  !results2.fso_tables.is_empty() { table = results2.fso_tables[0].name.clone();}},
                                             Err(_) => (),
                                         }
 
                                         let action = db_fso::ActionsInternal::new_action_internal(id2, 
                                             format!("{{\"item_text\":\"{}\",\"documentation\":\"{}\",\"major_version\":\"{}\",\"parent_id\":{},\"table_id\":{},\"deprecation_id\":{},\"restriction_id\":4,\"info_type\":\"{}\",\"default_value\":\"{}\",\"table_index\":{}}}",new_item.item_text,new_item.documentation,new_item.major_version,new_item.parent_id,new_item.table_id,new_item.deprecation_id,new_item.restriction_id,new_item.table_id,new_item.table_index),
                                             id2, 
-                                            Utc::now().format(DB_TIME_FORMAT).to_string(), 
+                                            get_current_time_i64(), 
                                             true, 
-                                            format!("Added item \"{}\" to the {}", new_item.item_text, table).to_string()).await;
+                                            format!("Added item \"{}\" to the {}", new_item.item_text, table).to_string(),
+                                            id,
+                                        ).await;
 
                                         match db_fso::db_insert_action(&action, &db).await {
                                             Ok(_)=> return send_success(&format!("{{\"id\":\"{}\"}}", id), &"".to_string()).await,
@@ -1434,12 +1443,14 @@ pub async fn update_item(mut req: Request, ctx: RouteContext<()>) -> worker::Res
                                     if !results.users.is_empty(){
                                         let id2 = i32::cast_from(results.users[0].id);
 
-                                        let action = db_fso::ActionsInternal::new_action_internal(id2, 
+                                        let action = db_fso::ActionsInternal::new_action_internal(
+                                            id2, 
                                             item_update_action_string,
                                             id2, 
-                                            Utc::now().format(DB_TIME_FORMAT).to_string(), 
+                                            get_current_time_i64(),  
                                             true, 
-                                            "Update item via API attempt".to_string()).await;
+                                            "Update item via API attempt".to_string(),
+                                            item.item_id).await;
 
                                         match db_fso::db_insert_action(&action, &db).await {
                                             Ok(_)=> (),
