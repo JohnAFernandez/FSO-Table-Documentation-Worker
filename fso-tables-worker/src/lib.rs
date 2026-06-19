@@ -15,10 +15,14 @@ use rand::*;
 use rand::distributions::Alphanumeric;
 use wasm_bindgen::JsValue;
 use chrono::{Utc, TimeDelta};
-mod secrets;
-mod db_fso;
 use casting::{CastFrom};
 use serde_json::from_str;
+
+mod db_fso;
+mod email_fns;
+mod secrets;
+use email_fns::{EmailSubmission, FullEmailAddress, EmailMessage};
+
 
 
 const DB_NAME: &str = "fso_table_database";    
@@ -31,91 +35,7 @@ pub fn get_current_time_i64() -> i64 {
     from_str::<i64>(&Utc::now().format(DB_TIME_FORMAT).to_string()).unwrap()   
 }
 
-#[derive(Serialize)]
-struct FullEmailAddress {
-    name: String,
-    email: String,
-}
-
-impl FullEmailAddress {
-    fn create_full_email(name: String, email:String) -> FullEmailAddress {
-        FullEmailAddress{ name, email}
-    }
-}
-
-#[allow(non_snake_case)]
-#[derive(Serialize)]
-struct EmailMessage {
-    sender: FullEmailAddress, 
-    to: Vec<FullEmailAddress>,
-    subject: String,
-    htmlContent: String, // do not change, as this needs to have this case to be properly processed by Bevo
-}
-
-impl EmailMessage {
-    fn create_activation_email(code: &String) -> EmailMessage{
-        EmailMessage{
-            sender : FullEmailAddress::create_full_email("FSO Tables Database User Activations".to_string(), "activations@fsotables.com".to_string()),
-            to : vec![], 
-            subject : "Account Confirmation Code".to_string(),
-            htmlContent : format!("
-            <div style=\"background-color: #000000; padding-top: 20px; padding-bottom: 20px; border-radius: 5px;\">
-                <div style=\"text-align:center; font-family: calibri; padding: 50px; background-color: #242424; color: #cecece; margin-left:50px; margin-right:50px; border-radius: 5px;\">
-                    <h2>
-                        Welcome to Ganymede, the Freespace Open Table Option Database
-                    </h2>
-                    <h3>
-                        To activate your account enter this confirmation code at the ganymede website
-                    </h3>
-                    <div style=\"display: grid;\">
-                        <h1 style=\"background-color: #333333; border-radius: 5px; padding:10px; padding-left:15px; padding-right:15px; letter-spacing: 0.5em;\">
-                            {}
-                        </h1>
-                    </div>
-                    <br>
-                    <h4>Account confirmation codes expire in 24 hours.
-                        <br><br>
-                        If you are unsure why you got this email, please permanently delete it.
-                        <br><br>
-                        Please do not reply, this email address is not monitored.
-                    </h4>
-                </div>
-            </div>", code),
-        }
-    }
-
-    fn create_password_reset_email(code: &String) -> EmailMessage{
-        EmailMessage{
-            sender : FullEmailAddress::create_full_email("FSO Tables Database Password Reset".to_string(), "credentials@fsotables.com".to_string()),
-            to : vec![], 
-            subject : "Account Reset Code".to_string(),
-            htmlContent : format!("
-            <div style=\"background-color: #000000; padding-top: 20px; padding-bottom: 20px; border-radius: 5px;\">
-                <div style=\"text-align:center; font-family: calibri; padding: 50px; background-color: #242424; color: #cecece; margin-left:50px; margin-right:50px; border-radius: 5px;\">
-                    <h2>
-                        We received a password reset request for your Ganymede account.
-                        <br>
-                        Here is your confirmation code:
-                    </h2>
-                    <div style=\"display: grid;\">
-                        <h1 style=\"background-color: #333333; border-radius: 5px; padding:10px; padding-left:15px; padding-right:15px; letter-spacing: 0.5em;\">
-                            {}
-                        </h1>
-                    </div>
-                    <br>
-                    <h4>
-                        Confirmation codes expire in 30 minutes.
-                        <br><br>
-                        If you are unsure why you got this code, please permanently delete this email.
-                        <br><br>
-                        Please do not reply, this email address is not monitored.
-                    </h4>
-                </div>
-            </div>", code),
-        }
-    }
-}
-
+//pub async fn db_insert_deprecation()
 
 //  POST, GET, PATCH, and DELETE -- PUTS AND PATCHES are going to be the same.
 #[event(fetch)]
@@ -221,10 +141,6 @@ pub async fn root_get(_req: Request, _ctx: RouteContext<()>) -> worker::Result<R
     send_success(&"You have accessed the Freespace Open Table Option Databse API.\n\nRoutes are users, tables, items, deprecations, and behaviors.\n\nThis API is currently under construction!".to_string(), &"".to_string()).await
 }
 
-#[derive(Serialize, Deserialize)]
-struct EmailSubmission{
-    email: String,
-}
 
 // TODO! This function should really able to distinguish and report whether the user simply *exists* in the user database or is active. 
 pub async fn user_register_new(mut req: Request, ctx: RouteContext<()>) -> worker::Result<Response> {  
@@ -1923,7 +1839,6 @@ pub struct BugReport{
     bug_type : String,
     description: String,
 }
-
 
 pub async fn add_bug_report(mut req: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
     match ctx.env.d1(DB_NAME) {
