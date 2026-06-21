@@ -98,7 +98,7 @@ async fn fetch(req: Request, env: Env, _ctx: Context,) -> worker::Result<Respons
         .get_async("/api/tables/:id/items", get_tables_items).options_async("/api/tables/:id/items", send_cors)
         .get_async("/api/tables/restrictions", get_restrictions).options_async("/api/tables/restrictions", send_cors)
         .get_async("/api/tables/restrictions/:id", get_restriction).options_async("/api/tables/restrictions/:id", send_cors)
-        //.post_async("/api/tables/items/:id/restriction", post_restriction) // Requires login
+        .post_async("/api/tables/items/:id/restriction", post_restriction) // Requires login
         .patch_async("/api/tables/restriction/:id", update_restriction).put_async("/api/tables/restriction/:id", update_restriction) // Requires login
         .delete_async("/api/tables/restrictions/:id", delete_restriction) // Admin only
         .get_async("/api/tables/deprecations", get_deprecations).options_async("/api/tables/deprecations", send_cors)
@@ -1648,6 +1648,53 @@ pub async fn get_restriction(_: Request, ctx: RouteContext<()>) -> worker::Resul
         None => return err_specific("{\"Error\":\"Internal Server Error, route parameter mismatch!\"}".to_string()).await,
     }
 }
+
+#[derive(Serialize, Deserialize)]
+struct RestrictionIn {
+    type_of: i32,
+    value1: String,
+    value2: String,
+    item_id: i32,
+}
+
+pub async fn post_restriction(mut req: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
+    match ctx.env.d1(DB_NAME) {
+        Ok(db) => {
+            let session_result = header_session_is_valid(&req, &db, &ctx).await;
+            if !session_result.0 {
+                return send_failure(&ERROR_NOT_LOGGED_IN.to_string(), 403).await
+            }
+
+            let username = session_result.1;
+
+            match db_get_user_role(&username, &db).await {                 
+                Ok(authorizer_role) => {
+                    match authorizer_role {
+                        UserRole::VIEWER => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
+                        _=> (),
+                    }         
+                    
+                    match req.json::<RestrictionIn>().await {
+                        Ok(restriction) => {
+                            match RestrictionNew::create_restriction_new(restriction.item_id, &restriction.value1, &restriction.value2, restriction.item_id).await {
+                                Ok(new_restriction) => {
+                                    match db_insert_restriction(&new_restriction, &db).await {
+                                        Ok(id) => return send_success(&id.to_string(), &"".to_string()).await,
+                                        Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, lease check your inputs and try again. | IEC00189\"}".to_string(),&(e.to_string() + " | IEC00189"), 500, &ctx).await,
+                                    }
+                                },
+                                Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error! Input for a new restriction is type_of, item_id both integers, and strings value1 and value2. All must be specified. | IEC00188\"}".to_string(),&(e.to_string() + " | IEC00188"), 500, &ctx).await,
+                            }
+                        },
+                        Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error! Input for a new restriction is type_of, item_id both integers, and strings value1 and value2. All must be specified. | IEC00187\"}".to_string(),&(e.to_string() + " | IEC00187"), 500, &ctx).await,
+                    }
+                },
+                Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00186\"}".to_string(),&(e.to_string() + " | IEC00186"), 500, &ctx).await,
+            }
+        }
+        Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00185\"}".to_string(),&(e.to_string() + " | IEC00185"), 500, &ctx).await,
+    }    
+}   
 
 pub async fn update_restriction(mut req: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
     match ctx.env.d1(DB_NAME) {

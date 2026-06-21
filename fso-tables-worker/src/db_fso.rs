@@ -356,7 +356,7 @@ pub struct Restrictions {
     pub illegal_value_float:  f32,
 }
 
-// 0 min_value, 1 Max_value, 2 max string length, 3 illegal value int, 4 illegal value float, 5 min and max int, 6 min and max float, 7 value list
+// 0 min_value, 1 max_value, 2 max string length, 3 illegal value int, 4 illegal value float, 5 min and max int, 6 min and max float, 7 value list
 pub struct RestrictionNew {
     pub type_of: i32,
     pub int_value1: i32,
@@ -364,6 +364,65 @@ pub struct RestrictionNew {
     pub float_value1: String,
     pub float_value2: String,
     pub allowed_value_list: String,
+    pub item_id: i32,
+}
+
+impl RestrictionNew {
+    pub async fn create_restriction_new(type_of_in: i32, value1: &String, value2: &String, item_id: i32) -> Result<RestrictionNew>{
+        let mut int_value1_in = DUMMY_INT;
+        let mut int_value2_in = DUMMY_INT;
+        let mut float_value1_in = DUMMY_FLOAT;
+        let mut float_value2_in = DUMMY_FLOAT;
+        let mut allowed_value_list_in = "".to_string();
+
+        match type_of_in {
+            2 | 3 => { 
+                match from_str::<i32>(value1) {
+                    Ok(int) => int_value1_in = int,
+                    Err(_) => return Err("Value 1 seems to be formatted incorrectly.".into()),
+                }
+            },
+            0 | 1 | 4 => {
+                match from_str::<f64>(value1) {
+                    Ok(float) => float_value1_in = float,
+                    Err(_) => return Err("Value 1 seems to be formatted incorrectly.".into()),
+                }
+            },
+            5 => {
+                match from_str::<i32>(value1) {
+                    Ok(int) => int_value1_in = int,
+                    Err(_) => return Err("Value 1 seems to be formatted incorrectly.".into()),
+                }
+                match from_str::<i32>(value2) {
+                    Ok(int) => int_value2_in = int,
+                    Err(_) => return Err("Value 2 seems to be formatted incorrectly.".into()),
+                }
+            },
+            6 => {
+                match from_str::<f64>(value1) {
+                    Ok(float) => float_value1_in = float,
+                    Err(_) => return Err("Value 1 seems to be formatted incorrectly.".into()),
+                }
+                match from_str::<f64>(value2) {
+                    Ok(float) => float_value2_in = float,
+                    Err(_) => return Err("Value 2 seems to be formatted incorrectly.".into()),
+                }
+            },
+            7 => allowed_value_list_in = value1.clone(),
+            _ => return Err("The type of restriction was out of range.  Valid values are 0-7".into()),
+        }
+
+        
+        Ok(RestrictionNew {
+            type_of: type_of_in,
+            int_value1: int_value1_in,
+            int_value2: int_value2_in,
+            float_value1: float_value1_in.to_string(),
+            float_value2: float_value2_in.to_string(),
+            allowed_value_list: allowed_value_list_in,
+            item_id: item_id, 
+        })
+    }
 }
 
 #[derive(Deserialize, Serialize)]
@@ -1445,11 +1504,13 @@ pub async fn db_insert_deprecation(new_deprecation: &DeprecationNew, db : &D1Dat
     }
 }
 
+
+// 0 min_value, 1 Max_value, 2 max string length, 3 illegal value int, 4 illegal value float, 5 min and max int, 6 min and max float, 7 value list
 pub async fn db_insert_restriction(new_restriction: &RestrictionNew, db : &D1Database) -> Result<i32> {
-    let mut new_id = -1; // define here to allow 
+    let new_id : i32; // define here to allow 
 
     // Add row with default parameters, retrieve ID. The database is supposed to do this query all at once, so it should avoid concurrency issues.
-    match db.prepare(format!("INSERT INTO restrictions (min_value, max_value, max_string_length, illegal_value_int, illegal_value_float, allowed_values) VALUES ( ?, {}, {} , {}, {}, \"\"; SELECT restriction_id from restrictions ORDER BY restriction_id desc LIMIT 1;)", DUMMY_FLOAT, DUMMY_INT, DUMMY_INT, DUMMY_FLOAT)).bind(&[JsValue::from(DUMMY_FLOAT)]) {
+    match db.prepare(format!("INSERT INTO restrictions (min_value, max_value, max_string_length, illegal_value_int, illegal_value_float, allowed_values, item_id) VALUES ( {}, {}, {} , {}, {}, ? \"\"; SELECT restriction_id from restrictions ORDER BY restriction_id desc LIMIT 1;)", DUMMY_FLOAT, DUMMY_FLOAT, DUMMY_INT, DUMMY_INT, DUMMY_FLOAT)).bind(&[JsValue::from(new_restriction.item_id)]) {
         Ok(query) => {
             match query.first::<i32>(Some("restriction_id")).await {
                 Ok(result) => {
@@ -1464,15 +1525,6 @@ pub async fn db_insert_restriction(new_restriction: &RestrictionNew, db : &D1Dat
         Err(e) => return Err(e.into()),
     }
 
-
-    // 0 min_value, 1 Max_value, 2 max string length, 3 illegal value int, 4 illegal value float, 5 min and max int, 6 min and max float, 7 value list
-
-    /*          0 => query += RESTRICTIONS_PATCH_ILLEGAL_VALUE_FLOAT_QUERY,
-                1 => query += RESTRICTIONS_PATCH_ILLEGAL_VALUE_INT_QUERY,
-                2 => query += RESTRICTIONS_PATCH_MAX_STRING_LENGTH_QUERY,
-                3 => query += RESTRICTIONS_PATCH_MAX_VALUE_QUERY,
-                4 => query += RESTRICTIONS_PATCH_MIN_VALUE_QUERY,
-                5 => query += RESTRICTIONS_PATCH_ALLOWED_VALUES_QUERY, */
     match new_restriction.type_of{
         0 => {
             match db_generic_update_query_db(&Table::Restrictions,4,&new_id.to_string(),&new_restriction.float_value1.to_string(), db).await {
@@ -1522,7 +1574,7 @@ pub async fn db_insert_restriction(new_restriction: &RestrictionNew, db : &D1Dat
                 Err(e)=> return Err(e.into()),
             }
 
-            match db_generic_update_query_db(&Table::Restrictions,3,&new_id.to_string(),&new_restriction.float_value1.to_string(), db).await {
+            match db_generic_update_query_db(&Table::Restrictions,3,&new_id.to_string(),&new_restriction.float_value2.to_string(), db).await {
                 Ok(_)=>(),
                 Err(e)=> return Err(e.into()),
             }
