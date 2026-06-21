@@ -118,7 +118,7 @@ async fn fetch(req: Request, env: Env, _ctx: Context,) -> worker::Result<Respons
         .patch_async("/api/bugreport/:id/unresolve", unresolve_bug_report).options_async("/api/bugreport/:id/unresolve", send_cors)
         .patch_async("/api/bugreport/:id/edit", update_bug_report).options_async("/api/bugreport/:id/edit", send_cors)
         .get_async("/api/test", test_all) // This might eventually be a "CI" test, but for now it just displays a message.
-        .or_else_any_method_async("", send_cors) // TODO, this does not work.
+        .or_else_any_method_async("/api", send_cors) // TODO, this does not work.
         .run(req, env)
         .await
 

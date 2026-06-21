@@ -13,6 +13,9 @@ pub enum UserRole {
     VIEWER = 3, // Waiting for someone to approve an upgrade to a maintainer level
 }
 
+const DUMMY_FLOAT : f64 = 9191.919;
+const DUMMY_INT : i32 = -2147483647;
+
 pub async fn number_to_role(n: i64) -> worker::Result<UserRole> {
     match n {
         0 => Ok(UserRole::OWNER),
@@ -69,13 +72,15 @@ const ACTIONS_INSERT_QUERY_2: &str = ", ?4, ?5, ?6)";
 //const BUG_REPORT_INSERT_QUERY_2: &str = ");";    
 
 const DEPRECATIONS_INSERT_QUERY: &str = "INSERT INTO deprecations (version, description, partial, item_id) VALUES (?1, ?2, ?3, ?4)"; 
-const EMAIL_VALIDATIONS_INSERT_QUERY: &str = "INSERT INTO email_validations (username) VALUES (?1)";
+//const EMAIL_VALIDATIONS_INSERT_QUERY: &str = "INSERT INTO email_validations (username) VALUES (?1)";
 const ERROR_REPORT_INSERT_QUERY: &str = "INSERT INTO error_reports (error, timestamp) VALUES (?1, ";
 const ERROR_REPORT_INSERT_QUERY_2: &str = ");";
 const FSO_ITEMS_INSERT_QUERY: &str = "INSERT INTO fso_items (item_text, documentation, major_version, parent_id, table_id, deprecation_id, restriction_id, info_type, table_index, default_value) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)";
 //const FSO_TABLES_INSERT_QUERY: &str = "INSERT INTO fso_tables VALUES (?1, ?2)";    
-//const PARSE_BEHAVIORS_INSERT_QUERY: &str = "INSERT INTO parse_behaviors (behavior, description) VALUES (?1, ?2)";    
-//const RESTRICTIONS_INSERT_QUERY: &str = "INSERT INTO restrictions (min_value, max_value, max_string_length, illegal_value_int, illegal_value_float) VALUES (?1, ?2, ?3, ?4, ?5)";    
+//const PARSE_BEHAVIORS_INSERT_QUERY: &str = "INSERT INTO parse_behaviors (behavior, description) VALUES (?1, ?2)";
+
+// restrictions are special.  The values that are important vary between row.  So we need to have dummy values that will never ever be used, and this cannot be defined outside a function.
+// const RESTRICTIONS_INSERT_QUERY: &str = ;    
 //const SESSIONS_INSERT_QUERY: &str = "INSERT INTO sessions (user, expiration) VALUES (?1, ";
 //const SESSIONS_INSERT_QUERY_2: &str = " );";
 //const TABLE_ALIASES_INSERT_QUERY: &str = "INSERT INTO table_aliases (table_id, filename) VALUES (?1, ?2)";    
@@ -117,6 +122,7 @@ const RESTRICTIONS_PATCH_MAX_VALUE_QUERY: &str = "UPDATE restrictions SET max_va
 const RESTRICTIONS_PATCH_MAX_STRING_LENGTH_QUERY: &str = "UPDATE restrictions SET max_string_length = ?1 ";
 const RESTRICTIONS_PATCH_ILLEGAL_VALUE_INT_QUERY: &str = "UPDATE restrictions SET illegal_value_int = ?1 ";
 const RESTRICTIONS_PATCH_ILLEGAL_VALUE_FLOAT_QUERY: &str = "UPDATE restrictions SET illegal_value_float = ?1 ";
+const RESTRICTIONS_PATCH_ALLOWED_VALUES_QUERY: &str = "UPDATE restrictions SET allowed_values = ?1";
 
 //const SESSIONS_PATCH_EXPIRATION_QUERY: &str =  "UPDATE sessions SET expiration = ?1 ";  
 
@@ -348,6 +354,16 @@ pub struct Restrictions {
     pub max_string_length:  i32,
     pub illegal_value_int:  i32,
     pub illegal_value_float:  f32,
+}
+
+// 0 min_value, 1 Max_value, 2 max string length, 3 illegal value int, 4 illegal value float, 5 min and max int, 6 min and max float, 7 value list
+pub struct RestrictionNew {
+    pub type_of: i32,
+    pub int_value1: i32,
+    pub int_value2: i32,
+    pub float_value1: String,
+    pub float_value2: String,
+    pub allowed_value_list: String,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -862,167 +878,170 @@ pub async fn db_generic_search_query_db(table: &Table, mode: i8 , key1: &String,
 
 pub async fn db_generic_update_query(table: &Table, mode: usize , key1: &String, key2: &String, ctx: &RouteContext<()>) -> Result<()> {
     match ctx.env.d1(DB_NAME){
-        Ok(db) => {
-            let mut query = "".to_string();
+        Ok(db) => db_generic_update_query_db(table, mode, key1, key2, &db).await,
+        Err(e) => return Err(e.into()),
+    }
+}
 
-            match table {
-                Table::Actions => {
-                    query = ACTIONS_PATCH_APPROVED_QUERY.to_owned() + BINDABLE_ACTIONS_FILTER_BY_ID; 
-                },
-                Table::BugReports => {
+pub async fn db_generic_update_query_db(table: &Table, mode: usize , key1: &String, key2: &String, db: &D1Database) -> Result<()> {
 
-                    match mode {
-                        0 => query += BUG_REPORT_PATCH_APPROVED_QUERY,
-                        1 => query += BUG_REPORT_PATCH_BUGTYPE_QUERY,
-                        2 => query += BUG_REPORT_PATCH_DESCRIPTION_QUERY,
-                        3 => query += BUG_REPORT_PATCH_STATUS_QUERY,
-                        _ => return Err("Internal Server Error: Out of range mode in Bug Report generic update query.".into()),
+    let mut query = "".to_string();
+
+    match table {
+        Table::Actions => {
+            query = ACTIONS_PATCH_APPROVED_QUERY.to_owned() + BINDABLE_ACTIONS_FILTER_BY_ID; 
+        },
+        Table::BugReports => {
+
+            match mode {
+                0 => query += BUG_REPORT_PATCH_APPROVED_QUERY,
+                1 => query += BUG_REPORT_PATCH_BUGTYPE_QUERY,
+                2 => query += BUG_REPORT_PATCH_DESCRIPTION_QUERY,
+                3 => query += BUG_REPORT_PATCH_STATUS_QUERY,
+                _ => return Err("Internal Server Error: Out of range mode in Bug Report generic update query.".into()),
+            }
+
+            query += BUG_REPORT_FILTER_BINDABLE;
+        }
+        Table::Deprecations => {
+
+            match mode {
+                0 => query += DEPRECATIONS_PATCH_VERSION_QUERY,
+                1 => query += DEPRECATIONS_PATCH_DESCRIPTION_QUERY,
+                2 => query += DEPRECATIONS_PATCH_PARTIAL_QUERY,
+                _ => return Err("Internal Server Error: Out of range mode in Deprecations generic update query.".into()),
+            }
+
+            query += DEPRECATIONS_FILTER_BINDABLE;
+        },
+        Table::EmailValidations => 
+            return Err("Internal Server Error: Server attempting to update Email Validations with generic update query. Update aborted.".into()), 
+        // This is definitely not done.  Figuring out all the relevant stuff for FSO items is a lot of effort.
+        Table::FsoItems => {
+            
+            // we will need something like this to properly update item index
+            //match db.prepare("SELECT table_index FROM fso_items WHERE item_id = ?1;").bind()
+
+            query += &(FSO_ITEM_PATCH_STRINGS[mode].to_owned() + BINDABLE_FSO_ITEMS_FILTER_);
+
+            match mode {
+                // Sorry the order was arbitrary
+                // 0 Default Value,   4 Major Version, 
+                0 | 4 => { 
+                    // no validation needed, even empty strings are ok 
+                    match db.prepare(query.clone()).bind(&[JsValue::from(key1), JsValue::from(key2)]){
+                        Ok(prepped_query)=> {
+                            match prepped_query.run().await {
+                                Ok(_) => return Ok(()),
+                                Err(e) => return Err((db_prepare_query_error(e, query).await).into()),
+                            }
+                        },
+                        Err(e) => return Err((db_prepare_query_error(e, query).await).into()),
+                    }
+                }, 
+                
+                // 5 Parent ID, 6 Table ID, 7 Table Index
+                5 | 6 | 7 => {
+                    if !is_integer(&key1){
+                        return Err(format!("Cannot set an ID to {} since it is a non-integer.", key1).into());
+                    };
+
+                    match db.prepare(query.clone()).bind(&[JsValue::from(from_str::<i32>(&key1).unwrap()), JsValue::from(key2)]){
+                        Ok(prepped_query)=> {
+                            match prepped_query.run().await {
+                                Ok(_) => return Ok(()),
+                                Err(e) => return Err((db_prepare_query_error(e, query).await).into()),
+                            }
+                        },
+                        Err(e) => return Err((db_prepare_query_error(e, query).await).into()),
                     }
 
-                    query += BUG_REPORT_FILTER_BINDABLE;
-                }
-                Table::Deprecations => {
 
-                    match mode {
-                        0 => query += DEPRECATIONS_PATCH_VERSION_QUERY,
-                        1 => query += DEPRECATIONS_PATCH_DESCRIPTION_QUERY,
-                        2 => query += DEPRECATIONS_PATCH_PARTIAL_QUERY,
-                        _ => return Err("Internal Server Error: Out of range mode in Deprecations generic update query.".into()),
+                },
+
+                // 1 Documentation, 2 Info_type, 3 Item Text
+                1 | 2 | 3 => {
+                    if key1.is_empty(){
+                        return Err("Neither documentation, item text, nor info_type can be empty.".into());
                     }
 
-                    query += DEPRECATIONS_FILTER_BINDABLE;
+                    match db.prepare(query.clone()).bind(&[JsValue::from(key1), JsValue::from(key2)]){
+                        Ok(prepped_query)=> {
+                            match prepped_query.run().await {
+                                Ok(_) => return Ok(()),
+                                Err(e) => return Err((db_prepare_query_error(e, query).await).into()),
+                            }
+                        },
+                        Err(e) => return Err((db_prepare_query_error(e, query).await).into()),
+                    }
+
                 },
-                Table::EmailValidations => 
-                    return Err("Internal Server Error: Server attempting to update Email Validations with generic update query. Update aborted.".into()), 
-                // This is definitely not done.  Figuring out all the relevant stuff for FSO items is a lot of effort.
-                Table::FsoItems => {
-                    
-                    // we will need something like this to properly update item index
-                    //match db.prepare("SELECT table_index FROM fso_items WHERE item_id = ?1;").bind()
-
-                    query += &(FSO_ITEM_PATCH_STRINGS[mode].to_owned() + BINDABLE_FSO_ITEMS_FILTER_);
-
-                    match mode {
-                        // Sorry the order was arbitrary
-                        // 0 Default Value,   4 Major Version, 
-                        0 | 4 => { 
-                            // no validation needed, even empty strings are ok 
-                            match db.prepare(query.clone()).bind(&[JsValue::from(key1), JsValue::from(key2)]){
-                                Ok(prepped_query)=> {
-                                    match prepped_query.run().await {
-                                        Ok(_) => return Ok(()),
-                                        Err(e) => return Err((db_prepare_query_error(e, query).await).into()),
-                                    }
-                                },
-                                Err(e) => return Err((db_prepare_query_error(e, query).await).into()),
-                            }
-                        }, 
-                        
-                        // 5 Parent ID, 6 Table ID, 7 Table Index
-                        5 | 6 | 7 => {
-                            if !is_integer(&key1){
-                                return Err(format!("Cannot set an ID to {} since it is a non-integer.", key1).into());
-                            };
-
-                            match db.prepare(query.clone()).bind(&[JsValue::from(from_str::<i32>(&key1).unwrap()), JsValue::from(key2)]){
-                                Ok(prepped_query)=> {
-                                    match prepped_query.run().await {
-                                        Ok(_) => return Ok(()),
-                                        Err(e) => return Err((db_prepare_query_error(e, query).await).into()),
-                                    }
-                                },
-                                Err(e) => return Err((db_prepare_query_error(e, query).await).into()),
-                            }
-
-
-                        },
-
-                        // 1 Documentation, 2 Info_type, 3 Item Text
-                        1 | 2 | 3 => {
-                            if key1.is_empty(){
-                                return Err("Neither documentation, item text, nor info_type can be empty.".into());
-                            }
-
-                            match db.prepare(query.clone()).bind(&[JsValue::from(key1), JsValue::from(key2)]){
-                                Ok(prepped_query)=> {
-                                    match prepped_query.run().await {
-                                        Ok(_) => return Ok(()),
-                                        Err(e) => return Err((db_prepare_query_error(e, query).await).into()),
-                                    }
-                                },
-                                Err(e) => return Err((db_prepare_query_error(e, query).await).into()),
-                            }
-
-                        },
-                        
+                
 //                        4 => (), // TODO! please change to validate that the Info type is within the correct set in the future 
 //                        5 => (), // please change to verify that major version is in the included set.
 
-                        _ => return Err("Internal Server Error: Out of range mode in FSO_ITEMS generic update query.".into()),
-                    }
-
-
-                },
-                Table::FsoTables => {
-                    return Err("Internal Server Error: Tables cannot be updated via the API.  This error message *should* be unreachable.  Please report!".into())
-                    
-                },
-                Table::ParseBehaviors => {
-                    match mode {
-                        0 => query += PARSE_BEHAVIORS_PATCH_BEHAVIOR_QUERY,
-                        1 => query += PARSE_BEHAVIORS_PATCH_DESCRIPTION_QUERY,
-                        _ => return Err("Internal Server Error: Out of range mode in Parse Behaviors generic update query.".into()),
-                    }
-
-                    query += PARSE_BEHAVIORS_FILTER_BINDABLE;
-                },
-                Table::Restrictions => {
-                    match mode {
-                        0 => query += RESTRICTIONS_PATCH_ILLEGAL_VALUE_FLOAT_QUERY,
-                        1 => query += RESTRICTIONS_PATCH_ILLEGAL_VALUE_INT_QUERY,
-                        2 => query += RESTRICTIONS_PATCH_MAX_STRING_LENGTH_QUERY,
-                        3 => query += RESTRICTIONS_PATCH_MAX_VALUE_QUERY,
-                        4 => query += RESTRICTIONS_PATCH_MIN_VALUE_QUERY,
-                        _ => return Err("Internal Server Error: Out of range mode in Restrictions generic update query.".into()),
-                    }
-
-                    query += RESTRICTIONS_FILTER_BINDABLE;
-
-                },/* 
-                Table::Sessions => {
-                    match mode {
-                        0 => query += SESSIONS_PATCH_EXPIRATION_QUERY,
-                        _ => return Err("Internal Server Error: Out of range mode in Sessions generic update query.".into()),
-                    }
-
-                    query += SESSIONS_FILTER_USER_BINDABLE;
-                },*/
-                Table::TableAliases => {
-                    match mode {
-                        0 => query += TABLE_ALIASES_PATCH_FILENAME_QUERY,
-                        1 => query += TABLE_ALIASES_PATCH_TABLE_ID_QUERY,
-                        _ => return Err("Internal Server Error: Out of range mode in Table Aliases generic update query.".into()),
-                    }
-
-                    query += TABLE_ALIASES_FILTER_BINDABLE;
-                },
-                Table::Users => {
-                    return Err("Internal Server Error: Users cannot be updated via the generic update function.  This error message *should* be unreachable.  Please report!".into())
-                },
+                _ => return Err("Internal Server Error: Out of range mode in FSO_ITEMS generic update query.".into()),
             }
 
-            match db.prepare(query.clone()).bind(&[JsValue::from(key1), JsValue::from(key2)]){
-                Ok(prepped_query)=> {
-                    match prepped_query.run().await {
-                        Ok(_) => return Ok(()),
-                        Err(e) => return Err((db_prepare_query_error(e, query).await).into()),
-                    }
-                },
+
+        },
+        Table::FsoTables => {
+            return Err("Internal Server Error: Tables cannot be updated via the API.  This error message *should* be unreachable.  Please report!".into())
+            
+        },
+        Table::ParseBehaviors => {
+            match mode {
+                0 => query += PARSE_BEHAVIORS_PATCH_BEHAVIOR_QUERY,
+                1 => query += PARSE_BEHAVIORS_PATCH_DESCRIPTION_QUERY,
+                _ => return Err("Internal Server Error: Out of range mode in Parse Behaviors generic update query.".into()),
+            }
+
+            query += PARSE_BEHAVIORS_FILTER_BINDABLE;
+        },
+        Table::Restrictions => {
+            match mode {
+                0 => query += RESTRICTIONS_PATCH_ILLEGAL_VALUE_FLOAT_QUERY,
+                1 => query += RESTRICTIONS_PATCH_ILLEGAL_VALUE_INT_QUERY,
+                2 => query += RESTRICTIONS_PATCH_MAX_STRING_LENGTH_QUERY,
+                3 => query += RESTRICTIONS_PATCH_MAX_VALUE_QUERY,
+                4 => query += RESTRICTIONS_PATCH_MIN_VALUE_QUERY,
+                5 => query += RESTRICTIONS_PATCH_ALLOWED_VALUES_QUERY,
+                _ => return Err("Internal Server Error: Out of range mode in Restrictions generic update query.".into()),
+            }
+
+            query += RESTRICTIONS_FILTER_BINDABLE;
+
+        },/* 
+        Table::Sessions => {
+            match mode {
+                0 => query += SESSIONS_PATCH_EXPIRATION_QUERY,
+                _ => return Err("Internal Server Error: Out of range mode in Sessions generic update query.".into()),
+            }
+
+            query += SESSIONS_FILTER_USER_BINDABLE;
+        },*/
+        Table::TableAliases => {
+            match mode {
+                0 => query += TABLE_ALIASES_PATCH_FILENAME_QUERY,
+                1 => query += TABLE_ALIASES_PATCH_TABLE_ID_QUERY,
+                _ => return Err("Internal Server Error: Out of range mode in Table Aliases generic update query.".into()),
+            }
+
+            query += TABLE_ALIASES_FILTER_BINDABLE;
+        },
+        Table::Users => {
+            return Err("Internal Server Error: Users cannot be updated via the generic update function.  This error message *should* be unreachable.  Please report!".into())
+        },
+    }
+
+    match db.prepare(query.clone()).bind(&[JsValue::from(key1), JsValue::from(key2)]){
+        Ok(prepped_query)=> {
+            match prepped_query.run().await {
+                Ok(_) => return Ok(()),
                 Err(e) => return Err((db_prepare_query_error(e, query).await).into()),
             }
         },
-        
-        Err(e) => return Err(e),
+        Err(e) => return Err((db_prepare_query_error(e, query).await).into()),
     }
 }
 
@@ -1424,6 +1443,101 @@ pub async fn db_insert_deprecation(new_deprecation: &DeprecationNew, db : &D1Dat
         },
         Err(e) => return Err(e.into()),
     }
+}
+
+pub async fn db_insert_restriction(new_restriction: &RestrictionNew, db : &D1Database) -> Result<i32> {
+    let mut new_id = -1; // define here to allow 
+
+    // Add row with default parameters, retrieve ID. The database is supposed to do this query all at once, so it should avoid concurrency issues.
+    match db.prepare(format!("INSERT INTO restrictions (min_value, max_value, max_string_length, illegal_value_int, illegal_value_float, allowed_values) VALUES ( ?, {}, {} , {}, {}, \"\"; SELECT restriction_id from restrictions ORDER BY restriction_id desc LIMIT 1;)", DUMMY_FLOAT, DUMMY_INT, DUMMY_INT, DUMMY_FLOAT)).bind(&[JsValue::from(DUMMY_FLOAT)]) {
+        Ok(query) => {
+            match query.first::<i32>(Some("restriction_id")).await {
+                Ok(result) => {
+                    match result{
+                        Some(id) => new_id = id,
+                        None => return Err("Did not find new restriction id after creating new row.".into()),
+                    }
+                },
+                Err(e) => return Err(e.into()),
+            }
+        },
+        Err(e) => return Err(e.into()),
+    }
+
+
+    // 0 min_value, 1 Max_value, 2 max string length, 3 illegal value int, 4 illegal value float, 5 min and max int, 6 min and max float, 7 value list
+
+    /*          0 => query += RESTRICTIONS_PATCH_ILLEGAL_VALUE_FLOAT_QUERY,
+                1 => query += RESTRICTIONS_PATCH_ILLEGAL_VALUE_INT_QUERY,
+                2 => query += RESTRICTIONS_PATCH_MAX_STRING_LENGTH_QUERY,
+                3 => query += RESTRICTIONS_PATCH_MAX_VALUE_QUERY,
+                4 => query += RESTRICTIONS_PATCH_MIN_VALUE_QUERY,
+                5 => query += RESTRICTIONS_PATCH_ALLOWED_VALUES_QUERY, */
+    match new_restriction.type_of{
+        0 => {
+            match db_generic_update_query_db(&Table::Restrictions,4,&new_id.to_string(),&new_restriction.float_value1.to_string(), db).await {
+                Ok(_)=>(),
+                Err(e)=> return Err(e.into()),  
+            } 
+        },
+        1 => {
+            match db_generic_update_query_db(&Table::Restrictions,3,&new_id.to_string(),&new_restriction.float_value1.to_string(), db).await{
+                Ok(_)=>(),
+                Err(e)=> return Err(e.into()),
+            }
+        },
+        2 => {
+            match db_generic_update_query_db(&Table::Restrictions,2,&new_id.to_string(),&new_restriction.int_value1.to_string(), db).await {
+                Ok(_)=>(),
+                Err(e)=> return Err(e.into()),
+            }
+        }
+        3 => {
+            match db_generic_update_query_db(&Table::Restrictions,1,&new_id.to_string(),&new_restriction.int_value1.to_string(), db).await {
+                Ok(_)=>(),
+                Err(e)=> return Err(e.into()),
+            }
+        },
+        4 => { 
+            match db_generic_update_query_db(&Table::Restrictions,0,&new_id.to_string(),&new_restriction.float_value1.to_string(), db).await {
+                Ok(_)=>(),
+                Err(e)=> return Err(e.into()),
+            }
+        },
+        5 => {
+            match db_generic_update_query_db(&Table::Restrictions,4,&new_id.to_string(),&new_restriction.int_value1.to_string(), db).await {
+                Ok(_)=>(),
+                Err(e)=> return Err(e.into()),
+            }
+
+            match db_generic_update_query_db(&Table::Restrictions,3,&new_id.to_string(),&new_restriction.int_value2.to_string(), db).await {
+                Ok(_)=>(),
+                Err(e)=> return Err(e.into()),
+            }
+        
+        },
+        6 => {
+            match db_generic_update_query_db(&Table::Restrictions,4,&new_id.to_string(),&new_restriction.float_value1.to_string(), db).await {
+                Ok(_)=>(),
+                Err(e)=> return Err(e.into()),
+            }
+
+            match db_generic_update_query_db(&Table::Restrictions,3,&new_id.to_string(),&new_restriction.float_value1.to_string(), db).await {
+                Ok(_)=>(),
+                Err(e)=> return Err(e.into()),
+            }
+        
+        },
+        7 => {
+            match db_generic_update_query_db(&Table::Restrictions,5,&new_id.to_string(),&new_restriction.allowed_value_list.to_string(), db).await {
+                Ok(_)=>(),
+                Err(e)=> return Err(e.into()), 
+            }
+        },
+        _ => return Err("New restriction type out of range.".into()),
+    }
+
+    Ok(new_id)
 }
 
 pub async fn db_insert_item(new_item : &NewItem, db : &D1Database) -> Result<i32>{
