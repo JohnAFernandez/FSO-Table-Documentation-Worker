@@ -98,7 +98,7 @@ async fn fetch(req: Request, env: Env, _ctx: Context,) -> worker::Result<Respons
         .get_async("/api/tables/:id/items", get_tables_items).options_async("/api/tables/:id/items", send_cors)
         .get_async("/api/tables/restrictions", get_restrictions).options_async("/api/tables/restrictions", send_cors)
         .get_async("/api/tables/restrictions/:id", get_restriction).options_async("/api/tables/restrictions/:id", send_cors)
-        .post_async("/api/tables/items/:id/restriction", post_restriction) // Requires login
+        .post_async("/api/tables/items/restriction", post_restriction) // Requires login
         .patch_async("/api/tables/restriction/:id", update_restriction).put_async("/api/tables/restriction/:id", update_restriction) // Requires login
         .delete_async("/api/tables/restrictions/:id", delete_restriction) // Admin only
         .get_async("/api/tables/deprecations", get_deprecations).options_async("/api/tables/deprecations", send_cors)
@@ -2637,13 +2637,3 @@ pub async fn err_specific_and_add_report(mut external: String, internal: &String
 
     send_failure(&external, code).await
 }
-
-/*
-use worker::*;
-
-#[derive(Deserialize)]
-struct Registration {
-	email: String,
-	password: String,
-}
-*/
