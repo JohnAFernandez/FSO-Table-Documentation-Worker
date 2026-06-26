@@ -50,7 +50,7 @@ const FSO_TABLES_QUERY: &str = "SELECT * FROM fso_tables ";
 const PARSE_BEHAVIORS_QUERY: &str = "SELECT * FROM parse_behaviors ";    
 const RESTRICTIONS_QUERY: &str = "SELECT * FROM restrictions ";    
 const SESSIONS_QUERY: &str = "SELECT id, user, expiration FROM sessions ";    
-const TABLE_ALIASES_QUERY: &str = "SELECT * FROM table_aliases ";    
+const TABLE_ALIASES_QUERY: &str = "SELECT * FROM aliases ";    
 const USERS_QUERY: &str = "SELECT id, username, role, active, email_confirmed, contribution_count, banned FROM users ";
 
 const ACTIONS_DELETE_QUERY: &str = "DELETE FROM actions ";
@@ -62,7 +62,7 @@ const FSO_ITEMS_DELETE_QUERY: &str = "DELETE FROM fso_items";
 const PARSE_BEHAVIORS_DELETE_QUERY: &str = "DELETE FROM parse_behaviors ";    
 const RESTRICTIONS_DELETE_QUERY: &str = "DELETE FROM restrictions ";    
 //const SESSIONS_DELETE_QUERY: &str = "DELETE FROM sessions ";    
-const TABLE_ALIASES_DELETE_QUERY: &str = "DELETE FROM table_aliases ";    
+const TABLE_ALIASES_DELETE_QUERY: &str = "DELETE FROM aliases ";    
 //const USERS_DELETE_QUERY: &str = "DELETE FROM users ";
 
 // Some (maybe most) of these will end up being unused as specialized functions are already written.  
@@ -84,7 +84,7 @@ const FSO_ITEMS_INSERT_QUERY: &str = "INSERT INTO fso_items (item_text, document
 // const RESTRICTIONS_INSERT_QUERY: &str = ;    
 //const SESSIONS_INSERT_QUERY: &str = "INSERT INTO sessions (user, expiration) VALUES (?1, ";
 //const SESSIONS_INSERT_QUERY_2: &str = " );";
-const TABLE_ALIASES_INSERT_QUERY: &str = "INSERT INTO table_aliases (table_id, item_id, filename) VALUES (?1, ?2, ?3)";    
+const TABLE_ALIASES_INSERT_QUERY: &str = "INSERT INTO aliases (table_id, item_id, filename) VALUES (?1, ?2, ?3)";    
 //const USERS_INSERT_QUERY: &str = "INSERT INTO users ( username, role, active, email_confirmed, contribution_count, banned: i64) VALUES (?1, ?2, ?3, ?4, ?5, ?6)";
 
 // Other patches should be done on the database end.
@@ -127,8 +127,8 @@ const RESTRICTIONS_PATCH_ALLOWED_VALUES_QUERY: &str = "UPDATE restrictions SET a
 
 //const SESSIONS_PATCH_EXPIRATION_QUERY: &str =  "UPDATE sessions SET expiration = ?1 ";  
 
-const TABLE_ALIASES_PATCH_TABLE_ID_QUERY: &str = "UPDATE table_aliases SET table_id = ?1 ";
-const TABLE_ALIASES_PATCH_FILENAME_QUERY: &str = "UPDATE table_aliases SET filename = ?1 ";
+const TABLE_ALIASES_PATCH_TABLE_ID_QUERY: &str = "UPDATE aliases SET table_id = ?1 ";
+const TABLE_ALIASES_PATCH_FILENAME_QUERY: &str = "UPDATE aliases SET filename = ?1 ";
 
 
 const BINDABLE_ACTIONS_FILTER_ID: &str = "WHERE action_id = ?;";
