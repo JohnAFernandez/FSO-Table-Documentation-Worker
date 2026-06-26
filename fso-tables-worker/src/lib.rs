@@ -89,7 +89,7 @@ async fn fetch(req: Request, env: Env, _ctx: Context,) -> worker::Result<Respons
         .delete_async("/api/tables/items/:id", delete_item) // Admin only
         .get_async("/api/tables/aliases", get_aliases).options_async("/api/tables/aliases", send_cors)
         .get_async("/api/tables/aliases/:id", get_alias).options_async("/api/tables/aliases/:id", send_cors)
-        //.post_async("/api/tables/:id/alias", post_alias) // Requires login
+        .post_async("/api/tables/:id/alias", post_alias) // Requires login
         .patch_async("/api/tables/aliases/:id", update_alias).put_async("/api/tables/aliases/:id", update_alias) // Requires login
         .delete_async("/api/tables/aliases/:id", delete_alias) // Admin only
         .get_async("/api/tables/:id", get_table).options_async("/api/tables/:id", send_cors)
@@ -1522,6 +1522,43 @@ pub async fn get_alias(_: Request, ctx: RouteContext<()>) -> worker::Result<Resp
             }
         },
         None => return err_specific("{\"Error\":\"Internal Server Error, route parameter mismatch!\"}".to_string()).await,
+    }
+}
+
+
+
+pub async fn post_alias(mut req: Request, ctx: RouteContext<()>)  -> worker::Result<Response> {
+    match ctx.env.d1(DB_NAME) {
+        Ok(db) => {
+            let session_result = header_session_is_valid(&req, &db, &ctx).await;
+            if !session_result.0 {
+                return send_failure(&ERROR_NOT_LOGGED_IN.to_string(), 403).await
+            }
+
+            let username = session_result.1;
+
+            match db_get_user_role(&username, &db).await {                 
+                Ok(authorizer_role) => {
+                    match authorizer_role {
+                        UserRole::VIEWER => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
+                        _=> (),
+                    }         
+                },
+                Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00191\"}".to_string(),&(e.to_string() + " | IEC00191"), 500, &ctx).await,
+            }
+
+            match req.json::<NewAlias>().await {
+                Ok(new_alias) => {
+                    match db_insert_alias(&new_alias, &db).await {
+                        Ok(id) => return send_success(&format!("{{\"alias_id\": \"{}\"}}", id), &"".to_string()).await,
+                        Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00193\"}".to_string(),&(e.to_string() + " | IEC00193"), 500, &ctx).await,
+                        
+                    }
+                },
+                Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00192\"}".to_string(),&(e.to_string() + " | IEC00192"), 500, &ctx).await,
+            }
+        },
+        Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00190\"}".to_string(),&(e.to_string() + " | IEC00190"), 500, &ctx).await,
     }
 }
 

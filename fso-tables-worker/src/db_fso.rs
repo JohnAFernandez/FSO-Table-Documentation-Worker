@@ -4,6 +4,7 @@ use chrono::{DateTime, Utc, TimeDelta};
 use crate::{UserDetails, DB_NAME, err_specific, JsValue, DB_TIME_FORMAT, NewItem, get_current_time_i64};
 use is_number::{is_integer};
 use serde_json::from_str;
+use std::cmp::min;
 
 #[derive(PartialEq, PartialOrd)]
 pub enum UserRole {
@@ -83,7 +84,7 @@ const FSO_ITEMS_INSERT_QUERY: &str = "INSERT INTO fso_items (item_text, document
 // const RESTRICTIONS_INSERT_QUERY: &str = ;    
 //const SESSIONS_INSERT_QUERY: &str = "INSERT INTO sessions (user, expiration) VALUES (?1, ";
 //const SESSIONS_INSERT_QUERY_2: &str = " );";
-//const TABLE_ALIASES_INSERT_QUERY: &str = "INSERT INTO table_aliases (table_id, filename) VALUES (?1, ?2)";    
+const TABLE_ALIASES_INSERT_QUERY: &str = "INSERT INTO table_aliases (table_id, item_id, filename) VALUES (?1, ?2, ?3)";    
 //const USERS_INSERT_QUERY: &str = "INSERT INTO users ( username, role, active, email_confirmed, contribution_count, banned: i64) VALUES (?1, ?2, ?3, ?4, ?5, ?6)";
 
 // Other patches should be done on the database end.
@@ -436,6 +437,13 @@ pub struct Session {
 pub struct TableAlias {
     pub alias_id: i32,
     pub table_id: i32,
+    pub filename: String,
+}
+
+#[derive(Deserialize, Serialize)]
+pub struct NewAlias {
+    pub table_id: i32,
+    pub item_id: i32,
     pub filename: String,
 }
 
@@ -1653,6 +1661,36 @@ pub async fn db_session_add(token: &String, email: &String, time: &String, ctx: 
             }
         },
         Err(e) => return Err(e.to_string().into()),
+    }
+}
+
+pub async fn db_insert_alias(new_alias: &NewAlias, db : &D1Database) -> worker::Result<i32> {
+    let item_id = min(new_alias.item_id, -1);
+    let table_id = min(new_alias.table_id, -1);
+
+    if item_id == -1 && table_id == -1 {
+        return Err("Must have either a valid item id or a valid table id to add an Alias.".into());
+    }
+
+    if new_alias.filename.is_empty() {
+        return Err("Alias must not be empty.".into());
+    }
+
+    let query = TABLE_ALIASES_INSERT_QUERY.to_owned() + ";" + "SELECT alias_id from table_aliases ORDER BY alias_id desc LIMIT 1;";
+
+    match db.prepare(query).bind(&[JsValue::from(table_id), JsValue::from(item_id), JsValue::from(&new_alias.filename)]) {
+        Ok(bound_query) => {
+            match bound_query.first::<i32>(Some("alias_id")).await {
+                Ok (option)=> {
+                    match option {
+                        Some(id) => return Ok(id),
+                        None => return Err("Could not find alias after adding to table.".into()),
+                    }
+                },
+                Err(e) => return Err(e.into()),
+            }
+        },
+        Err(e) => return Err(e.into()),
     }
 }
 

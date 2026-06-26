@@ -1,6 +1,6 @@
 [package]
 name = "fso-tables-worker"
-version = "0.1.0"
+version = "1.0.0"
 edition = "2021"
 authors = [ "JohnAFernandez <jafernandez.tampabay@gmail.com>" ]
 description = "A cloudflare worker designed to allow the FSO tables to be worked on by any authorized party."
