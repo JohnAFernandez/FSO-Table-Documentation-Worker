@@ -1676,7 +1676,7 @@ pub async fn db_insert_alias(new_alias: &NewAlias, db : &D1Database) -> worker::
         return Err("Alias must not be empty.".into());
     }
 
-    let query = TABLE_ALIASES_INSERT_QUERY.to_owned() + ";" + "SELECT alias_id from table_aliases ORDER BY alias_id desc LIMIT 1;";
+    let query = TABLE_ALIASES_INSERT_QUERY.to_owned() + ";" + "SELECT alias_id from aliases ORDER BY alias_id desc LIMIT 1;";
 
     match db.prepare(query).bind(&[JsValue::from(table_id), JsValue::from(item_id), JsValue::from(&new_alias.filename)]) {
         Ok(bound_query) => {
