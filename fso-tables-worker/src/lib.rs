@@ -1267,19 +1267,8 @@ pub async fn update_item(mut req: Request, ctx: RouteContext<()>) -> worker::Res
                                 }    
                             }
 
-                            if item.deprecation_id != "~!*$%" {
-                                match db_generic_update_query(&Table::FsoItems, 1, &item.deprecation_id, &item.item_id.to_string(),  &ctx).await {
-                                    Ok(_) => item_update_action_string += &format!("\"deprecation_id\":\"{}\"", item.deprecation_id),
-                                    Err(e) => {
-                                        item_update_error_string += &"Could not update default value due to: ".to_string();
-                                        item_update_error_string += &e.to_string();
-                                        item_update_error_string += &" ".to_string();
-                                    },
-                                }
-                            }
-
                             if item.documentation != "~!*$%"{
-                                match db_generic_update_query(&Table::FsoItems, 2, &item.documentation, &item.item_id.to_string(),  &ctx).await {
+                                match db_generic_update_query(&Table::FsoItems, 1, &item.documentation, &item.item_id.to_string(),  &ctx).await {
                                     Ok(_) => item_update_action_string += &format!("\"documentation\":\"{}\"", item.documentation),
                                     Err(e) => {
                                         item_update_error_string += &"Could not update default value due to: ".to_string();
@@ -1290,7 +1279,7 @@ pub async fn update_item(mut req: Request, ctx: RouteContext<()>) -> worker::Res
                             }
 
                             if item.info_type != "~!*$%"{
-                                match db_generic_update_query(&Table::FsoItems, 3, &item.info_type, &item.item_id.to_string(),  &ctx).await {
+                                match db_generic_update_query(&Table::FsoItems, 2, &item.info_type, &item.item_id.to_string(),  &ctx).await {
                                     Ok(_) => item_update_action_string += &format!("\"info_type\":\"{}\"", item.info_type),
                                     Err(e) => {
                                         item_update_error_string += &"Could not update default value due to: ".to_string();
@@ -1301,7 +1290,7 @@ pub async fn update_item(mut req: Request, ctx: RouteContext<()>) -> worker::Res
                             }
 
                             if item.item_text != "~!*$%"{
-                                match db_generic_update_query(&Table::FsoItems, 4, &item.item_text, &item.item_id.to_string(),  &ctx).await {
+                                match db_generic_update_query(&Table::FsoItems, 3, &item.item_text, &item.item_id.to_string(),  &ctx).await {
                                     Ok(_) => item_update_action_string += &format!("\"item_text\":\"{}\"", item.item_text),
                                     Err(e) => {
                                         item_update_error_string += &"Could not update default value due to: ".to_string();
@@ -1312,7 +1301,7 @@ pub async fn update_item(mut req: Request, ctx: RouteContext<()>) -> worker::Res
                             }
 
                             if item.major_version != "~!*$%"{
-                                match db_generic_update_query(&Table::FsoItems, 5, &item.major_version, &item.item_id.to_string(),  &ctx).await {
+                                match db_generic_update_query(&Table::FsoItems, 4, &item.major_version, &item.item_id.to_string(),  &ctx).await {
                                     Ok(_) => item_update_action_string += &format!("\"major_version\":\"{}\"", item.major_version),
                                     Err(e) => {
                                         item_update_error_string += &"Could not update default value due to: ".to_string();
@@ -1323,7 +1312,7 @@ pub async fn update_item(mut req: Request, ctx: RouteContext<()>) -> worker::Res
                             }
                             
                             if item.parent_id != "~!*$%" {
-                                match db_generic_update_query(&Table::FsoItems, 6, &item.parent_id, &item.item_id.to_string(),  &ctx).await {
+                                match db_generic_update_query(&Table::FsoItems, 5, &item.parent_id, &item.item_id.to_string(),  &ctx).await {
                                     Ok(_) => item_update_action_string += &format!("\"parent_id\":\"{}\"", item.parent_id),
                                     Err(e) => {
                                         item_update_error_string += &"Could not update default value due to: ".to_string();
@@ -1333,19 +1322,8 @@ pub async fn update_item(mut req: Request, ctx: RouteContext<()>) -> worker::Res
                                 }
                             }
 
-                            if item.restriction_id != "~!*$%" {
-                                match db_generic_update_query(&Table::FsoItems, 7, &item.restriction_id, &item.item_id.to_string(),  &ctx).await {
-                                    Ok(_) => item_update_action_string += &format!("\"restriction_id\":\"{}\"", item.restriction_id),
-                                    Err(e) => {
-                                        item_update_error_string += &"Could not update default value due to: ".to_string();
-                                        item_update_error_string += &e.to_string();
-                                        item_update_error_string += &" ".to_string();
-                                    }
-                                }
-                            }
-
                             if item.table_id != "~!*$%" {
-                                match db_generic_update_query(&Table::FsoItems, 8, &item.table_id.to_string(), &item.item_id.to_string(),  &ctx).await {
+                                match db_generic_update_query(&Table::FsoItems, 6, &item.table_id.to_string(), &item.item_id.to_string(),  &ctx).await {
                                     Ok(_) => item_update_action_string += &format!("\"table_id\":\"{}\"", item.table_id),
                                     Err(e) => {
                                         item_update_error_string += &"Could not update default value due to: ".to_string();
@@ -1356,7 +1334,7 @@ pub async fn update_item(mut req: Request, ctx: RouteContext<()>) -> worker::Res
                             }
 
                             if item.table_index != "~!*$%" {
-                                match db_generic_update_query(&Table::FsoItems, 9, &item.table_id.to_string(), &item.item_id.to_string(),  &ctx).await {
+                                match db_generic_update_query(&Table::FsoItems, 7, &item.table_id.to_string(), &item.item_id.to_string(),  &ctx).await {
                                     Ok(_) => item_update_action_string += &format!("\"table_id\":\"{}\"", item.table_id),
                                     Err(e) => {
                                         item_update_error_string += &"Could not update default value due to: ".to_string();
