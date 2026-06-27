@@ -8,10 +8,11 @@ use std::cmp::min;
 
 #[derive(PartialEq, PartialOrd)]
 pub enum UserRole {
-    OWNER = 0,
-    ADMIN = 1, // Able to upgrade other users to a maintainer or downgrade maintainers to viewers
-    MAINTAINER = 2, // Able to make changes to table fsdocs
-    VIEWER = 3, // Waiting for someone to approve an upgrade to a maintainer level
+    Owner = 0,
+    Admin = 1, // Able to upgrade other users to a maintainer or downgrade maintainers to viewers
+    TrustedMaintainer = 2,
+    Maintainer = 3, // Able to make changes to table fsdocs
+    Viewer = 4, // Waiting for someone to approve an upgrade to a maintainer level
 }
 
 const DUMMY_FLOAT : f64 = 9191.919;
@@ -19,11 +20,12 @@ const DUMMY_INT : i32 = -2147483647;
 
 pub async fn number_to_role(n: i64) -> worker::Result<UserRole> {
     match n {
-        0 => Ok(UserRole::OWNER),
-        1 => Ok(UserRole::ADMIN),
-        2 => Ok(UserRole::MAINTAINER),
-        3 => Ok(UserRole::VIEWER),
-        _ => panic!("Tried to convert a number into a UserRole, but the number is out of range: {}.", n)
+        0 => Ok(UserRole::Owner),
+        1 => Ok(UserRole::Admin),
+        2 => Ok(UserRole::TrustedMaintainer),
+        3 => Ok(UserRole::Maintainer),
+        4 => Ok(UserRole::Viewer),
+        _ => Err(format!("Tried to convert a number into a UserRole, but the number is out of range: {}.", n).into())
     }
 }
 
@@ -1300,13 +1302,14 @@ pub async fn db_get_user_role(email: &String, db: &D1Database) -> worker::Result
 }
 
 pub async fn db_force_role(email: &String, db : &D1Database, role: UserRole) -> worker::Result<()> {
-    let role_num : i64;
+    let role_num : i32;
     
     match role {
-        UserRole::ADMIN => role_num = 1,
-        UserRole::MAINTAINER => role_num = 2,
-        UserRole::VIEWER => role_num = 3,
-        UserRole::OWNER => return Err("Nice try bro.  No owners unless I add them directly.".into()),
+        UserRole::Admin => role_num = 1,
+        UserRole::TrustedMaintainer => role_num = 2,
+        UserRole::Maintainer => role_num = 3,
+        UserRole::Viewer => role_num = 4,
+        UserRole::Owner => return Err("Nice try bro.  No owners unless I add them directly.".into()),
     }
 
     let query_string = format!("UPDATE users SET role = {} WHERE username = ?", role_num);
@@ -1480,7 +1483,7 @@ pub async fn db_downgrade_user(email: &String, ctx: &RouteContext<()>) -> Result
 
     match &db{
         Ok(connection) => {
-            let query_string = format!("UPDATE users SET Min(role + 1, 3) WHERE username = ?");
+            let query_string = format!("UPDATE users SET role = Min(role + 1, 4) WHERE username = ?");
 
             let query = connection.prepare(&query_string).bind(&[email.into()]).unwrap();
             

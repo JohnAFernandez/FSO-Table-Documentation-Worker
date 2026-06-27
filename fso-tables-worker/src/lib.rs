@@ -447,7 +447,7 @@ pub async fn deactivate_user(mut req: Request, ctx: RouteContext<()>) -> worker:
                 
                             // Owners can only be deactivated by someone working directly with the database.
                             // But otherwise, you *can* deactivate yourself.
-                            if target_user.email == username && authorizer_role != UserRole::OWNER {
+                            if target_user.email == username && authorizer_role != UserRole::Owner {
                                 
                                 match db_deactivate_user(&username, &db).await {
                                     Ok(_) => return send_success(&"{\"Response\": \"User Deactivated\"}".to_string(), &"".to_string()).await,
@@ -458,8 +458,7 @@ pub async fn deactivate_user(mut req: Request, ctx: RouteContext<()>) -> worker:
 
                             // these two types are not allowed to deactivate other users
                             match authorizer_role {
-                                UserRole::MAINTAINER => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
-                                UserRole::VIEWER => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
+                                UserRole::Maintainer | UserRole::Viewer => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
                                 _=> (),
                             }         
                                                                                     
@@ -533,17 +532,17 @@ pub async fn activate_user(mut req: Request, ctx: RouteContext<()>) -> worker::R
                         // these two types are not allowed to deactivate other users, and the owner can only be activated
                         // directly.
                         match authorizer_role {
-                            UserRole::OWNER => {
+                            UserRole::Owner => {
                                 let _ = db_deactivate_user(&target_user.email, &db).await;
                                 return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await
                             }
-                            UserRole::MAINTAINER => {
+                            UserRole::Maintainer => {
                                 if target_user.email != username{
                                     let _ = db_deactivate_user(&target_user.email, &db).await;
                                     return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await    
                                 }
                             },
-                            UserRole::VIEWER => { 
+                            UserRole::Viewer => { 
                                 if target_user.email != username{
                                     let _ = db_deactivate_user(&target_user.email, &db).await;
                                     return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await
@@ -557,8 +556,8 @@ pub async fn activate_user(mut req: Request, ctx: RouteContext<()>) -> worker::R
                             Ok(role) => {
                                 // only allow returning accounts to be maintainers in case a bad actor decides to 
                                 // try to act via a deactivated Admin
-                                if role < UserRole::MAINTAINER{
-                                    match db_force_role(&target_user.email, &db, UserRole::MAINTAINER).await {
+                                if role < UserRole::Maintainer{
+                                    match db_force_role(&target_user.email, &db, UserRole::Maintainer).await {
                                         Ok(_) => return send_success(&"{\"Response\": \"User Activated\"}".to_string(), &"".to_string()).await,
                                         Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00027\"}".to_string(),&(e.to_string() + " | IEC00027"), 500, &ctx).await,
                                     }
@@ -875,8 +874,7 @@ pub async fn user_upgrade_user_permissions(mut req: Request, ctx: RouteContext<(
 
                             // these two types are not allowed to upgrade other users
                             match authorizer_role {
-                                UserRole::MAINTAINER => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
-                                UserRole::VIEWER => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
+                                UserRole::Viewer | UserRole::Maintainer  => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
                                 _=> (),
                             }         
 
@@ -884,7 +882,7 @@ pub async fn user_upgrade_user_permissions(mut req: Request, ctx: RouteContext<(
                             match db_get_user_role(&target_user.email, &db).await { 
                                 Ok(target_user_role) => {
                                     // We cannot upgrade Admins here.  Only when directly accessing the database.
-                                    if authorizer_role < target_user_role && target_user_role > UserRole::ADMIN {
+                                    if authorizer_role < target_user_role && target_user_role > UserRole::Admin {
                                         match db_upgrade_user(&target_user.email, &ctx).await {
                                             Ok(_) => return send_success(&"{\"Response\": \"User Upgraded\"}".to_string(), &"".to_string()).await,
                                             Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00195\"}".to_string(),&(e.to_string() + " | IEC00195"), 500, &ctx).await,                               
@@ -939,8 +937,7 @@ pub async fn user_downgrade_user_permissions(mut req: Request, ctx: RouteContext
 
                             // these two types are not allowed to downgrade other users
                             match authorizer_role {
-                                UserRole::MAINTAINER => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
-                                UserRole::VIEWER => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
+                                UserRole::Maintainer | UserRole::Viewer  => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
                                 _=> (),
                             }         
 
@@ -948,7 +945,7 @@ pub async fn user_downgrade_user_permissions(mut req: Request, ctx: RouteContext
                             match db_get_user_role(&target_user.email, &db).await { 
                                 Ok(target_user_role) => {
                                     // We cannot upgrade Admins here.  Only when directly accessing the database.
-                                    if authorizer_role < target_user_role && target_user_role < UserRole::VIEWER {
+                                    if authorizer_role < target_user_role && target_user_role < UserRole::Viewer {
                                         match db_downgrade_user(&target_user.email, &ctx).await {
                                             Ok(_) => return send_success(&"{\"Response\": \"Success, user Downgraded\"}".to_string(), &"".to_string()).await,
                                             Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00042\"}".to_string(),&(e.to_string() + " | IEC00042"), 500, &ctx).await,                               
@@ -1009,7 +1006,7 @@ pub async fn update_parse_type(mut req: Request, ctx: RouteContext<()>) -> worke
             match db_get_user_role(&username, &db).await {                 
                 Ok(authorizer_role) => {
                     match authorizer_role {
-                        UserRole::VIEWER => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
+                        UserRole::Viewer => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
                         _=> (),
                     }         
 
@@ -1060,8 +1057,8 @@ pub async fn delete_parse_type(req: Request, ctx: RouteContext<()>) -> worker::R
             match db_get_user_role(&username, &db).await {                 
                 Ok(authorizer_role) => {
                     match authorizer_role {
-                        UserRole::VIEWER => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
-                        UserRole::MAINTAINER => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
+                        UserRole::Viewer => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
+                        UserRole::Maintainer => return send_failure(&ERROR_NON_MAINTAINER_ACTION.to_string(), 403).await,
                         _=> {},
                     }         
                 },
@@ -1148,7 +1145,7 @@ pub async fn insert_item(mut req: Request, ctx: RouteContext<()>) -> worker::Res
             match db_get_user_role(&username, &db).await {                 
                 Ok(authorizer_role) => {
                     match authorizer_role {
-                        UserRole::VIEWER => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
+                        UserRole::Viewer => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
                         _=> (),
                     }  
                 },
@@ -1249,7 +1246,7 @@ pub async fn update_item(mut req: Request, ctx: RouteContext<()>) -> worker::Res
             match db_get_user_role(&username, &db).await {                 
                 Ok(authorizer_role) => {
                     match authorizer_role {
-                        UserRole::VIEWER => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
+                        UserRole::Viewer => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
                         _=> (),
                     }         
 
@@ -1405,8 +1402,8 @@ pub async fn delete_item(req: Request, ctx: RouteContext<()>) -> worker::Result<
             match db_get_user_role(&username, &db).await {                 
                 Ok(authorizer_role) => {
                     match authorizer_role {
-                        UserRole::VIEWER => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
-                        UserRole::MAINTAINER => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
+                        UserRole::Viewer => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
+                        UserRole::Maintainer => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
                         _=> {},
                     }         
                 },
@@ -1524,7 +1521,7 @@ pub async fn post_alias(mut req: Request, ctx: RouteContext<()>)  -> worker::Res
             match db_get_user_role(&username, &db).await {                 
                 Ok(authorizer_role) => {
                     match authorizer_role {
-                        UserRole::VIEWER => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
+                        UserRole::Viewer => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
                         _=> (),
                     }         
                 },
@@ -1559,7 +1556,7 @@ pub async fn update_alias(mut req: Request, ctx: RouteContext<()>) -> worker::Re
             match db_get_user_role(&username, &db).await {                 
                 Ok(authorizer_role) => {
                     match authorizer_role {
-                        UserRole::VIEWER => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
+                        UserRole::Viewer => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
                         _=> (),
                     }         
 
@@ -1610,8 +1607,8 @@ pub async fn delete_alias(req: Request, ctx: RouteContext<()>) -> worker::Result
             match db_get_user_role(&username, &db).await {                 
                 Ok(authorizer_role) => {
                     match authorizer_role {
-                        UserRole::VIEWER => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
-                        UserRole::MAINTAINER => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
+                        UserRole::Viewer => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
+                        UserRole::Maintainer => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
                         _=> {},
                     }         
                 },
@@ -1689,7 +1686,7 @@ pub async fn post_restriction(mut req: Request, ctx: RouteContext<()>) -> worker
             match db_get_user_role(&username, &db).await {                 
                 Ok(authorizer_role) => {
                     match authorizer_role {
-                        UserRole::VIEWER => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
+                        UserRole::Viewer => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
                         _=> (),
                     }         
                     
@@ -1728,7 +1725,7 @@ pub async fn update_restriction(mut req: Request, ctx: RouteContext<()>) -> work
             match db_get_user_role(&username, &db).await {                 
                 Ok(authorizer_role) => {
                     match authorizer_role {
-                        UserRole::VIEWER => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
+                        UserRole::Viewer => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
                         _=> (),
                     }         
 
@@ -1792,8 +1789,8 @@ pub async fn delete_restriction(req: Request, ctx: RouteContext<()>) -> worker::
             match db_get_user_role(&username, &db).await {                 
                 Ok(authorizer_role) => {
                     match authorizer_role {
-                        UserRole::VIEWER => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
-                        UserRole::MAINTAINER => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
+                        UserRole::Viewer => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
+                        UserRole::Maintainer => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
                         _=> {},
                     }         
                 },
@@ -1861,7 +1858,7 @@ pub async fn post_deprecation(mut req: Request, ctx: RouteContext<()>) -> worker
             match db_get_user_role(&username, &db).await {                 
                 Ok(authorizer_role) => {
                     match authorizer_role {
-                        UserRole::VIEWER => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
+                        UserRole::Viewer => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
                         _=> (),
                     }         
                 
@@ -1905,7 +1902,7 @@ pub async fn update_deprecation(mut req: Request, ctx: RouteContext<()>) -> work
             match db_get_user_role(&username, &db).await {                 
                 Ok(authorizer_role) => {
                     match authorizer_role {
-                        UserRole::VIEWER => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
+                        UserRole::Viewer => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
                         _=> (),
                     }         
 
@@ -1963,8 +1960,8 @@ pub async fn delete_deprecation(req: Request, ctx: RouteContext<()>) -> worker::
             match db_get_user_role(&username, &db).await {                 
                 Ok(authorizer_role) => {
                     match authorizer_role {
-                        UserRole::VIEWER => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
-                        UserRole::MAINTAINER => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
+                        UserRole::Viewer => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
+                        UserRole::Maintainer => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
                         _=> {},
                     }         
                 },
@@ -2041,8 +2038,7 @@ pub async fn resolve_bug_report(req: Request, ctx: RouteContext<()>) -> worker::
             match db_get_user_role(&username, &db).await {                 
                 Ok(authorizer_role) => {
                     match authorizer_role {
-                        UserRole::VIEWER => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
-                        UserRole::MAINTAINER => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
+                        UserRole::Viewer | UserRole::Maintainer => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
                         _=> (),
                     }         
                     match ctx.param("id"){
@@ -2087,8 +2083,7 @@ pub async fn unresolve_bug_report(req: Request, ctx: RouteContext<()>) -> worker
             match db_get_user_role(&username, &db).await {                 
                 Ok(authorizer_role) => {
                     match authorizer_role {
-                        UserRole::VIEWER => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
-                        UserRole::MAINTAINER => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
+                        UserRole::Viewer | UserRole::Maintainer => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
                         _=> (),
                     }         
 
@@ -2135,8 +2130,8 @@ pub async fn acknowledge_bug_report(req: Request, ctx: RouteContext<()>) -> work
             match db_get_user_role(&username, &db).await {                 
                 Ok(authorizer_role) => {
                     match authorizer_role {
-                        UserRole::OWNER => (),
-                        UserRole::ADMIN => (),
+                        UserRole::Owner => (),
+                        UserRole::Admin => (),
                         _=> return err_specific("{\"Error\":\"Only administrators can acknowledge bug reports\"}".to_string()).await,
                     }         
                 },
@@ -2203,8 +2198,8 @@ pub async fn update_bug_report(mut req: Request, ctx: RouteContext<()>) -> worke
             match db_get_user_role(&username, &db).await {                 
                 Ok(authorizer_role) => {
                     match authorizer_role {
-                        UserRole::OWNER => administrator = true,
-                        UserRole::ADMIN => administrator = true,
+                        UserRole::Owner => administrator = true,
+                        UserRole::Admin => administrator = true,
                         _=> (),
                     }         
                 },                
@@ -2626,13 +2621,12 @@ pub async fn add_mandatory_headers(token: &String) -> worker::Headers {
     return headers
 }
 
-/// CODE 403
+/// All of these are CODE 403
+const ERROR_NON_MAINTAINER_ACTION: &str = "{\"Error\": \"This operation has been turned off for Mainterner level and below.\"}";
 const ERROR_INSUFFICIENT_PERMISSISONS: &str = "{\"Error\": \"This operation is not authorizable via our API at your access level.\"}";
-/// CODE 403
 const ERROR_NOT_LOGGED_IN: &str = "{\"Error\": \"You must be logged in and provide an access token to access this endpoint.\"}";
-/// CODE 403
 const ERROR_USER_NOT_ACTIVE: &str = "{\"Error\": \"The user must be active before it can authorize this type of action\"}";
-/// CODE 404
+
 //const ERR_API_FALLBACK: &str = "{\"Error\": \"A method for this API route does not exist.\"}";
 
 /// CODE 403
