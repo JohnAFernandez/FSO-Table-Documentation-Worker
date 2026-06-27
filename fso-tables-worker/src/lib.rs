@@ -45,35 +45,21 @@ async fn fetch(req: Request, env: Env, _ctx: Context,) -> worker::Result<Respons
     // table_aliases, users
     Router::new()
         // No Post, put, patch, or delete for overarching category
-        .get_async("/api/users", db_user_stats_get)
-        .options_async("/api/users", send_cors)
-        .post_async("/api/users/register", user_register_new)
-        .options_async("/api/users/register", send_cors)
-        .post_async("/api/validation/:email", user_confirm_email)
-        .options_async("/api/validation/:email", send_cors)
-        .get_async("/api/users/myaccount", user_get_details)
-        .options_async("/api/users/myaccount", send_cors)
-        .post_async("/api/users/myaccount/password", user_change_password)
-        .options_async("/api/users/myaccount/password", send_cors)
-        .post_async("/api/users/reset-password", user_reset_password)
-        .options_async("/api/users/reset-password", send_cors)
-        .post_async("/api/users/reset-password/confirm", user_reset_password_confirmed)
-        .options_async("/api/users/reset-password/confirm", send_cors)
-        .post_async("/api/users/login", user_login)
-        .options_async("/api/users/login", send_cors)
-        .post_async("/api/users/logout", user_logout)
-        .options_async("/api/users/logout", send_cors)
-        .post_async("/api/users/activate", activate_user).put_async("/api/users/activate", activate_user).patch_async("/api/users/activate", activate_user)
-        .options_async("/api/users/activate", send_cors)
-        .post_async("/api/users/upgrade", user_upgrade_user_permissions).patch_async("/api/users/:username/upgrade", user_upgrade_user_permissions)
-        .options_async("/api/users/upgrade", send_cors)
-        .post_async("/api/users/downgrade", user_downgrade_user_permissions).patch_async("/api/users/:username/downgrade", user_downgrade_user_permissions)
-        .options_async("/api/users/downgrade", send_cors)
+        .get_async("/api/users", db_user_stats_get).options_async("/api/users", send_cors)
+        .post_async("/api/users/register", user_register_new).options_async("/api/users/register", send_cors)
+        .post_async("/api/validation/:email", user_confirm_email).options_async("/api/validation/:email", send_cors)
+        .get_async("/api/users/myaccount", user_get_details).options_async("/api/users/myaccount", send_cors)
+        .post_async("/api/users/myaccount/password", user_change_password).options_async("/api/users/myaccount/password", send_cors)
+        .post_async("/api/users/reset-password", user_reset_password).options_async("/api/users/reset-password", send_cors)
+        .post_async("/api/users/reset-password/confirm", user_reset_password_confirmed).options_async("/api/users/reset-password/confirm", send_cors)
+        .post_async("/api/users/login", user_login).options_async("/api/users/login", send_cors)
+        .post_async("/api/users/logout", user_logout).options_async("/api/users/logout", send_cors)
+        .post_async("/api/users/activate", activate_user).put_async("/api/users/activate", activate_user).patch_async("/api/users/activate", activate_user).options_async("/api/users/activate", send_cors)
+        .post_async("/api/users/upgrade", user_upgrade_user_permissions).patch_async("/api/users/:username/upgrade", user_upgrade_user_permissions).options_async("/api/users/upgrade", send_cors)
+        .post_async("/api/users/downgrade", user_downgrade_user_permissions).patch_async("/api/users/:username/downgrade", user_downgrade_user_permissions).options_async("/api/users/downgrade", send_cors)
         .delete_async("/api/users", deactivate_user)
-        .get_async("/api/tables/parse-types", get_parse_types)
-        .options_async("/api/tables/parse-types", send_cors)
-        .get_async("/api/tables/parse-types/:id", get_parse_type)
-        .options_async("/api/tables/parse-types/:id", send_cors)
+        .get_async("/api/tables/parse-types", get_parse_types).options_async("/api/tables/parse-types", send_cors)
+        .get_async("/api/tables/parse-types/:id", get_parse_type).options_async("/api/tables/parse-types/:id", send_cors)
         // TODO this may never get done, I'm not sure
         //.post_async("/api/tables/parse-types", post_parse_behavior)
         .patch_async("/api/tables/parse-types", update_parse_type).put_async("/api/tables/parse-types", update_parse_type)
@@ -82,8 +68,7 @@ async fn fetch(req: Request, env: Env, _ctx: Context,) -> worker::Result<Respons
         // TODO: stretch goal will allow UI to update table description, deprecation and aliases
         .get_async("/api/tables", get_tables).options_async("/api/tables", send_cors)
         .get_async("/api/tables/items", get_items).options_async("/api/tables/items", send_cors)
-        .get_async("/api/tables/items/:id", get_item)
-        .options_async("/api/tables/items/:id", send_cors)
+        .get_async("/api/tables/items/:id", get_item).options_async("/api/tables/items/:id", send_cors)
         .post_async("/api/tables/items", insert_item) // Requires login
         .patch_async("/api/tables/items", update_item).put_async("/api/tables/items", update_item) //Requires login 
         .delete_async("/api/tables/items/:id", delete_item) // Admin only
@@ -458,7 +443,7 @@ pub async fn deactivate_user(mut req: Request, ctx: RouteContext<()>) -> worker:
 
                             // these two types are not allowed to deactivate other users
                             match authorizer_role {
-                                UserRole::Maintainer | UserRole::Viewer => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
+                                UserRole::TrustedMaintainer | UserRole::Maintainer | UserRole::Viewer => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
                                 _=> (),
                             }         
                                                                                     
@@ -514,7 +499,7 @@ pub async fn activate_user(mut req: Request, ctx: RouteContext<()>) -> worker::R
                     // We need to see if the activating user is active, otherwise we should ignore
                     if !db_user_is_active(&username, &db).await {
                         // Owners can only be deactivated by someone working directly with the database.
-                        // But otherwise, you *can* deactivate yourself.
+                        // But otherwise, you *can* activate yourself.
                         if target_user.email == username{
                             match db_activate_user(&target_user.email, &db).await {
                                 Ok(_) => (),
@@ -536,16 +521,11 @@ pub async fn activate_user(mut req: Request, ctx: RouteContext<()>) -> worker::R
                                 let _ = db_deactivate_user(&target_user.email, &db).await;
                                 return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await
                             }
-                            UserRole::Maintainer => {
+                            
+                            UserRole::TrustedMaintainer | UserRole::Maintainer | UserRole::Viewer => {
                                 if target_user.email != username{
                                     let _ = db_deactivate_user(&target_user.email, &db).await;
                                     return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await    
-                                }
-                            },
-                            UserRole::Viewer => { 
-                                if target_user.email != username{
-                                    let _ = db_deactivate_user(&target_user.email, &db).await;
-                                    return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await
                                 }
                             },
                             _=> (),
