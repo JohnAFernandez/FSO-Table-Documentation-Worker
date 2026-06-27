@@ -65,10 +65,10 @@ async fn fetch(req: Request, env: Env, _ctx: Context,) -> worker::Result<Respons
         .options_async("/api/users/logout", send_cors)
         .post_async("/api/users/activate", activate_user).put_async("/api/users/activate", activate_user).patch_async("/api/users/activate", activate_user)
         .options_async("/api/users/activate", send_cors)
-        .post_async("/api/users/:username/upgrade", user_upgrade_user_permissions).patch_async("/api/users/:username/upgrade", user_upgrade_user_permissions)
-        .options_async("/api/users/:username/upgrade", send_cors)
-        .post_async("/api/users/:username/downgrade", user_downgrade_user_permissions).patch_async("/api/users/:username/downgrade", user_downgrade_user_permissions)
-        .options_async("/api/users/:username/downgrade", send_cors)
+        .post_async("/api/users/upgrade", user_upgrade_user_permissions).patch_async("/api/users/:username/upgrade", user_upgrade_user_permissions)
+        .options_async("/api/users/upgrade", send_cors)
+        .post_async("/api/users/downgrade", user_downgrade_user_permissions).patch_async("/api/users/:username/downgrade", user_downgrade_user_permissions)
+        .options_async("/api/users/downgrade", send_cors)
         .delete_async("/api/users", deactivate_user)
         .get_async("/api/tables/parse-types", get_parse_types)
         .options_async("/api/tables/parse-types", send_cors)
@@ -316,6 +316,11 @@ pub async fn user_confirm_email(mut req: Request, ctx: RouteContext<()>) -> work
                                                                 match db_generic_delete(Table::EmailValidations, &username, &ctx).await {
                                                                     Ok(_) => (),
                                                                     Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00011\"}".to_string(),&(e.to_string() + " | IEC00011"), 500, &ctx).await,
+                                                                }
+
+                                                                match db_set_user_to_active(&username, &ctx).await {
+                                                                    Ok(_) => (),
+                                                                    Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00194\"}".to_string(),&(e.to_string() + " | IEC00194"), 500, &ctx).await,
                                                                 }
 
                                                                 return create_session_and_send(&username, &salt, &ctx).await;   
@@ -870,7 +875,7 @@ pub async fn user_upgrade_user_permissions(mut req: Request, ctx: RouteContext<(
                                 return err_specific("{\"Error\":\"You cannot upgrade your own account.\"}".to_string()).await
                             }
 
-                            // these two types are not allowed to deactivate other users
+                            // these two types are not allowed to upgrade other users
                             match authorizer_role {
                                 UserRole::MAINTAINER => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
                                 UserRole::VIEWER => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
@@ -883,7 +888,7 @@ pub async fn user_upgrade_user_permissions(mut req: Request, ctx: RouteContext<(
                                     // We cannot upgrade Admins here.  Only when directly accessing the database.
                                     if authorizer_role < target_user_role && target_user_role > UserRole::ADMIN {
                                         //db_upgrade_user(&target_user.email, &db).await;
-                                        return send_success(&"{\"Response\": \"User Upgraded\"]".to_string(), &"".to_string()).await;
+                                        return send_success(&"{\"Response\": \"User Upgraded\"}".to_string(), &"".to_string()).await;
                                     } else {
                                         return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await;
                                     }

@@ -1439,6 +1439,25 @@ pub async fn db_set_new_pass(email: &String, password: &String, ctx: &RouteConte
     }
 }
 
+pub async fn db_set_user_to_active(email: &String, ctx: &RouteContext<()>) -> Result<()> {
+    let db = ctx.env.d1(DB_NAME);
+
+    match &db{
+        Ok(connection) => {
+            let query_string = format!("UPDATE users SET active = 1 WHERE username = ?");
+
+            let query = connection.prepare(&query_string).bind(&[email.into()]).unwrap();
+            
+            match query.first::<UserDetails>(None).await {
+                Ok(_) => Ok(()),
+                Err(e) => return Err(e.to_string().into()),
+            }
+        },
+        Err(e) => return Err(e.to_string().into()),
+    }
+}
+
+
 pub async fn db_user_stats_get(_: Request, _ctx: RouteContext<()>) -> worker::Result<Response> {   
     let db = _ctx.env.d1(DB_NAME);
 
