@@ -1462,7 +1462,7 @@ pub async fn db_upgrade_user(email: &String, ctx: &RouteContext<()>) -> Result<(
 
     match &db{
         Ok(connection) => {
-            let query_string = format!("UPDATE users SET role = Min(role - 1, 0) WHERE username = ?");
+            let query_string = format!("UPDATE users SET role = Max(role - 1, 1 ) WHERE username = ?");
 
             let query = connection.prepare(&query_string).bind(&[email.into()]).unwrap();
             
@@ -1480,7 +1480,7 @@ pub async fn db_downgrade_user(email: &String, ctx: &RouteContext<()>) -> Result
 
     match &db{
         Ok(connection) => {
-            let query_string = format!("UPDATE users SET Max(role + 1, 3) WHERE username = ?");
+            let query_string = format!("UPDATE users SET Min(role + 1, 3) WHERE username = ?");
 
             let query = connection.prepare(&query_string).bind(&[email.into()]).unwrap();
             
