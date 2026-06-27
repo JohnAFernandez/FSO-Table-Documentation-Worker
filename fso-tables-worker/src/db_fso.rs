@@ -1457,6 +1457,41 @@ pub async fn db_set_user_to_active(email: &String, ctx: &RouteContext<()>) -> Re
     }
 }
 
+pub async fn db_upgrade_user(email: &String, ctx: &RouteContext<()>) -> Result<()> {
+    let db = ctx.env.d1(DB_NAME);
+
+    match &db{
+        Ok(connection) => {
+            let query_string = format!("UPDATE users SET role = Min(role - 1, 0) WHERE username = ?");
+
+            let query = connection.prepare(&query_string).bind(&[email.into()]).unwrap();
+            
+            match query.first::<UserDetails>(None).await {
+                Ok(_) => Ok(()),
+                Err(e) => return Err(e.to_string().into()),
+            }
+        },
+        Err(e) => return Err(e.to_string().into()),
+    }
+}
+
+pub async fn db_downgrade_user(email: &String, ctx: &RouteContext<()>) -> Result<()> {
+    let db = ctx.env.d1(DB_NAME);
+
+    match &db{
+        Ok(connection) => {
+            let query_string = format!("UPDATE users SET Max(role + 1, 3) WHERE username = ?");
+
+            let query = connection.prepare(&query_string).bind(&[email.into()]).unwrap();
+            
+            match query.first::<UserDetails>(None).await {
+                Ok(_) => Ok(()),
+                Err(e) => return Err(e.to_string().into()),
+            }
+        },
+        Err(e) => return Err(e.to_string().into()),
+    }
+}
 
 pub async fn db_user_stats_get(_: Request, _ctx: RouteContext<()>) -> worker::Result<Response> {   
     let db = _ctx.env.d1(DB_NAME);
