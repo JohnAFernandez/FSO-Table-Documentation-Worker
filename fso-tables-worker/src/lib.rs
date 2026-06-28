@@ -411,16 +411,11 @@ pub async fn user_get_details(req: Request, ctx: RouteContext<()>) -> worker::Re
 
             match db_get_user_details(&username, &db).await {
                 Ok(res) => {
-                    match db_get_user_salt(&username, &ctx).await { // TODO, this salt retrieval should sometimes be in maybe_renew_lapsing_session
-                        Ok(salt) => {
-                            match maybe_renew_lapsing_session(session_result.4.try_into().unwrap(), session_result.3, &salt, &ctx).await {
-                                Ok(new_token) => token = new_token,
-                                Err(_) => (), // TODO, this needs to be a log only error report 
-                            }
-                        },
-                        Err(_) => (),
-                    }                    
-
+                    match maybe_renew_lapsing_session_no_salt(session_result.4.try_into().unwrap(), session_result.3, &username, &ctx).await {
+                        Ok(new_token) => token = new_token,
+                        Err(_) => (), // TODO, this needs to be a log only error report 
+                    }
+                    
                     return Ok(Response::from_json(&res).unwrap().with_headers(add_mandatory_headers(&token).await))
                 },
                 Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00017\"}".to_string(),&(e.to_string() + " | IEC00017"), 500, &ctx).await,
@@ -2386,6 +2381,14 @@ pub async fn header_get_token(req: &Request) -> worker::Result<String> {
         Err(_) => return Err("All login token retreival methods failed. Check your input. IEC00137".to_string().into()),
     }
 
+}
+
+// wrapper for regular lapsing session
+pub async fn maybe_renew_lapsing_session_no_salt(old_session_id: i32, old_session_timestamp: i64, username: &String, ctx: &RouteContext<()>) -> Result<String> {
+    match db_get_user_salt(&username, &ctx).await {
+        Ok(salt) => return maybe_renew_lapsing_session(old_session_id, old_session_timestamp, &salt, ctx).await,
+        Err(e) => return Err(e.into()),
+    }
 }
 
 pub async fn maybe_renew_lapsing_session(old_session_id: i32, old_session_timestamp: i64, salt: &String, ctx: &RouteContext<()>) -> Result<String> {
