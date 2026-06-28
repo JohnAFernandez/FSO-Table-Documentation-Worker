@@ -45,6 +45,7 @@ async fn fetch(req: Request, env: Env, _ctx: Context,) -> worker::Result<Respons
     // table_aliases, users
     Router::new()
         // No Post, put, patch, or delete for overarching category
+        .get_async("/api/status", query_for_update).options_async("/api/status", send_cors)
         .get_async("/api/users", db_user_stats_get).options_async("/api/users", send_cors)
         .post_async("/api/users/register", user_register_new).options_async("/api/users/register", send_cors)
         .post_async("/api/validation/:email", user_confirm_email).options_async("/api/validation/:email", send_cors)
@@ -129,6 +130,33 @@ pub async fn root_get(_req: Request, _ctx: RouteContext<()>) -> worker::Result<R
     send_success(&"You have accessed the Freespace Open Table Option Databse API.\n\nRoutes are users, tables, items, deprecations, and behaviors.\n\nThis API is currently under construction!".to_string(), &"".to_string()).await
 }
 
+#[derive(Serialize,Deserialize)]
+struct RemoteTime{
+    remote_time: i64, 
+}
+
+pub async fn query_for_update(mut req: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
+    let db_res = bind_database(&ctx).await; if db_res.is_err() { return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error! Please report and provide code: IEC00141\"}".to_string(),&(db_res.unwrap_err().to_string() + " | IEC00141"), 500, &ctx).await }
+    let db = db_res.unwrap();
+
+    match db_get_last_update_time(&db).await {
+        Ok(last_database_time) => {
+            match req.json::<RemoteTime>().await {
+                Ok(remote_time) => {
+                    if last_database_time <= remote_time.remote_time {
+                        return send_success(&"{\"update_needed\":\"false\"".to_string(), &"".to_string()).await;
+                    } else {
+                        return send_success(&"{\"update_needed\":\"true\"".to_string(), &"".to_string()).await;
+                    }
+                },
+                Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00066\"}".to_string(),&(e.to_string() + " | IEC00066"), 500, &ctx).await,
+            }
+        },
+
+        Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00065\"}".to_string(),&(e.to_string() + " | IEC00065"), 500, &ctx).await,
+    }
+    
+}
 
 // TODO! This function should really able to distinguish and report whether the user simply *exists* in the user database or is active. 
 pub async fn user_register_new(mut req: Request, ctx: RouteContext<()>) -> worker::Result<Response> {  

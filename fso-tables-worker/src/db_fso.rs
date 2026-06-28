@@ -1832,6 +1832,20 @@ pub async fn db_check_token(username: &String, token: &String, time: String, db:
     }
 }
 
+pub async fn db_get_last_update_time(db: &D1Database) -> Result<i64> {
+    let query = "SELECT timestamp FROM actions ORDER BY timestamp DESC LIMIT 1;";
+
+    match db.prepare(query).first::<i64>(Some("timestamp")).await {
+        Ok(opt)=> { 
+            match opt {
+                Some(id) => return Ok(id),
+                None => return Err("Could not find any timestamps in the action table.".into()), 
+            }
+        }  
+        Err(e) => return Err(e),
+    }
+}
+
 #[derive(Serialize, Deserialize)]
 struct ResetCodeRecord {
     code: String,
