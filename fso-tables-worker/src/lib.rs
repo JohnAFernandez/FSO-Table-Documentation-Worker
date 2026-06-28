@@ -111,11 +111,18 @@ async fn fetch(req: Request, env: Env, _ctx: Context,) -> worker::Result<Respons
         */
 }
 
+pub async fn bind_database(ctx: &RouteContext<()>) -> Result<D1Database> {
+    match ctx.env.d1(DB_NAME) {
+        Ok(db) => return Ok(db),
+        Err(e) => return Err(format!("While binding to database this happened: {} Please report! ", &e.to_string()).into()) 
+    }
+}
+
 pub async fn test_all(_req: Request, _ctx: RouteContext<()>) -> worker::Result<Response> {
     
     let mut _return_object = FsoTablesQueryResults::new_results().await;
 
-    return send_success(&"Test API is deactivated as tests were successful.".to_string(), &"".to_string()).await;
+    return send_success(&"Test API is inactive as tests were successful.".to_string(), &"".to_string()).await;
 }
 
 pub async fn root_get(_req: Request, _ctx: RouteContext<()>) -> worker::Result<Response> {   
@@ -1383,7 +1390,7 @@ pub async fn delete_item(req: Request, ctx: RouteContext<()>) -> worker::Result<
                 Ok(authorizer_role) => {
                     match authorizer_role {
                         UserRole::Viewer => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
-                        UserRole::Maintainer => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
+                        UserRole::Maintainer => return send_failure(&ERROR_NON_MAINTAINER_ACTION.to_string(), 403).await,
                         _=> {},
                     }         
                 },
@@ -1588,7 +1595,7 @@ pub async fn delete_alias(req: Request, ctx: RouteContext<()>) -> worker::Result
                 Ok(authorizer_role) => {
                     match authorizer_role {
                         UserRole::Viewer => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
-                        UserRole::Maintainer => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
+                        UserRole::Maintainer => return send_failure(&ERROR_NON_MAINTAINER_ACTION.to_string(), 403).await,
                         _=> {},
                     }         
                 },
@@ -1770,7 +1777,7 @@ pub async fn delete_restriction(req: Request, ctx: RouteContext<()>) -> worker::
                 Ok(authorizer_role) => {
                     match authorizer_role {
                         UserRole::Viewer => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
-                        UserRole::Maintainer => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
+                        UserRole::Maintainer => return send_failure(&ERROR_NON_MAINTAINER_ACTION.to_string(), 403).await,
                         _=> {},
                     }         
                 },
@@ -1941,7 +1948,7 @@ pub async fn delete_deprecation(req: Request, ctx: RouteContext<()>) -> worker::
                 Ok(authorizer_role) => {
                     match authorizer_role {
                         UserRole::Viewer => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
-                        UserRole::Maintainer => return send_failure(&ERROR_INSUFFICIENT_PERMISSISONS.to_string(), 403).await,
+                        UserRole::Maintainer => return send_failure(&ERROR_NON_MAINTAINER_ACTION.to_string(), 403).await,
                         _=> {},
                     }         
                 },
@@ -2339,7 +2346,7 @@ pub async fn create_session_and_send(email: &String, salt: &String, ctx: &RouteC
         Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00133\"}".to_string(),&(e.to_string() + " | IEC00133"), 500, &ctx).await,
     }
 
-    // We give the user two hours to do what they need to do.
+    // We give the user seven days to do what they need to do.
     match db_session_add(&hashed_string, &email, &(Utc::now() + TimeDelta::days(7)).format(DB_TIME_FORMAT).to_string(), ctx).await {
         // remember! double {{ }} needed to escape here, even on the right side.
         Ok(_) => return send_success(&"".to_string(), &login_token).await,
