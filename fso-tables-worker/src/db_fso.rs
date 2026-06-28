@@ -1717,6 +1717,30 @@ pub async fn db_session_add(token: &String, email: &String, time: &String, ctx: 
     }
 }
 
+pub async fn db_renew_session(token: &String, id: i32, time: &String, ctx: &RouteContext<()>) -> worker::Result<()> {
+
+    let db = ctx.env.d1(DB_NAME);
+
+    match &db{
+        Ok(connection)=> {
+
+            let final_token = &token.replace("\"", "");
+            let query = format!("UPDATE sessions SET key = \"{}\" AND expiration = {} WHERE id = ?", final_token, time);
+
+            match connection.prepare(query).bind(&[JsValue::from(id)]) {
+                Ok(statement) => {
+                    match statement.run().await {
+                        Ok(_) => return Ok(()),
+                        Err(e) => return Err(e),
+                    }
+                },
+                Err(e)=> return Err(e),
+            }
+        },
+        Err(e) => return Err(e.to_string().into()),
+    }
+}
+
 pub async fn db_insert_alias(new_alias: &NewAlias, db : &D1Database) -> worker::Result<i32> {
     let item_id = min(new_alias.item_id, -1);
     let table_id = min(new_alias.table_id, -1);
@@ -1807,7 +1831,7 @@ pub async fn db_insert_error_record(error: &String,  ctx: &RouteContext<()>) -> 
     }
 }
 
-pub async fn db_check_token(username: &String, token: &String, time: String, db: &D1Database) -> Result<bool> {
+pub async fn db_check_token(username: &String, token: &String, time: String, db: &D1Database) -> Result<(bool, i64, i64)> {
     let final_token = &token.replace("\"", "");
     let query = SESSIONS_QUERY.to_owned() + &SESSIONS_FILTER_A + &format!("{}", final_token) + &SESSIONS_FILTER_B;
     
@@ -1818,12 +1842,12 @@ pub async fn db_check_token(username: &String, token: &String, time: String, db:
                     match result.results::<Session>() {
                         Ok(results) => {                             
                             if results.is_empty() {
-                                return Ok(false);
+                                return Ok((false, -1, -1));
                             }
                             
-                            return Ok(time.parse::<i64>().unwrap() < results[0].expiration);
+                            return Ok((time.parse::<i64>().unwrap() < results[0].expiration, results[0].expiration, results[0].id));
                         },
-                        Err(_) => return Ok(false),        
+                        Err(_) => return Ok((false, -1, -1)),        
                     },
                 Err(e)=> Err(e),
             }

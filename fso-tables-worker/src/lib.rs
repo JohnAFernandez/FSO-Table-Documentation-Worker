@@ -398,9 +398,22 @@ pub async fn user_get_details(req: Request, ctx: RouteContext<()>) -> worker::Re
             }
 
             let username = session_result.1;
+            let mut token = "".to_string();
 
             match db_get_user_details(&username, &db).await {
-                Ok(res) => return Ok(Response::from_json(&res).unwrap().with_headers(add_mandatory_headers(&"".to_string()).await)),
+                Ok(res) => {
+                    match db_get_user_salt(&username, &ctx).await { // TODO, this salt retrieval should sometimes be in maybe_renew_lapsing_session
+                        Ok(salt) => {
+                            match maybe_renew_lapsing_session(session_result.4.try_into().unwrap(), session_result.3, &salt, &ctx).await {
+                                Ok(new_token) => token = new_token,
+                                Err(_) => (), // TODO, this needs to be a log only error report 
+                            }
+                        },
+                        Err(_) => (),
+                    }                    
+
+                    return Ok(Response::from_json(&res).unwrap().with_headers(add_mandatory_headers(&token).await))
+                },
                 Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00017\"}".to_string(),&(e.to_string() + " | IEC00017"), 500, &ctx).await,
             }    
                   
@@ -2284,14 +2297,15 @@ pub async fn update_bug_report(mut req: Request, ctx: RouteContext<()>) -> worke
 
 // SECTION!! generic server tasks
 pub async fn  header_has_token(req: &Request) -> Option<worker::Result<Response>> {
-    match req.headers().has("Cookie"){
+    // TODO! I am really not sure what this does.  I think deprecated cookie name? Does this still work with it commented out?
+    /*     match req.headers().has("Cookie"){
         Ok(res) => {
             if res { 
                 return None 
             }
         },
         Err(_) => (),
-    }
+    }*/
 
     match req.headers().has("GanymedeToken"){
         Ok(res) => {
@@ -2300,7 +2314,7 @@ pub async fn  header_has_token(req: &Request) -> Option<worker::Result<Response>
             } else {
                 return Some(send_failure(&ERROR_BAD_REQUEST.to_string(), 403).await)                
             }        
-        },
+        }, // TODO, this should be an internal error
         Err(_) => return Some(send_failure(&ERROR_BAD_REQUEST.to_string(), 403).await),
     }
 }
@@ -2363,6 +2377,35 @@ pub async fn header_get_token(req: &Request) -> worker::Result<String> {
         Err(_) => return Err("All login token retreival methods failed. Check your input. IEC00137".to_string().into()),
     }
 
+}
+
+pub async fn maybe_renew_lapsing_session(old_session_id: i32, old_session_timestamp: i64, salt: &String, ctx: &RouteContext<()>) -> Result<String> {
+    let new_time =  from_str::<i64>(&(Utc::now() + TimeDelta::days(5)).format(DB_TIME_FORMAT).to_string());
+
+    if new_time.is_err(){
+        return Err((new_time.unwrap_err().to_string() + " Need this to work to have a new session.").into());
+    }
+
+    if old_session_timestamp < new_time.unwrap() {
+        return renew_session(old_session_id, salt, ctx).await
+    } else {
+        return Ok("".to_string())
+    }
+}
+
+pub async fn renew_session(old_session_id: i32, salt: &String, ctx: &RouteContext<()>) -> Result<String> {
+    let login_token = create_random_string().await;
+    let hashed_string: String;                                
+
+    match hash_string(&salt, &login_token).await {
+        Ok(hashed) => hashed_string = hashed,
+        Err(e) => return Err(e.into()),
+    }
+
+    match db_renew_session(&hashed_string, old_session_id, &(Utc::now() + TimeDelta::days(7)).format(DB_TIME_FORMAT).to_string(), ctx).await {
+        Ok(_) => return Ok(hashed_string), 
+        Err(e) => return Err(e.into()),
+    }
 }
 
 pub async fn create_session_and_send(email: &String, salt: &String, ctx: &RouteContext<()>) -> worker::Result<Response> {
@@ -2443,12 +2486,13 @@ pub async fn create_random_code() -> String {
     .to_string()
 }
 
-// this is a big one.  We'll need to 1. Lookup an entry on username/tokens
-// 2. Compare the token they gave us and see if it matches the username. 
-// 3. See if the token is still valid.
-pub async fn header_session_is_valid(req: &Request, db: &D1Database, ctx: &RouteContext<()>) -> (bool, String, String)  {
-    let mut return_tuple = (false, "".to_string(), "".to_string());
+// this is a big one.  We'll need to lookup an entry on username/tokens, compare the token they gave us and see if it matches the username. 
+// See if the token is still valid, and look up and return the session ID and expiration time. (only going to update sessions when the user has not be active for two days)
+// The return type is valid, Error/username, hash, expiration, id
+pub async fn header_session_is_valid(req: &Request, db: &D1Database, ctx: &RouteContext<()>) -> (bool, String, String, i64, i64)  {
+    let mut return_tuple = (false, "".to_string(), "".to_string(), -1, -1);
     
+    // RETURNING SOME IS BAD HERE and means we don't have a header!
     match header_has_token(&req).await {
         Some(r) => { 
             match r {
@@ -2461,6 +2505,7 @@ pub async fn header_session_is_valid(req: &Request, db: &D1Database, ctx: &Route
         None => (),
     }
 
+    // I think here Some is bad too
     match header_has_username(&req).await {
         Some(r) => { 
             match r {
@@ -2478,6 +2523,7 @@ pub async fn header_session_is_valid(req: &Request, db: &D1Database, ctx: &Route
             if let Ok(username) = header_get_username(&req).await{
                 return_tuple.1 = username;
             } else {
+                return_tuple.1 = "Failed to get username from header.".to_string();
                 return return_tuple;
             }
             
@@ -2493,7 +2539,11 @@ pub async fn header_session_is_valid(req: &Request, db: &D1Database, ctx: &Route
             let hashed_token = hash_string(&salt, &token).await.unwrap();
 
             match db_check_token(&return_tuple.1, &hashed_token, Utc::now().format(DB_TIME_FORMAT).to_string(), &db).await {
-                Ok(result) => return_tuple.0 = result,
+                Ok(result) => {
+                    return_tuple.0 = result.0;
+                    return_tuple.3 = result.1;
+                    return_tuple.4 = result.2;
+                },
                 Err(e) => return_tuple.1 = e.to_string(),
             }
 
