@@ -1725,7 +1725,7 @@ pub async fn db_renew_session(token: &String, id: i32, time: &String, ctx: &Rout
         Ok(connection)=> {
 
             let final_token = &token.replace("\"", "");
-            let query = format!("UPDATE sessions SET key = \"{}\" AND expiration = {} WHERE id = ?", final_token, time);
+            let query = format!("UPDATE sessions SET \"key\" = \"{}\", expiration = {} WHERE id = ?", final_token, time);
 
             match connection.prepare(query).bind(&[JsValue::from(id)]) {
                 Ok(statement) => {
