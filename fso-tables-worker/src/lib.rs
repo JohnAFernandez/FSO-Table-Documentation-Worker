@@ -2389,7 +2389,7 @@ pub async fn header_get_token(req: &Request) -> worker::Result<String> {
 }
 
 pub async fn maybe_renew_lapsing_session(old_session_id: i32, old_session_timestamp: i64, salt: &String, ctx: &RouteContext<()>) -> Result<String> {
-    let new_time =  from_str::<i64>(&(Utc::now() + TimeDelta::days(5)).format(DB_TIME_FORMAT).to_string());
+    let new_time =  from_str::<i64>(&(Utc::now() + TimeDelta::days(11)).format(DB_TIME_FORMAT).to_string());
 
     if new_time.is_err(){
         return Err((new_time.unwrap_err().to_string() + " Need this to work to have a new session.").into());
@@ -2411,7 +2411,7 @@ pub async fn renew_session(old_session_id: i32, salt: &String, ctx: &RouteContex
         Err(e) => return Err(e.into()),
     }
 
-    match db_renew_session(&hashed_string, old_session_id, &(Utc::now() + TimeDelta::days(7)).format(DB_TIME_FORMAT).to_string(), ctx).await {
+    match db_renew_session(&hashed_string, old_session_id, &(Utc::now() + TimeDelta::days(14)).format(DB_TIME_FORMAT).to_string(), ctx).await {
         Ok(_) => return Ok(hashed_string), 
         Err(e) => return Err(e.into()),
     }
