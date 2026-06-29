@@ -1048,22 +1048,33 @@ pub async fn update_parse_type(mut req: Request, ctx: RouteContext<()>) -> worke
                                 return err_specific("{\"Error\":\"Invalid behavior id, cannot update.\"}".to_string()).await;
                             }
 
+                            let mut error_string = "".to_string();
+
                             if parse_behavior.behavior != "~!*$%"{
                                 match db_generic_update_query(&Table::ParseBehaviors, 0, &parse_behavior.behavior, &parse_behavior.behavior_id.to_string(),  &ctx).await {
                                     Ok(_) => (),
-                                    Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00048\"}".to_string(),&(e.to_string() + " | IEC00048"), 500, &ctx).await,
+                                    Err(e) => { 
+                                        error_string += &e.to_string();
+                                        error_string += " | IEC00048\n"
+                                    },
                                 }    
                             }
 
                             if parse_behavior.description != "~!*$%"{
                                 match db_generic_update_query(&Table::ParseBehaviors, 1, &parse_behavior.description, &parse_behavior.behavior_id.to_string(),  &ctx).await {
                                     Ok(_) => (),
-                                    Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00049\"}".to_string(),&(e.to_string() + " | IEC00049"), 500, &ctx).await,
+                                    Err(e) => { 
+                                        error_string += &e.to_string();
+                                        error_string += " | IEC00049\n"
+                                    },
                                 }
                             }
 
-                            return send_success(&"{\"Response\": \"Success!\"}".to_string(), &"".to_string()).await
-
+                            if error_string.is_empty() {
+                                return send_success(&"{\"Response\": \"Success!\"}".to_string(), &"".to_string()).await
+                            } else {
+                                return err_specific_and_add_report(format!("{{\"Could_not_update\":\"{}\"}}", error_string),&error_string, 500, &ctx).await;
+                            }
                         },
                         Err(e) => return err_specific("{\"Error\":\"".to_string() + &e.to_string() + "\n Make sure that the request json has a behavior_id, behavior, and description, even if not updating.  If not updating a field (parse_id cannot be updated) mark that field with \'~!*$%\'.\"}").await,
                     }
@@ -1306,7 +1317,7 @@ pub async fn update_item(mut req: Request, ctx: RouteContext<()>) -> worker::Res
                                 match db_generic_update_query(&Table::FsoItems, 1, &item.documentation, &item.item_id.to_string(),  &ctx).await {
                                     Ok(_) => item_update_action_string += &format!("\"documentation\":\"{}\"", item.documentation),
                                     Err(e) => {
-                                        item_update_error_string += &"Could not update default value due to: ".to_string();
+                                        item_update_error_string += &"Could not update documentation due to: ".to_string();
                                         item_update_error_string += &e.to_string();
                                         item_update_error_string += &" ".to_string();
                                     },
@@ -1317,7 +1328,7 @@ pub async fn update_item(mut req: Request, ctx: RouteContext<()>) -> worker::Res
                                 match db_generic_update_query(&Table::FsoItems, 2, &item.info_type, &item.item_id.to_string(),  &ctx).await {
                                     Ok(_) => item_update_action_string += &format!("\"info_type\":\"{}\"", item.info_type),
                                     Err(e) => {
-                                        item_update_error_string += &"Could not update default value due to: ".to_string();
+                                        item_update_error_string += &"Could not update type due to: ".to_string();
                                         item_update_error_string += &e.to_string();
                                         item_update_error_string += &" ".to_string();
                                     },
@@ -1328,7 +1339,7 @@ pub async fn update_item(mut req: Request, ctx: RouteContext<()>) -> worker::Res
                                 match db_generic_update_query(&Table::FsoItems, 3, &item.item_text, &item.item_id.to_string(),  &ctx).await {
                                     Ok(_) => item_update_action_string += &format!("\"item_text\":\"{}\"", item.item_text),
                                     Err(e) => {
-                                        item_update_error_string += &"Could not update default value due to: ".to_string();
+                                        item_update_error_string += &"Could not update item text due to: ".to_string();
                                         item_update_error_string += &e.to_string();
                                         item_update_error_string += &" ".to_string();
                                     },
@@ -1339,7 +1350,7 @@ pub async fn update_item(mut req: Request, ctx: RouteContext<()>) -> worker::Res
                                 match db_generic_update_query(&Table::FsoItems, 4, &item.major_version, &item.item_id.to_string(),  &ctx).await {
                                     Ok(_) => item_update_action_string += &format!("\"major_version\":\"{}\"", item.major_version),
                                     Err(e) => {
-                                        item_update_error_string += &"Could not update default value due to: ".to_string();
+                                        item_update_error_string += &"Could not update version due to: ".to_string();
                                         item_update_error_string += &e.to_string();
                                         item_update_error_string += &" ".to_string();
                                     },
@@ -1350,7 +1361,7 @@ pub async fn update_item(mut req: Request, ctx: RouteContext<()>) -> worker::Res
                                 match db_generic_update_query(&Table::FsoItems, 5, &item.parent_id, &item.item_id.to_string(),  &ctx).await {
                                     Ok(_) => item_update_action_string += &format!("\"parent_id\":\"{}\"", item.parent_id),
                                     Err(e) => {
-                                        item_update_error_string += &"Could not update default value due to: ".to_string();
+                                        item_update_error_string += &"Could not update parent id due to: ".to_string();
                                         item_update_error_string += &e.to_string();
                                         item_update_error_string += &" ".to_string();
                                     },
@@ -1361,7 +1372,7 @@ pub async fn update_item(mut req: Request, ctx: RouteContext<()>) -> worker::Res
                                 match db_generic_update_query(&Table::FsoItems, 6, &item.table_id.to_string(), &item.item_id.to_string(),  &ctx).await {
                                     Ok(_) => item_update_action_string += &format!("\"table_id\":\"{}\"", item.table_id),
                                     Err(e) => {
-                                        item_update_error_string += &"Could not update default value due to: ".to_string();
+                                        item_update_error_string += &"Could not update table ID due to: ".to_string();
                                         item_update_error_string += &e.to_string();
                                         item_update_error_string += &" ".to_string();
                                     }
@@ -1370,9 +1381,9 @@ pub async fn update_item(mut req: Request, ctx: RouteContext<()>) -> worker::Res
 
                             if item.table_index != "~!*$%" {
                                 match db_generic_update_query(&Table::FsoItems, 7, &item.table_id.to_string(), &item.item_id.to_string(),  &ctx).await {
-                                    Ok(_) => item_update_action_string += &format!("\"table_id\":\"{}\"", item.table_id),
+                                    Ok(_) => item_update_action_string += &format!("\"table_index\":\"{}\"", item.table_id),
                                     Err(e) => {
-                                        item_update_error_string += &"Could not update default value due to: ".to_string();
+                                        item_update_error_string += &"Could not update table index due to: ".to_string();
                                         item_update_error_string += &e.to_string();
                                         item_update_error_string += &" ".to_string();
                                     }
@@ -1575,6 +1586,14 @@ pub async fn post_alias(mut req: Request, ctx: RouteContext<()>)  -> worker::Res
     }
 }
 
+#[derive(Deserialize, Serialize)]
+pub struct TableAliasUpdate {
+    pub alias_id: i32,
+    pub table_id: String,
+    pub alias: String,
+    pub item_id: String,
+}
+
 pub async fn update_alias(mut req: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
     match ctx.env.d1(DB_NAME) {
         Ok(db) => {
@@ -1592,30 +1611,61 @@ pub async fn update_alias(mut req: Request, ctx: RouteContext<()>) -> worker::Re
                         _=> (),
                     }         
 
-                    match req.json::<TableAlias>().await {
+                    let mut error_string = "".to_string();
+                    
+                    match req.json::<TableAliasUpdate>().await {
                         Ok(table_alias) => {
                             if table_alias.alias_id < 0 {
                                 return err_specific("{\"Error\":\"Invalid table alias id, cannot update.\"}".to_string()).await;
                             }
 
-                            if table_alias.filename != "~!*$%"{
-                                match db_generic_update_query(&Table::TableAliases, 0, &table_alias.filename, &table_alias.alias_id.to_string(),  &ctx).await {
+                            if table_alias.alias != "~!*$%"{
+                                match db_generic_update_query(&Table::TableAliases, 0, &table_alias.alias, &table_alias.alias_id.to_string(),  &ctx).await {
                                     Ok(_) => (),
-                                    Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00078\"}".to_string(),&(e.to_string() + " | IEC00078"), 500, &ctx).await,
+                                    Err(e) => {
+                                        error_string += "Could not update alias text due to: ";
+                                        error_string += &e.to_string();
+                                        error_string += " ";
+                                    },
                                 }    
                             }
 
-                            if table_alias.table_id > -2{
-                                match db_generic_update_query(&Table::TableAliases, 1, &table_alias.table_id.to_string(), &table_alias.alias_id.to_string(),  &ctx).await {
-                                    Ok(_) => (),
-                                    Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00079\"}".to_string(),&(e.to_string() + " | IEC00079"), 500, &ctx).await,
+                            if table_alias.table_id != "~!*$%"{
+                                if !is_integer(&table_alias.table_id){
+                                    error_string += "Provided table id is not an integer";
+                                } else {
+
+                                    match db_generic_update_query(&Table::TableAliases, 1, &table_alias.table_id.to_string(), &table_alias.alias_id.to_string(),  &ctx).await {
+                                        Ok(_) => (),
+                                        Err(e) => {
+                                            error_string += "Could not update table id due to: ";
+                                            error_string += &e.to_string();
+                                            error_string += " ";
+                                        },
+                                    }
+                                }
+                            }
+
+                            if table_alias.item_id != "~!*$%"{
+                                if !is_integer(&table_alias.table_id){
+                                    error_string += "Provided table id is not an integer";
+                                } else {
+
+                                    match db_generic_update_query(&Table::TableAliases, 1, &table_alias.table_id, &table_alias.alias_id.to_string(),  &ctx).await {
+                                        Ok(_) => (),
+                                        Err(e) => {
+                                            error_string += "Could not update item id due to: ";
+                                            error_string += &e.to_string();
+                                            error_string += " ";
+                                        },
+                                    }
                                 }
                             }
 
                             return Response::ok("Success!")
 
                         },
-                        Err(e) => return err_specific("{\"Error\":\"".to_string() + &e.to_string() + "\nMake sure that the request json has an alias_id, filename, and table_id, even if not updating.  If not updating a field (alias_id cannot be updated) mark with string \'~!*$%\'.\"}").await,
+                        Err(e) => return err_specific("{\"Error\":\"".to_string() + &e.to_string() + "\nMake sure that the request json has an alias_id, filename, table_id, and item_id, even if not updating.  If not updating a field (alias_id cannot be updated) mark with string \'~!*$%\'.\"}").await,
                     }
                 },
                 Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00080\"}".to_string(),&(e.to_string() + " | IEC00080"), 500, &ctx).await,
@@ -1744,6 +1794,16 @@ pub async fn post_restriction(mut req: Request, ctx: RouteContext<()>) -> worker
     }    
 }   
 
+#[derive(Deserialize, Serialize)]
+pub struct RestrictionsUpdate {
+    pub restriction_id: i32,
+    pub min_value: String,
+    pub max_value: String,
+    pub max_string_length:  String,
+    pub illegal_value_int:  String,
+    pub illegal_value_float:  String,
+}
+
 pub async fn update_restriction(mut req: Request, ctx: RouteContext<()>) -> worker::Result<Response> {
     match ctx.env.d1(DB_NAME) {
         Ok(db) => {
@@ -1761,41 +1821,95 @@ pub async fn update_restriction(mut req: Request, ctx: RouteContext<()>) -> work
                         _=> (),
                     }         
 
-                    match req.json::<Restrictions>().await {
+                    match req.json::<RestrictionsUpdate>().await {
                         Ok(restriction) => {
+                            let mut error_string = "".to_string();
+
                             if restriction.restriction_id < 0 {
                                 return err_specific("{\"Error\":\"Invalid restriction id, cannot update.\"}".to_string()).await;
                             }
 
-                            match db_generic_update_query(&Table::Restrictions, 0, &restriction.illegal_value_float.to_string(), &restriction.restriction_id.to_string(),  &ctx).await {
-                                Ok(_) => (),
-                                Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00087\"}".to_string(),&(e.to_string() + " | IEC00087"), 500, &ctx).await,
-                            }    
-
-                            match db_generic_update_query(&Table::Restrictions, 1, &restriction.illegal_value_int.to_string(), &restriction.restriction_id.to_string(),  &ctx).await {
-                                Ok(_) => (),
-                                Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00088\"}".to_string(),&(e.to_string() + " | IEC00088"), 500, &ctx).await,
+                            if restriction.illegal_value_float != "~!*$%" {
+                                if !is_float(&restriction.illegal_value_float) {
+                                    error_string += "Illegal Value Float could not be updated because it is not a float."
+                                } else {
+                                    match db_generic_update_query(&Table::Restrictions, 0, &restriction.illegal_value_float.to_string(), &restriction.restriction_id.to_string(),  &ctx).await {
+                                        Ok(_) => (),
+                                        Err(e) => { 
+                                            error_string += "Could not update Illegal value float because: ";
+                                            error_string += &e.to_string();
+                                            error_string += " ";
+                                        }
+                                    }    
+                                }
                             }
-                            
-                            if restriction.max_string_length > -2 {
-                                match db_generic_update_query(&Table::Restrictions, 2, &restriction.max_string_length.to_string(), &restriction.restriction_id.to_string(),  &ctx).await {
-                                    Ok(_) => (),
-                                    Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00089\"}".to_string(),&(e.to_string() + " | IEC00089"), 500, &ctx).await,
+
+
+                            if restriction.illegal_value_int != "~!*$%" {  
+                                if !is_integer(&restriction.illegal_value_int){
+                                    error_string += "Illegal Value Int could not be updated because it is not an integer. "
+                                }  else {
+                                    match db_generic_update_query(&Table::Restrictions, 1, &restriction.illegal_value_int.to_string(), &restriction.restriction_id.to_string(),  &ctx).await {
+                                        Ok(_) => (),
+                                        Err(e) => { 
+                                            error_string += "Could not update Illegal value int because: ";
+                                            error_string += &e.to_string();
+                                            error_string += " ";
+                                        }
+                                    }
+                                }
+                            }
+
+                            if restriction.max_string_length != "~!*$%" {
+                                if !is_integer(&restriction.max_string_length){
+                                    error_string += "Max string length could not be updated because it is not an integer. "
+                                } else {
+                                    match db_generic_update_query(&Table::Restrictions, 2, &restriction.max_string_length.to_string(), &restriction.restriction_id.to_string(),  &ctx).await {
+                                        Ok(_) => (),
+                                        Err(e) => { 
+                                            error_string += "Could not update max string length because: ";
+                                            error_string += &e.to_string();
+                                            error_string += " ";
+                                        }
+                                    }    
+                                }
+                            }
+
+                            if restriction.max_value != "~!*$%" {
+                                if !is_float(&restriction.max_value){
+                                    error_string += "Max value could not be updated because it is not a number. "
+                                } else {
+                                    match db_generic_update_query(&Table::Restrictions, 3, &restriction.max_value.to_string(), &restriction.restriction_id.to_string(),  &ctx).await {
+                                        Ok(_) => (),
+                                        Err(e) => { 
+                                            error_string += "Could not update max value because: ";
+                                            error_string += &e.to_string();
+                                            error_string += " ";
+                                        }
+                                    }
                                 }    
                             }
 
-                            match db_generic_update_query(&Table::Restrictions, 3, &restriction.max_value.to_string(), &restriction.restriction_id.to_string(),  &ctx).await {
-                                Ok(_) => (),
-                                Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00090\"}".to_string(),&(e.to_string() + " | IEC00090"), 500, &ctx).await,
-                            }    
+                            if restriction.min_value != "~!*$%" {
+                                if !is_float(&restriction.min_value){
+                                    error_string += "Min value could not be updated because it is not a number. "
+                                } else {
+                                    match db_generic_update_query(&Table::Restrictions, 4, &restriction.min_value.to_string(), &restriction.restriction_id.to_string(),  &ctx).await {
+                                        Ok(_) => (),
+                                        Err(e) => { 
+                                            error_string += "Could not update min value because: ";
+                                            error_string += &e.to_string();
+                                            error_string += " ";
+                                        }
+                                    }    
+                                }
+                            }
 
-                            match db_generic_update_query(&Table::Restrictions, 4, &restriction.min_value.to_string(), &restriction.restriction_id.to_string(),  &ctx).await {
-                                Ok(_) => (),
-                                Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00091\"}".to_string(),&(e.to_string() + " | IEC00091"), 500, &ctx).await,
-                            }    
-
-                            return send_success(&"{\"Response\": \"Success!\"}".to_string(), &"".to_string()).await
-
+                            if error_string.is_empty(){
+                                return send_success(&"{\"Response\": \"Success!\"}".to_string(), &"".to_string()).await
+                            } else {
+                                return err_specific_and_add_report(format!("{{\"Error\":\"{} IEC00091\"}}", error_string),&(error_string + " | IEC00091"), 500, &ctx).await
+                            }
                         },
                         Err(e) => return err_specific("{\"Error\":\"".to_string() + &e.to_string() + "\nMake sure that the request json has a restriction_id, illegal_value_float, illegal_value_int, max_string_length, max_value, min_value, and description, even if not updating.  If not updating a field (parse_id cannot be updated) mark with string \'~!*$%\'.\"}").await,
                     }
@@ -1940,6 +2054,8 @@ pub async fn update_deprecation(mut req: Request, ctx: RouteContext<()>) -> work
 
                     match req.json::<DeprecationIn>().await {
                         Ok(deprecation) => {
+                            let mut error_string = "".to_string();
+
                             if deprecation.deprecation_id < 0 {
                                 return err_specific("{\"Error\":\"Invalid deprecation id, cannot update.\"}".to_string()).await;
                             }
@@ -1947,21 +2063,37 @@ pub async fn update_deprecation(mut req: Request, ctx: RouteContext<()>) -> work
                             if deprecation.version != "~!*$%"{
                                 match db_generic_update_query(&Table::Deprecations, 0, &deprecation.version, &deprecation.deprecation_id.to_string(),  &ctx).await {
                                     Ok(_) => (),
-                                    Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00099\"}".to_string(),&(e.to_string() + " | IEC00099"), 500, &ctx).await,
+                                    Err(e) => { 
+                                        error_string += "Could not deprecation version because: ";
+                                        error_string += &e.to_string();
+                                        error_string += " ";
+                                    }
                                 }    
                             }
 
                             if deprecation.description != "~!*$%"{
                                 match db_generic_update_query(&Table::Deprecations, 1, &deprecation.description, &deprecation.deprecation_id.to_string(),  &ctx).await {
                                     Ok(_) => (),
-                                    Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00100\"}".to_string(),&(e.to_string() + " | IEC00100"), 500, &ctx).await,
+                                    Err(e) => { 
+                                        error_string += "Could not update description because: ";
+                                        error_string += &e.to_string();
+                                        error_string += " ";
+                                    }
                                 }
                             }
 
                             if deprecation.partial != "~!*$%"{
-                                match db_generic_update_query(&Table::Deprecations, 1, &deprecation.partial.to_string(), &deprecation.deprecation_id.to_string(),  &ctx).await {
-                                    Ok(_) => (),
-                                    Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00101\"}".to_string(),&(e.to_string() + " | IEC00101"), 500, &ctx).await,
+                                if !is_integer(&deprecation.partial){
+                                    error_string += "Could not update partial mode because partial is not an integer. ";
+                                } else {
+                                    match db_generic_update_query(&Table::Deprecations, 1, &deprecation.partial.to_string(), &deprecation.deprecation_id.to_string(),  &ctx).await {
+                                        Ok(_) => (),
+                                        Err(e) => { 
+                                            error_string += "Could not partial mode because: ";
+                                            error_string += &e.to_string();
+                                            error_string += " ";
+                                        },
+                                    }
                                 }
                             }
 
