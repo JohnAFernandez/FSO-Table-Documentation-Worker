@@ -1323,6 +1323,15 @@ pub async fn db_force_role(email: &String, db : &D1Database, role: UserRole) -> 
     }
 }
 
+pub async fn db_add_contribution(email: &String, db: &D1Database) -> worker::Result<()> {
+    let query = db.prepare("UPDATE users SET contribution_count = (contribution_count + 1) WHERE username = ?").bind(&[email.into()]).unwrap();
+
+    match query.run().await {
+        Ok(_) => return Ok(()),
+        Err(e) => return Err(e),
+    }    
+}
+
 pub async fn db_get_user_details(email: &String, db: &D1Database) -> worker::Result<UserDetails> {
     let query = db.prepare("SELECT username, role, contribution_count, active FROM users WHERE username = ?").bind(&[email.into()]).unwrap();
 

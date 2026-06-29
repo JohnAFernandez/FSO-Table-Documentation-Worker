@@ -1068,6 +1068,9 @@ pub async fn update_parse_type(mut req: Request, ctx: RouteContext<()>) -> worke
                                 }
                             }
 
+                            // We are not worried about failure here
+                            let _ = db_add_contribution(&username, &db).await;
+
                             if error_string.is_empty() {
                                 return send_success(&"{\"Response\": \"Success!\"}".to_string(), &"".to_string()).await
                             } else {
@@ -1572,7 +1575,10 @@ pub async fn post_alias(mut req: Request, ctx: RouteContext<()>)  -> worker::Res
             match req.json::<NewAlias>().await {
                 Ok(new_alias) => {
                     match db_insert_alias(&new_alias, &db).await {
-                        Ok(id) => return send_success(&format!("{{\"alias_id\": \"{}\"}}", id), &"".to_string()).await,
+                        Ok(id) => {
+                            let _ = db_add_contribution(&username, &db).await;
+                            return send_success(&format!("{{\"alias_id\": \"{}\"}}", id), &"".to_string()).await
+                        }
                         Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00193\"}".to_string(),&(e.to_string() + " | IEC00193"), 500, &ctx).await,
                         
                     }
@@ -1660,6 +1666,7 @@ pub async fn update_alias(mut req: Request, ctx: RouteContext<()>) -> worker::Re
                                 }
                             }
 
+                            let _ = db_add_contribution(&username, &db).await;
                             return Response::ok("Success!")
 
                         },
@@ -1775,7 +1782,10 @@ pub async fn post_restriction(mut req: Request, ctx: RouteContext<()>) -> worker
                             match RestrictionNew::create_restriction_new(restriction.item_id, &restriction.value1, &restriction.value2, restriction.item_id).await {
                                 Ok(new_restriction) => {
                                     match db_insert_restriction(&new_restriction, &db).await {
-                                        Ok(id) => return send_success(&id.to_string(), &"".to_string()).await,
+                                        Ok(id) => {
+                                            let _ = db_add_contribution(&username, &db).await;
+                                            return send_success(&id.to_string(), &"".to_string()).await
+                                        },
                                         Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, lease check your inputs and try again. | IEC00189\"}".to_string(),&(e.to_string() + " | IEC00189"), 500, &ctx).await,
                                     }
                                 },
@@ -1822,6 +1832,7 @@ pub async fn update_restriction(mut req: Request, ctx: RouteContext<()>) -> work
                     match req.json::<RestrictionsUpdate>().await {
                         Ok(restriction) => {
                             let mut error_string = "".to_string();
+                            let mut success = false; 
 
                             if restriction.restriction_id < 0 {
                                 return err_specific("{\"Error\":\"Invalid restriction id, cannot update.\"}".to_string()).await;
@@ -1832,7 +1843,7 @@ pub async fn update_restriction(mut req: Request, ctx: RouteContext<()>) -> work
                                     error_string += "Illegal Value Float could not be updated because it is not a float."
                                 } else {
                                     match db_generic_update_query(&Table::Restrictions, 0, &restriction.illegal_value_float.to_string(), &restriction.restriction_id.to_string(),  &ctx).await {
-                                        Ok(_) => (),
+                                        Ok(_) => success = true,
                                         Err(e) => { 
                                             error_string += "Could not update Illegal value float because: ";
                                             error_string += &e.to_string();
@@ -1848,7 +1859,7 @@ pub async fn update_restriction(mut req: Request, ctx: RouteContext<()>) -> work
                                     error_string += "Illegal Value Int could not be updated because it is not an integer. "
                                 }  else {
                                     match db_generic_update_query(&Table::Restrictions, 1, &restriction.illegal_value_int.to_string(), &restriction.restriction_id.to_string(),  &ctx).await {
-                                        Ok(_) => (),
+                                        Ok(_) => success = true,
                                         Err(e) => { 
                                             error_string += "Could not update Illegal value int because: ";
                                             error_string += &e.to_string();
@@ -1863,7 +1874,7 @@ pub async fn update_restriction(mut req: Request, ctx: RouteContext<()>) -> work
                                     error_string += "Max string length could not be updated because it is not an integer. "
                                 } else {
                                     match db_generic_update_query(&Table::Restrictions, 2, &restriction.max_string_length.to_string(), &restriction.restriction_id.to_string(),  &ctx).await {
-                                        Ok(_) => (),
+                                        Ok(_) => success = true,
                                         Err(e) => { 
                                             error_string += "Could not update max string length because: ";
                                             error_string += &e.to_string();
@@ -1878,7 +1889,7 @@ pub async fn update_restriction(mut req: Request, ctx: RouteContext<()>) -> work
                                     error_string += "Max value could not be updated because it is not a number. "
                                 } else {
                                     match db_generic_update_query(&Table::Restrictions, 3, &restriction.max_value.to_string(), &restriction.restriction_id.to_string(),  &ctx).await {
-                                        Ok(_) => (),
+                                        Ok(_) => success = true,
                                         Err(e) => { 
                                             error_string += "Could not update max value because: ";
                                             error_string += &e.to_string();
@@ -1893,7 +1904,7 @@ pub async fn update_restriction(mut req: Request, ctx: RouteContext<()>) -> work
                                     error_string += "Min value could not be updated because it is not a number. "
                                 } else {
                                     match db_generic_update_query(&Table::Restrictions, 4, &restriction.min_value.to_string(), &restriction.restriction_id.to_string(),  &ctx).await {
-                                        Ok(_) => (),
+                                        Ok(_) => success = true,
                                         Err(e) => { 
                                             error_string += "Could not update min value because: ";
                                             error_string += &e.to_string();
@@ -1901,6 +1912,10 @@ pub async fn update_restriction(mut req: Request, ctx: RouteContext<()>) -> work
                                         }
                                     }    
                                 }
+                            }
+
+                            if success {
+                                let _ = db_add_contribution(&username, &db).await;
                             }
 
                             if error_string.is_empty(){
@@ -2018,7 +2033,10 @@ pub async fn post_deprecation(mut req: Request, ctx: RouteContext<()>) -> worker
                             }
 
                             match db_insert_deprecation(&new_deprecation, &db).await {
-                                Ok(new_id)=> return send_success(&format!("{{\"id\":\"{}\"}}", new_id), &"".to_string()).await,
+                                Ok(new_id)=> {
+                                    let _ = db_add_contribution(&username, &db).await;
+                                    return send_success(&format!("{{\"id\":\"{}\"}}", new_id), &"".to_string()).await
+                                },
                                 Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00177\"}".to_string(),&(e.to_string() + " | IEC00177"), 500, &ctx).await,
                             }
                         },
@@ -2053,6 +2071,7 @@ pub async fn update_deprecation(mut req: Request, ctx: RouteContext<()>) -> work
                     match req.json::<DeprecationIn>().await {
                         Ok(deprecation) => {
                             let mut error_string = "".to_string();
+                            let mut success = false;
 
                             if deprecation.deprecation_id < 0 {
                                 return err_specific("{\"Error\":\"Invalid deprecation id, cannot update.\"}".to_string()).await;
@@ -2060,7 +2079,7 @@ pub async fn update_deprecation(mut req: Request, ctx: RouteContext<()>) -> work
 
                             if deprecation.version != "~!*$%"{
                                 match db_generic_update_query(&Table::Deprecations, 0, &deprecation.version, &deprecation.deprecation_id.to_string(),  &ctx).await {
-                                    Ok(_) => (),
+                                    Ok(_) => success = true,
                                     Err(e) => { 
                                         error_string += "Could not deprecation version because: ";
                                         error_string += &e.to_string();
@@ -2071,7 +2090,7 @@ pub async fn update_deprecation(mut req: Request, ctx: RouteContext<()>) -> work
 
                             if deprecation.description != "~!*$%"{
                                 match db_generic_update_query(&Table::Deprecations, 1, &deprecation.description, &deprecation.deprecation_id.to_string(),  &ctx).await {
-                                    Ok(_) => (),
+                                    Ok(_) => success = true,
                                     Err(e) => { 
                                         error_string += "Could not update description because: ";
                                         error_string += &e.to_string();
@@ -2085,7 +2104,7 @@ pub async fn update_deprecation(mut req: Request, ctx: RouteContext<()>) -> work
                                     error_string += "Could not update partial mode because partial is not an integer. ";
                                 } else {
                                     match db_generic_update_query(&Table::Deprecations, 1, &deprecation.partial.to_string(), &deprecation.deprecation_id.to_string(),  &ctx).await {
-                                        Ok(_) => (),
+                                        Ok(_) => success = true,
                                         Err(e) => { 
                                             error_string += "Could not partial mode because: ";
                                             error_string += &e.to_string();
@@ -2095,7 +2114,15 @@ pub async fn update_deprecation(mut req: Request, ctx: RouteContext<()>) -> work
                                 }
                             }
 
-                            return send_success(&"{\"Response\": \"Success!\"}".to_string(), &"".to_string()).await
+                            if success {
+                                let _ = db_add_contribution(&username, &db).await;                                
+                            }
+
+                            if error_string.is_empty() {
+                                return send_success(&"{\"Response\": \"Success!\"}".to_string(), &"".to_string()).await
+                            } else {
+                                return err_specific(format!("{{\"Error\":\"The following errors were encountered while trying to update a deprecation: {}\"}}", error_string)).await
+                            }
 
                         },
                         Err(e) => return err_specific("{\"Error\":\"".to_string() + &e.to_string() + "\nMake sure that the request json has a deprecation_id, date, and version, even if not updating.  If not updating a field (deprecation_id cannot be updated) mark with this string \'~!*$%\'.\"}").await,
