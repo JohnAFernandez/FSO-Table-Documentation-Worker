@@ -435,7 +435,8 @@ pub struct Session {
 pub struct TableAlias {
     pub alias_id: i32,
     pub table_id: i32,
-    pub filename: String,
+    pub alias: String,
+    pub item_id: i32,
 }
 
 #[derive(Deserialize, Serialize)]
