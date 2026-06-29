@@ -144,7 +144,7 @@ pub async fn create_session_and_send(email: &String, salt: &String, ctx: &RouteC
     }
 
     // We give the user seven days to do what they need to do.
-    match db_session_add(&hashed_string, &email, &(Utc::now() + TimeDelta::days(7)).format(DB_TIME_FORMAT).to_string(), ctx).await {
+    match db_session_add(&hashed_string, &email, &(Utc::now() + TimeDelta::days(14)).format(DB_TIME_FORMAT).to_string(), ctx).await {
         // remember! double {{ }} needed to escape here, even on the right side.
         Ok(_) => return send_success(&"".to_string(), &login_token).await,
         Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00134\"}".to_string(),&(e.to_string() + " | IEC00134"), 500, &ctx).await,
