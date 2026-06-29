@@ -15,15 +15,15 @@ use worker::*;
 
 
 pub async fn  header_has_token(req: &Request) -> Option<worker::Result<Response>> {
-    // TODO! I am really not sure what this does.  I think deprecated cookie name? Does this still work with it commented out?
-    /*     match req.headers().has("Cookie"){
+    // Most of the time the cookie header has the token we're looking for
+    match req.headers().has("Cookie"){
         Ok(res) => {
             if res { 
                 return None 
             }
         },
         Err(_) => (),
-    }*/
+    }
 
     match req.headers().has("GanymedeToken"){
         Ok(res) => {
@@ -97,7 +97,7 @@ pub async fn header_get_token(req: &Request) -> worker::Result<String> {
 
 }
 
-// wrapper for regular lapsing session
+// wrapper for regular lapsing session function
 pub async fn maybe_renew_lapsing_session_no_salt(old_session_id: i32, old_session_timestamp: i64, username: &String, ctx: &RouteContext<()>) -> Result<String> {
     match db_get_user_salt(&username, &ctx).await {
         Ok(salt) => return maybe_renew_lapsing_session(old_session_id, old_session_timestamp, &salt, ctx).await,
@@ -305,11 +305,16 @@ pub async fn add_mandatory_headers(token: &String) -> worker::Headers {
     headers.set("Access-Control-Allow-Credentials","true").unwrap();
     headers.set("Access-Control-Max-Age", "100000").unwrap();
     if !token.is_empty() {
-        match headers.set("Set-Cookie", &format!("GanymedeToken={}; SameSite=None; Path=/; Httponly; Secure; Expires={}; Domain=.fsotables.com", token, ( Utc::now() + TimeDelta::days(7) - TimeDelta::seconds(5) ).to_rfc2822())) {  //)) {
+        match headers.set("Set-Cookie", &format!("GanymedeToken={}; SameSite=None; Path=/; Httponly; Secure; Expires={}; Domain=fsotables.com;", token, ( Utc::now() + TimeDelta::days(28) - TimeDelta::seconds(5) ).to_rfc2822())) {  //)) {
             Ok(_) => {},
             Err(_) => {},
         }
-    }
+    } else {
+        match headers.set("Set-Cookie", &format!("Username=; SameSite=None; Path=/; Httponly; Secure; Expires={}; Domain=fsotables.com;", ( Utc::now() - TimeDelta::days(28) - TimeDelta::seconds(5) ).to_rfc2822())) {  //)) {
+            Ok(_) => {},
+            Err(_) => {},
+        }
+    } /*'Username=; SameSite=None; Path=/; Httponly; Secure; Expires={}; Domain=fsotables.com;']   ( Utc::now() - TimeDelta::days(28) - TimeDelta::seconds(5) ).to_rfc2822()*/
 
     return headers
 }
