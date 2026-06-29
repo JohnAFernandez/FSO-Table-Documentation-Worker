@@ -1580,17 +1580,24 @@ pub async fn db_insert_deprecation(new_deprecation: &DeprecationNew, db : &D1Dat
 pub async fn db_insert_restriction(new_restriction: &RestrictionNew, db : &D1Database) -> Result<i32> {
     let new_id : i32; // define here to allow 
 
-    // Add row with default parameters, retrieve ID. The database is supposed to do this query all at once, so it should avoid concurrency issues.
-    match db.prepare(format!("INSERT INTO restrictions (min_value, max_value, max_string_length, illegal_value_int, illegal_value_float, allowed_values, item_id) VALUES ( {}, {}, {} , {}, {}, ? \"\"; SELECT restriction_id from restrictions ORDER BY restriction_id desc LIMIT 1;)", DUMMY_FLOAT, DUMMY_FLOAT, DUMMY_INT, DUMMY_INT, DUMMY_FLOAT)).bind(&[JsValue::from(new_restriction.item_id)]) {
+    // Add row with default parameters, retrieve ID. 
+    // TODO: We cannot query this all at once for some reason, so we could theoretically have concurrency issues. Maybe make a new query that makes sure we have selected a default 
+    match db.prepare(format!("INSERT INTO restrictions (min_value, max_value, max_string_length, illegal_value_int, illegal_value_float, allowed_values, item_id) VALUES ( {}, {}, {} , {}, {}, \" \", ? )", DUMMY_FLOAT, DUMMY_FLOAT, DUMMY_INT, DUMMY_INT, DUMMY_FLOAT)).bind(&[JsValue::from(new_restriction.item_id)]) {
         Ok(query) => {
-            match query.first::<i32>(Some("restriction_id")).await {
-                Ok(result) => {
-                    match result{
-                        Some(id) => new_id = id,
-                        None => return Err("Did not find new restriction id after creating new row.".into()),
+            match query.run().await{
+                Ok(_) => {
+                    let query2 = db.prepare("SELECT restriction_id from restrictions ORDER BY restriction_id desc LIMIT 1;");
+                    match query2.first::<i32>(Some("restriction_id")).await {
+                        Ok(opt) => {
+                            match opt {
+                                Some(id) => new_id = id,
+                                None => return Err("Could not find new id for inserted restriction.".into()),
+                            }
+                        },
+                        Err(e) => return Err(e.into()),
                     }
                 },
-                Err(e) => return Err(e.into()),
+                Err(e) => return Err(e.into()),                
             }
         },
         Err(e) => return Err(e.into()),
@@ -1598,61 +1605,61 @@ pub async fn db_insert_restriction(new_restriction: &RestrictionNew, db : &D1Dat
 
     match new_restriction.type_of{
         0 => {
-            match db_generic_update_query_db(&Table::Restrictions,4,&new_id.to_string(),&new_restriction.float_value1.to_string(), db).await {
+            match db_generic_update_query_db(&Table::Restrictions,4,&new_restriction.float_value1.to_string(),&new_id.to_string(), db).await {
                 Ok(_)=>(),
                 Err(e)=> return Err(e.into()),  
             } 
         },
         1 => {
-            match db_generic_update_query_db(&Table::Restrictions,3,&new_id.to_string(),&new_restriction.float_value1.to_string(), db).await{
+            match db_generic_update_query_db(&Table::Restrictions,3,&new_restriction.float_value1.to_string(),&new_id.to_string(), db).await{
                 Ok(_)=>(),
                 Err(e)=> return Err(e.into()),
             }
         },
         2 => {
-            match db_generic_update_query_db(&Table::Restrictions,2,&new_id.to_string(),&new_restriction.int_value1.to_string(), db).await {
+            match db_generic_update_query_db(&Table::Restrictions,2,&new_restriction.int_value1.to_string(),&new_id.to_string(), db).await {
                 Ok(_)=>(),
                 Err(e)=> return Err(e.into()),
             }
         }
         3 => {
-            match db_generic_update_query_db(&Table::Restrictions,1,&new_id.to_string(),&new_restriction.int_value1.to_string(), db).await {
+            match db_generic_update_query_db(&Table::Restrictions,1,&new_restriction.int_value1.to_string(),&new_id.to_string(), db).await {
                 Ok(_)=>(),
                 Err(e)=> return Err(e.into()),
             }
         },
         4 => { 
-            match db_generic_update_query_db(&Table::Restrictions,0,&new_id.to_string(),&new_restriction.float_value1.to_string(), db).await {
+            match db_generic_update_query_db(&Table::Restrictions,0,&new_restriction.float_value1.to_string(),&new_id.to_string(), db).await {
                 Ok(_)=>(),
                 Err(e)=> return Err(e.into()),
             }
         },
         5 => {
-            match db_generic_update_query_db(&Table::Restrictions,4,&new_id.to_string(),&new_restriction.int_value1.to_string(), db).await {
+            match db_generic_update_query_db(&Table::Restrictions,4,&new_restriction.int_value1.to_string(),&new_id.to_string(), db).await {
                 Ok(_)=>(),
                 Err(e)=> return Err(e.into()),
             }
 
-            match db_generic_update_query_db(&Table::Restrictions,3,&new_id.to_string(),&new_restriction.int_value2.to_string(), db).await {
+            match db_generic_update_query_db(&Table::Restrictions,3,&new_restriction.int_value2.to_string(),&new_id.to_string(), db).await {
                 Ok(_)=>(),
                 Err(e)=> return Err(e.into()),
             }
         
         },
         6 => {
-            match db_generic_update_query_db(&Table::Restrictions,4,&new_id.to_string(),&new_restriction.float_value1.to_string(), db).await {
+            match db_generic_update_query_db(&Table::Restrictions,4,&new_restriction.float_value1.to_string(), &new_id.to_string(), db).await {
                 Ok(_)=>(),
                 Err(e)=> return Err(e.into()),
             }
 
-            match db_generic_update_query_db(&Table::Restrictions,3,&new_id.to_string(),&new_restriction.float_value2.to_string(), db).await {
+            match db_generic_update_query_db(&Table::Restrictions,3,&new_restriction.float_value2.to_string(), &new_id.to_string(), db).await {
                 Ok(_)=>(),
                 Err(e)=> return Err(e.into()),
             }
         
         },
         7 => {
-            match db_generic_update_query_db(&Table::Restrictions,5,&new_id.to_string(),&new_restriction.allowed_value_list.to_string(), db).await {
+            match db_generic_update_query_db(&Table::Restrictions,5,&new_restriction.allowed_value_list.to_string(),&new_id.to_string(), db).await {
                 Ok(_)=>(),
                 Err(e)=> return Err(e.into()), 
             }

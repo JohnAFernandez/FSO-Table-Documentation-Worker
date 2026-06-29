@@ -1779,7 +1779,7 @@ pub async fn post_restriction(mut req: Request, ctx: RouteContext<()>) -> worker
                     
                     match req.json::<RestrictionIn>().await {
                         Ok(restriction) => {
-                            match RestrictionNew::create_restriction_new(restriction.item_id, &restriction.value1, &restriction.value2, restriction.item_id).await {
+                            match RestrictionNew::create_restriction_new(restriction.type_of, &restriction.value1, &restriction.value2, restriction.item_id).await {
                                 Ok(new_restriction) => {
                                     match db_insert_restriction(&new_restriction, &db).await {
                                         Ok(id) => {
