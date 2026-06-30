@@ -353,6 +353,7 @@ pub struct Restrictions {
     pub max_string_length:  i32,
     pub illegal_value_int:  i32,
     pub illegal_value_float:  f32,
+    pub item_id: i32,
 }
 
 // 0 min_value, 1 max_value, 2 max string length, 3 illegal value int, 4 illegal value float, 5 min and max int, 6 min and max float, 7 value list
