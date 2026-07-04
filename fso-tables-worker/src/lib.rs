@@ -1169,8 +1169,6 @@ pub struct NewItem{
     pub major_version: String, 
     pub parent_id: i32,
     pub table_id: i32,
-    pub deprecation_id: i32,
-    pub restriction_id: i32,
     pub info_type: String,
     pub table_index: i32,
     pub default_value: String,

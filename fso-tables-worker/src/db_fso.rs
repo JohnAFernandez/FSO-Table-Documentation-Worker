@@ -78,7 +78,7 @@ const DEPRECATIONS_INSERT_QUERY: &str = "INSERT INTO deprecations (version, desc
 //const EMAIL_VALIDATIONS_INSERT_QUERY: &str = "INSERT INTO email_validations (username) VALUES (?1)";
 const ERROR_REPORT_INSERT_QUERY: &str = "INSERT INTO error_reports (error, timestamp) VALUES (?1, ";
 const ERROR_REPORT_INSERT_QUERY_2: &str = ");";
-const FSO_ITEMS_INSERT_QUERY: &str = "INSERT INTO fso_items (item_text, documentation, major_version, parent_id, table_id, deprecation_id, restriction_id, info_type, table_index, default_value) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)";
+const FSO_ITEMS_INSERT_QUERY: &str = "INSERT INTO fso_items (item_text, documentation, major_version, parent_id, table_id, info_type, table_index, default_value) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)";
 //const FSO_TABLES_INSERT_QUERY: &str = "INSERT INTO fso_tables VALUES (?1, ?2)";    
 //const PARSE_BEHAVIORS_INSERT_QUERY: &str = "INSERT INTO parse_behaviors (behavior, description) VALUES (?1, ?2)";
 
@@ -1683,8 +1683,6 @@ pub async fn db_insert_item(new_item : &NewItem, db : &D1Database) -> Result<i32
         JsValue::from(&new_item.major_version),
         JsValue::from(new_item.parent_id),
         JsValue::from(new_item.table_id),
-        JsValue::from(new_item.deprecation_id),
-        JsValue::from(new_item.restriction_id),
         JsValue::from(&new_item.info_type),
         JsValue::from(new_item.table_index),
         JsValue::from(&new_item.default_value)]) 
