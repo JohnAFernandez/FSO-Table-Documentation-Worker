@@ -1242,7 +1242,7 @@ pub async fn insert_item(mut req: Request, ctx: RouteContext<()>) -> worker::Res
                                         }
 
                                         let action = ActionsInternal::new_action_internal(id2, 
-                                            format!("{{\"item_text\":\"{}\",\"documentation\":\"{}\",\"major_version\":\"{}\",\"parent_id\":{},\"table_id\":{},\"deprecation_id\":{},\"restriction_id\":4,\"info_type\":\"{}\",\"default_value\":\"{}\",\"table_index\":{}}}",new_item.item_text,new_item.documentation,new_item.major_version,new_item.parent_id,new_item.table_id,new_item.deprecation_id,new_item.restriction_id,new_item.table_id,new_item.table_index),
+                                            format!("{{\"item_text\":\"{}\",\"documentation\":\"{}\",\"major_version\":\"{}\",\"parent_id\":{},\"table_id\":{},\"info_type\":\"{}\",\"default_value\":\"{}\",\"table_index\":{}}}",new_item.item_text,new_item.documentation,new_item.major_version,new_item.parent_id,new_item.table_id,new_item.info_type,new_item.default_value,new_item.table_index),
                                             id2, 
                                             get_current_time_i64(), 
                                             true, 
