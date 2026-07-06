@@ -38,7 +38,8 @@ async fn fetch(req: Request, env: Env, _ctx: Context,) -> worker::Result<Respons
     // table_aliases, users
     Router::new()
         // No Post, put, patch, or delete for overarching category
-        .get_async("/api/status", query_for_update)                         .options_async("/api/status", send_cors)
+        // this first one is post because I don't want to change it to a header
+        .post_async("/api/check_update", query_for_update)                  .options_async("/api/status", send_cors)
         .get_async("/api/users", db_user_stats_get)                         .options_async("/api/users", send_cors)
         .post_async("/api/users/register", user_register_new)               .options_async("/api/users/register", send_cors)
         .post_async("/api/validation/:email", user_confirm_email)           .options_async("/api/validation/:email", send_cors)
@@ -151,9 +152,9 @@ pub async fn query_for_update(mut req: Request, ctx: RouteContext<()>) -> worker
             match req.json::<RemoteTime>().await {
                 Ok(remote_time) => {
                     if last_database_time <= remote_time.remote_time {
-                        return send_success(&"{\"update_needed\":\"false\"".to_string(), &"".to_string()).await;
+                        return send_success(&"{\"update_needed\":\"false\"}".to_string(), &"".to_string()).await;
                     } else {
-                        return send_success(&"{\"update_needed\":\"true\"".to_string(), &"".to_string()).await;
+                        return send_success(&"{\"update_needed\":\"true\"}".to_string(), &"".to_string()).await;
                     }
                 },
                 Err(e) => return err_specific_and_add_report("{\"Error\":\"Internal Database Function Error, please check your inputs and try again. | IEC00066\"}".to_string(),&(e.to_string() + " | IEC00066"), 500, &ctx).await,
