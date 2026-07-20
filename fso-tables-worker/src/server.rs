@@ -298,7 +298,7 @@ pub async fn send_cors(_: Request, _: RouteContext<()>) -> worker::Result<Respon
 
 pub async fn add_mandatory_headers(token: &String) -> worker::Headers {
     let headers: Headers = Headers::new();
-//
+
     headers.set("Access-Control-Allow-Origin", "https://fsotables.com").unwrap();
     headers.set("Access-Control-Allow-Methods", "GET,PATCH,POST,PUT,DELETE").unwrap();
     headers.set("Access-Control-Allow-Headers", "username,Set-Cookie,GanymedeToken,password").unwrap();
