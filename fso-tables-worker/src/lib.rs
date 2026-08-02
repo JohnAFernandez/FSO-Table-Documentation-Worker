@@ -1380,7 +1380,7 @@ pub async fn update_item(mut req: Request, ctx: RouteContext<()>) -> worker::Res
                             }
 
                             if item.table_index != "~!*$%" {
-                                match db_generic_update_query(&Table::FsoItems, 7, &item.table_id.to_string(), &item.item_id.to_string(),  &ctx).await {
+                                match db_generic_update_query(&Table::FsoItems, 7, &item.table_index.to_string(), &item.item_id.to_string(),  &ctx).await {
                                     Ok(_) => item_update_action_string += &format!("\"table_index\":\"{}\"", item.table_id),
                                     Err(e) => {
                                         item_update_error_string += &"Could not update table index due to: ".to_string();
